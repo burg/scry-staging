@@ -1,0 +1,6 @@
+[submodule "WebKit"]
+	path = OpenSource
+	url = git://git.webkit.org/WebKit.git
+[submodule "OpenSource"]
+	path = OpenSource
+	url = git://git.webkit.org/WebKit.git

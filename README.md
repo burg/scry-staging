@@ -1,7 +1,4 @@
-This is a staging repository for work on the WEB_REPLAY feature in
-WebKit. It's used to create demos and prototypes without being blocked
-on reviews, while also helping to consolidate stable implementation
-pieces into patches to be submitted upstream.
+This is a staging repository for work on the element tracking research prototype, codenamed Scry. It's used to keep a fairly clean set of patches on top of WebKit trunk, allowing close tracking of upstream progress.
 
 The repository contains a patch series under version control, as well
 as a WebKit repository submodule at a particular version to which the
@@ -9,15 +6,11 @@ patches should be applied. This allows patches to be based on a
 specific commit of WebKit, and to be updated as that base commit
 catches up to the master branch of the WebKit git repository.
 
-The patch series is split into different directories, so that forks
-which add patches to the repository do not have to worry about patch
-numberings changing in the original replay-staging repository.
-
 ---
 
 # Getting
 
-    git clone git://github.com/burg/replay-staging.git
+    git clone git://github.com/burg/scry-staging.git
 
 Then follow the steps below for updating.
 
@@ -89,9 +82,5 @@ fail to apply.
                    # (git://git.webkit.org/WebKit.git)
 
     patches/       # Base directory for all patches.
-        replay/    # Contains replay infrastructure patches.
-    other_dir/ # See note [1]
+        scry/    # Contains element tracking feature patches.
 ```
-
-[1] Forks of this repository should use a separate patch directory if
-they merely build on top of the replay infrastructure patches.

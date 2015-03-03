@@ -1,0 +1,224 @@
+From ba426911cca722d4e48ec09198332e25ca4bb9a0 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Mon, 2 Mar 2015 14:55:06 -0800
+Subject: [PATCH] [Scry] Allow two 1-element snapshot stacks to be selected at
+ a time.
+
+---
+ .../Views/ElementTrackingTimelineOverviewGraph.js  | 41 ++++++++++++++++++++++
+ .../UserInterface/Views/TimelineRecordStack.css    |  6 ++++
+ .../UserInterface/Views/TimelineRecordStack.js     | 21 ++++++++++-
+ 3 files changed, 67 insertions(+), 1 deletion(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+index 3cd99b5..c2f7a2b 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+@@ -22,26 +22,30 @@
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementTrackingTimelineOverviewGraph = function(timeline)
+ {
+     WebInspector.TimelineOverviewGraph.call(this, timeline);
+ 
+     this.element.classList.add(WebInspector.ElementTrackingTimelineOverviewGraph.StyleClassName);
+ 
++    this.element.addEventListener("click", this._timelineGraphClicked.bind(this));
++
+     this.representedObject = timeline;
+     this.representedObject.addEventListener(WebInspector.Timeline.Event.RecordAdded, this._timelineRecordAdded, this);
+ 
+     this._timelineRecordBars = [];
+     this._timelineRecordStacks = [];
+ 
++    this._selectedRecords = [];
++
+     this.reset();
+ };
+ 
+ WebInspector.ElementTrackingTimelineOverviewGraph.StyleClassName = "element-tracking";
+ 
+ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+     constructor: WebInspector.ElementTrackingTimelineOverviewGraph,
+     __proto__: WebInspector.TimelineOverviewGraph.prototype,
+ 
+     // Public
+@@ -91,26 +95,63 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+         {
+             var stack = this._timelineRecordStacks[stackIndex];
+             if (!stack)
+                 stack = this._timelineRecordStacks[stackIndex] = new WebInspector.TimelineRecordStack(records);
+             else {
+                 stack.records = records;
+             }
+             stack.refresh(this);
+             if (!stack.element.parentNode)
+                 this.element.appendChild(stack.element);
++
++            if (records.length !== 1)
++                stack.selected = false;
++            else if (this._selectedRecords.indexOf(records[0]) !== -1)
++                stack.selected = true;
++            else
++                stack.selected = false;
++
+             ++stackIndex;
+         }
+ 
+         WebInspector.TimelineRecordStack.createStacksForVisibleRecords(this.representedObject.snapshotRecords, secondsPerPixel, this, createStack.bind(this));
+         // Neuter any remaining objects not used in this layout iteration.
+         for (; stackIndex < this._timelineRecordStacks.length; ++stackIndex)
+             this._timelineRecordStacks[stackIndex].records = null;
+     },
+ 
+     // Private
+ 
+     _timelineRecordAdded: function(event)
+     {
+         this.needsLayout();
++    },
++
++    _timelineGraphClicked: function(event)
++    {
++        if (event.target.classList.contains(WebInspector.TimelineRecordStack.StyleClassName))
++            this._recordStackClicked(event);
++    },
++
++    _recordStackClicked: function(event)
++    {
++        var recordStack = event.target.recordStack;
++        console.assert(recordStack instanceof WebInspector.TimelineRecordStack, recordStack);
++
++        // Can only select if it represents a single snapshot.
++        if (recordStack.records.length !== 1)
++            return;
++
++        var selectedRecord = recordStack.records[0];
++
++        var foundIndex = this._selectedRecords.indexOf(selectedRecord);
++        if (foundIndex !== -1)
++            this._selectedRecords.splice(foundIndex, 1);
++
++        if (this._selectedRecords.length > 1)
++            this._selectedRecords = [];
++
++        this._selectedRecords.push(selectedRecord);
++
++        this.needsLayout();
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
+index df2cc26..a015df1 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
+@@ -27,20 +27,26 @@
+ .timeline-record-stack {
+     position: absolute;
+     height: 36px;
+     background-color: rgba(200, 200, 200, 0.8);
+     z-index: 10;
+     min-width: 48px;
+     border-left: 1px solid rgb(200, 200, 200);
+     border-right: 1px solid rgb(200, 200, 200);
+ }
+ 
++.timeline-record-stack.selected {
++    border-left: 2px solid rgb(150, 150, 150);
++    border-right: 2px solid rgb(150, 150, 150);
++    background-color: rgb(200, 200, 200);
++}
++
+ .timeline-record-stack-counter {
+     position: absolute;
+     bottom: 2px;
+     right: 1px;
+     height: 13px;
+ 
+     background-color: rgb(150, 150, 150);
+     color: rgb(255, 255, 255);
+     border-radius: 4px;
+     font-size: 9px;
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
+index 3abad47..ef291af 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
+@@ -21,33 +21,39 @@
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.TimelineRecordStack = function(records)
+ {
+     WebInspector.Object.call(this);
+ 
++    this._isSelected = false;
++
+     this._element = document.createElement("div");
+     this._element.classList.add(WebInspector.TimelineRecordStack.StyleClassName);
++
+     this._counterElement = document.createElement("span");
+     this._counterElement.classList.add(WebInspector.TimelineRecordStack.CounterStyleClassName);
+-    this._element.appendChild(this._counterElement);
+ 
++    this._element.recordStack = this;
++
++    // Set this last, since it triggers relayout using the above elements.
+     this.records = records;
+ };
+ 
+ WebInspector.Object.addConstructorFunctions(WebInspector.TimelineRecordStack);
+ 
+ WebInspector.TimelineRecordStack.StyleClassName = "timeline-record-stack";
+ WebInspector.TimelineRecordStack.CounterStyleClassName = "timeline-record-stack-counter";
++WebInspector.TimelineRecordStack.SelectedStyleClassName = "selected";
+ WebInspector.TimelineRecordStack.MinimumWidthPixels = 48;
+ WebInspector.TimelineRecordStack.MinimumMarginPixels = 2;
+ 
+ WebInspector.TimelineRecordStack.createStacksForVisibleRecords = function(records, secondsPerPixel, graphDataSource, createStackCallback)
+ {
+     if (!records.length)
+         return;
+ 
+     var startTime = graphDataSource.startTime;
+     var currentTime = graphDataSource.currentTime;
+@@ -159,20 +165,33 @@ WebInspector.TimelineRecordStack.prototype = {
+ 
+         this._records = records;
+ 
+         // Assume all records are the same type.
+         if (this._records.length)
+             this._element.classList.add(this._records[0].type);
+         else // Tear down any unused DOM.
+             this._element.remove();
+     },
+ 
++    get selected()
++    {
++        return this._isSelected;
++    },
++
++    set selected(value)
++    {
++        console.assert(!value || this._records.length === 1, this);
++
++        this._isSelected = !!value;
++        this._element.classList.toggle(WebInspector.TimelineRecordStack.SelectedStyleClassName, value);
++    },
++
+     refresh: function(graphDataSource)
+     {
+         if (!this._records || !this._records.length)
+             return false;
+ 
+         var firstRecord = this._records[0];
+         var barStartTime = firstRecord.startTime;
+ 
+         // If this bar has no time info, return early.
+         if (isNaN(barStartTime))
+-- 
+2.2.2
+

@@ -1,4 +1,4 @@
-From 55a430cf6513d939ac6d3e6bac962589b6fb61d2 Mon Sep 17 00:00:00 2001
+From 24347182e9bfdbb73dceb660899849adb1ce51b1 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 23 Jan 2015 15:03:00 -0800
 Subject: [PATCH] Basic prototype for capturing element snapshots.
@@ -25,7 +25,7 @@ the old one if its bounding box is different (changed size or position).
  Source/WebCore/inspector/InspectorTimelineAgent.h  |   3 +-
  Source/WebCore/platform/graphics/ImageBuffer.cpp   |  32 ++++
  Source/WebCore/platform/graphics/ImageBuffer.h     |   2 +
- .../Localizations/en.lproj/localizedStrings.js     | Bin 58214 -> 58320 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 58528 -> 58634 bytes
  Source/WebInspectorUI/UserInterface/Base/Main.js   |   3 +
  .../UserInterface/Controllers/DOMTracingManager.js |  79 ++++++++
  Source/WebInspectorUI/UserInterface/Main.html      |   3 +
@@ -907,10 +907,10 @@ index cc6e10f..c599f6c 100644
  
      // Cross-agents API
 diff --git a/Source/WebCore/inspector/InspectorTimelineAgent.cpp b/Source/WebCore/inspector/InspectorTimelineAgent.cpp
-index 1a4d6e7..0b55911 100644
+index b4886de..81b6dc6 100644
 --- a/Source/WebCore/inspector/InspectorTimelineAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorTimelineAgent.cpp
-@@ -326,27 +326,34 @@ void InspectorTimelineAgent::willRecalculateStyle(Frame* frame)
+@@ -329,27 +329,34 @@ void InspectorTimelineAgent::willRecalculateStyle(Frame* frame)
  void InspectorTimelineAgent::didRecalculateStyle()
  {
      didCompleteCurrentRecord(TimelineRecordType::RecalculateStyles);
@@ -947,7 +947,7 @@ index 1a4d6e7..0b55911 100644
  
  void InspectorTimelineAgent::didScroll()
  {
-@@ -683,26 +690,16 @@ void InspectorTimelineAgent::pushCurrentRecord(RefPtr<InspectorObject>&& data, T
+@@ -686,26 +693,16 @@ void InspectorTimelineAgent::pushCurrentRecord(RefPtr<InspectorObject>&& data, T
  {
      pushCurrentRecord(createRecordEntry(WTF::move(data), type, captureCallStack, frame));
  }
@@ -1108,26 +1108,25 @@ index 08ead67..5d2cac6 100644
      
      String toDataURL(const String& mimeType, const double* quality = 0, CoordinateSystem = LogicalCoordinateSystem) const;
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index c60752bb362555caee375c6fcbc5042708b21b91..6738b31aa30a4a66acff9904e5b2f550809c7339 100644
+index f01dfaaface6ee6cb29512393483021088c8e8ce..0d63479c9ff317a1ac25ddb8e07f1034653ed750 100644
 GIT binary patch
-delta 465
-zcmaEMjQPTGX3qcr$`}$EiWn3oZcyB)tt!mPAfuqlP|P5!Fga2<8Nu6pRJhlanL$lq
-za;T>!m~Qm^tPWSK#1PA%z+el+N(`<HDGZqmB|tXZsKx+`$-ePYo8Nj#b1?&jCpU&V
-zGK1{!57kHEzm4z(^XtQamLbW*_&|9{p#CI=9EMbeJfKCo47m*XKsptw8jmc@Z1xCQ
-z6tiJ`nEdGoc@%jVA0}@bX^tWf<G+n?n|wc-ZL@yV_fkZ_P1e6)io#Qwd{tOuviv2E
-z$*C77O<s9}XLI~T5f1ibhHPMnxlVS7m*frsMo1z9SY+}&FU!rjHz#u<nPLA}WwNdw
-O7Y96e?H{W%G5`Sd8FO3!
+delta 404
+zcmZ2*lDX>?Gw1(*WekZ7MGOiPHz;n@Ru$%CkWo-&C}xmVm>embjNolPDlBfs%%G+)
+z`M#$nn0EBhnQZQL9H9g#BgO&O?dW5%Io8{hiy3I(WbQCWW{{DLQTix+$8cXTe}0%L
+ziad-Dlb;waj3N)?!{sAnQRSh0m^@>oJc>Mw50gJ0X^tWf<2#1CP1cWRoBTRTX!Gf)
+zsbxr>&Ae!e!c*CN`r;!F)?|ik28GFf-qO4wz)($O0P`7KCqHmE-@N?RWKJYKoO*hQ
+L;HrG0&d2}&G?8E|
 
-delta 540
-zcmca`ocY-?X0Ct#8Oj(E8HyMbCO5JwZq!m0=2VbjP-Q4qkY$)0A)G7%=P59h02L-N
-z<S?X8cGS?Fyg-y~GLNv><OUI^%~2xXO_&taCO`BLpKRwT3}PM()1AD=^Ed}gKTu8#
-z!8sUaIoT&(YI0w^)#Ms)o5>pjr8d`icXKiWl}~O6bz}xv?-!~M<Ff(z3Jk@Q3(pu&
-zzThhk7Oo33MNtOiqbZXFng(_-Lmop4gDyiZLq3pBg_<pcQx?f4WuT%0ptfR$OrZZW
-zfvh|RE1*--fb0r}RE89&VQNIELoycZfm0FkC>{Xv(LBJUAT#-(zwl(gNL83hBq3zQ
-v3Nd1n6QYDRJ48J#MT$Ya3#KSMmCX|_JmT1V=VmV_A~M+Z^pF&-c&rWp(cg^t
+delta 463
+zcmeA=#k}AoGuOZW3}p<73`GnIlN(tTH)^R0b1KL%s4^5Q$TCch5Kb0?^As3LfC`fs
+zawb2t(4V|Olx;GPu-N1V5vR>jB8{fZ3Th0K?|Eu6DX2|;=%+jRfG5XfJFop}aP3MA
+zu?z|fwm_`J;L4D~kO?$S0VWI7VmbN1EuP8y!uck@ao5_s!22U7Gf;LiSC}I+&?%Fm
+z^pUxf9m0LV{CQzOn-S7bE=XDus2k{5hE#?;pl!MgxeWP0Iu)WAw<O%;2@$f$CPTR}
+z=}D3DNU~5KNRmlGX7a%R;mJ25RiO&dM1YFiCU1ymoBS$DX!EJ4sbxsvopI3=g{QLl
+a)Wt^}o5gPTaw3VZd7_KLQ(?Ad-~s^J`*j`w
 
 diff --git a/Source/WebInspectorUI/UserInterface/Base/Main.js b/Source/WebInspectorUI/UserInterface/Base/Main.js
-index 21c57f9..83d5630 100644
+index 95b8f9c..bf5ca58 100644
 --- a/Source/WebInspectorUI/UserInterface/Base/Main.js
 +++ b/Source/WebInspectorUI/UserInterface/Base/Main.js
 @@ -59,20 +59,22 @@ WebInspector.loaded = function()

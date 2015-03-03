@@ -1,4 +1,4 @@
-From 3dd6b0f0981481534b6ede04e6cee7fe35cc02f4 Mon Sep 17 00:00:00 2001
+From 74fa5e1ab6b7e3edc77012dab6757289f50723ae Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 12 Feb 2015 18:55:51 -0800
 Subject: [PATCH] Start collecting trace operations for attribute modify/remove
@@ -12,7 +12,7 @@ Subject: [PATCH] Start collecting trace operations for attribute modify/remove
  .../WebCore/inspector/InspectorDOMTracingAgent.cpp |  72 ++++++++++++++
  .../WebCore/inspector/InspectorDOMTracingAgent.h   |   8 ++
  .../WebCore/inspector/InspectorInstrumentation.cpp |   4 +
- .../Localizations/en.lproj/localizedStrings.js     | Bin 58618 -> 59098 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 58932 -> 59412 bytes
  .../UserInterface/Controllers/DOMTracingManager.js |  36 +++++++
  .../UserInterface/Controllers/TimelineManager.js   |  64 ++++++------
  Source/WebInspectorUI/UserInterface/Main.html      |   1 +
@@ -89,10 +89,10 @@ index acfcb83..62a4df8 100644
      ]
  }
 diff --git a/Source/WebCore/WebCore.xcodeproj/project.pbxproj b/Source/WebCore/WebCore.xcodeproj/project.pbxproj
-index 605d1bf..dca3d35 100644
+index 45bb7dc..a7474a1 100644
 --- a/Source/WebCore/WebCore.xcodeproj/project.pbxproj
 +++ b/Source/WebCore/WebCore.xcodeproj/project.pbxproj
-@@ -5560,20 +5560,22 @@
+@@ -5561,20 +5561,22 @@
  		C375D7FD16639519006184AB /* TypeAhead.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C375D7FB16639519006184AB /* TypeAhead.cpp */; };
  		C375D7FE16639519006184AB /* TypeAhead.h in Headers */ = {isa = PBXBuildFile; fileRef = C375D7FC16639519006184AB /* TypeAhead.h */; settings = {ATTRIBUTES = (Private, ); }; };
  		C37CDEBD149EF2030042090D /* ColorChooserClient.h in Headers */ = {isa = PBXBuildFile; fileRef = C37CDEBC149EF2030042090D /* ColorChooserClient.h */; settings = {ATTRIBUTES = (Private, ); }; };
@@ -115,7 +115,7 @@ index 605d1bf..dca3d35 100644
  		C4E657FE1A97FBED00479C15 /* InspectorStyleRuleSet.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F71A97FBED00479C15 /* InspectorStyleRuleSet.h */; };
  		C4E657FF1A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C4E657F81A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp */; };
  		C4E658001A97FBED00479C15 /* InspectorStylesheetRuleSet.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F91A97FBED00479C15 /* InspectorStylesheetRuleSet.h */; };
-@@ -13036,20 +13038,22 @@
+@@ -13037,20 +13039,22 @@
  		C348612215FDE21E007A1CC9 /* InputTypeNames.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InputTypeNames.h; sourceTree = "<group>"; };
  		C375D7FB16639519006184AB /* TypeAhead.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TypeAhead.cpp; sourceTree = "<group>"; };
  		C375D7FC16639519006184AB /* TypeAhead.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TypeAhead.h; sourceTree = "<group>"; };
@@ -138,7 +138,7 @@ index 605d1bf..dca3d35 100644
  		C4E657F51A97FBED00479C15 /* InspectorStyleRule.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStyleRule.h; sourceTree = "<group>"; };
  		C4E657F61A97FBED00479C15 /* InspectorStyleProperty.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStyleProperty.h; sourceTree = "<group>"; };
  		C4E657F71A97FBED00479C15 /* InspectorStyleRuleSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStyleRuleSet.h; sourceTree = "<group>"; };
-@@ -15284,20 +15288,22 @@
+@@ -15285,20 +15289,22 @@
  				A584FE311864D5AF00843B10 /* CommandLineAPIHost.cpp */,
  				A584FE321864D5AF00843B10 /* CommandLineAPIHost.h */,
  				A584FE331864D5AF00843B10 /* CommandLineAPIHost.idl */,
@@ -161,7 +161,7 @@ index 605d1bf..dca3d35 100644
  				82AB1741124B99EC00C5069D /* InspectorCSSAgent.cpp */,
  				82AB1742124B99EC00C5069D /* InspectorCSSAgent.h */,
  				C4E657F11A97F7A700479C15 /* InspectorCSSId.h */,
-@@ -24141,20 +24147,21 @@
+@@ -24143,20 +24149,21 @@
  				93D3C1590F97A9D70053C013 /* DOMHTMLCanvasElement.h in Headers */,
  				93F9B6580BA0F35E00854064 /* DOMHTMLCanvasElementInternal.h in Headers */,
  				85DF2F8E0AA3C88100AD64C5 /* DOMHTMLCollection.h in Headers */,
@@ -183,7 +183,7 @@ index 605d1bf..dca3d35 100644
  				85E711A70AC5D5350053270F /* DOMHTMLElementInternal.h in Headers */,
  				8540756A0AD6CBF900620C57 /* DOMHTMLEmbedElement.h in Headers */,
  				855247D00AD850B80012093B /* DOMHTMLEmbedElementInternal.h in Headers */,
-@@ -28845,20 +28852,21 @@
+@@ -28847,20 +28854,21 @@
  				A83B78FF0CCAFF15000B0825 /* JSSVGFontFaceSrcElement.cpp in Sources */,
  				A83B78FD0CCAFF15000B0825 /* JSSVGFontFaceUriElement.cpp in Sources */,
  				B2FA3D980AB75A6F000E5AC4 /* JSSVGForeignObjectElement.cpp in Sources */,
@@ -648,15 +648,15 @@ index aaecb49..23b0e07 100644
  }
  
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index 7c63138eddb4500984c1049e067809aa0448d025..1e7ababfbc016e2a9dffe721491edce348a84342 100644
+index b48d4cc0b87da4d1431b2fbc23cd769bb3b815cd..e6a58809c8cd96671d49447fd786140a12450109 100644
 GIT binary patch
-delta 160
-zcmex$lKIwI<_$k&COgOo@G3C)GUPL)Fk~{MF=S4DC@wrXPDX$mNpy0cpW$RX8KKGd
-zuE|V}kr4vQ1u>*D<N|e-O>X4WpIjizw)u~YjxDDrLmophP^xG$W2^Aw2eAT3B8IJo
-jlNDmbCMQG*ZFY!CW1IZoniN<G!mNWK_M4X_gtPzvF!(X<
+delta 137
+zcmdmThIz^b<_$k&COgOoa4RtQGUPL)Fk~{MO`hl{JUK>2h!;tWA#-vgr~YI+8KKD%
+zH)KGvldfA$E|6v0{6}V+EvF|#9z!uhDnrp^!JWdB--QVvi3DCSoV*}jZ1Srpq0OhF
+W(%2?T-H-w)nap(EVzWY`NGkw~axItu
 
-delta 32
-qcmV+*0N?-G%>(+$1F-lUv+x}-J(HeY29wTP60@#bW(Ko{VpN0>qYqyI
+delta 24
+gcmbPofqBar<_$k&Hh+-aWxH7+rjBj1Kr%}!0G8zn$N&HU
 
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
 index a2c48ba..e207d62 100644

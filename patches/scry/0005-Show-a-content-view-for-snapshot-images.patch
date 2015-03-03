@@ -1,4 +1,4 @@
-From 6e88b1e6f885170d08ff0bd43aeaa6457dc7dc4d Mon Sep 17 00:00:00 2001
+From a8b5c84cab3c5a632c5511ded38a6a22b1480bca Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 21:44:02 -0800
 Subject: [PATCH] Show a content view for snapshot images.
@@ -15,10 +15,10 @@ Subject: [PATCH] Show a content view for snapshot images.
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
 
 diff --git a/Source/WebInspectorUI/UserInterface/Base/Main.js b/Source/WebInspectorUI/UserInterface/Base/Main.js
-index 83d5630..67aef8c 100644
+index bf5ca58..1c3a2c4 100644
 --- a/Source/WebInspectorUI/UserInterface/Base/Main.js
 +++ b/Source/WebInspectorUI/UserInterface/Base/Main.js
-@@ -387,21 +387,24 @@ WebInspector.sidebarPanelForRepresentedObject = function(representedObject)
+@@ -388,21 +388,24 @@ WebInspector.sidebarPanelForRepresentedObject = function(representedObject)
      if (representedObject instanceof WebInspector.Frame || representedObject instanceof WebInspector.Resource ||
          representedObject instanceof WebInspector.Script || representedObject instanceof WebInspector.ContentFlow)
          return this.resourceSidebarPanel;

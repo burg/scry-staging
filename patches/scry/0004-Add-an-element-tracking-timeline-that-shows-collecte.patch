@@ -1,11 +1,11 @@
-From f1aa109bc995673103e14b5d9a984d6163a962f9 Mon Sep 17 00:00:00 2001
+From 0416c76548010d7ea98954439590f6bd370ac39e Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 09:45:51 -0800
 Subject: [PATCH] Add an element tracking timeline that shows collected
  snapshots.
 
 ---
- .../Localizations/en.lproj/localizedStrings.js     | Bin 58320 -> 58618 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 58634 -> 58932 bytes
  .../UserInterface/Controllers/DOMTracingManager.js |  19 +-
  .../UserInterface/Controllers/TimelineManager.js   |   3 +-
  Source/WebInspectorUI/UserInterface/Main.html      |   6 +
@@ -35,15 +35,15 @@ Subject: [PATCH] Add an element tracking timeline that shows collected
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js
 
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index 6738b31aa30a4a66acff9904e5b2f550809c7339..7c63138eddb4500984c1049e067809aa0448d025 100644
+index 0d63479c9ff317a1ac25ddb8e07f1034653ed750..b48d4cc0b87da4d1431b2fbc23cd769bb3b815cd 100644
 GIT binary patch
 delta 144
-zcmca`ocY&D<_$9vCU5ZJ;}2mdVn}32X2@p9WXNMkpS&<gmJ=>EIWfg}^NfTNYui$W
-z5{3c>5UIf6%#Z=p0#wY9%8<gK#1IP<vjt)$27j;$40V$mIrTSl&Dmx$IZBRaa?C}J
-S$zr`)lP6r_*nHrEfG_}-`Y4zH
+zcmeA=#k}PV^9H5F$pPLx+zJdK3`Goy49N`HlP5X|Pu>?Uz=;qMlr!9{kmzS)Tgp(v
+zP{05p6&RcuGJqQL7}6P18B!RO7-E59wm_`J;15=Tp>A>`r~c-gxqT*+qvUud`&{Li
+Sd@M_AvcNTt&A%=R2m=6{(I)Ev
 
-delta 24
-gcmex$lKH}M<_$9vHuEKxSa1F?XN$?^R~H3@0i%ozk^lez
+delta 36
+ucmV+<0Nekx%ma$b1F#}tvzTE_JhM`sj5L$T(~^@6+YFPg)CRN2(`*t%DG|~D
 
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
 index 49203aa..215ce07 100644

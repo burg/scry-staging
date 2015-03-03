@@ -1,4 +1,4 @@
-From 6e42c530cda00d58b90e799c18cd1d660c5530f8 Mon Sep 17 00:00:00 2001
+From 2c4c50cfca45fe36f133ea7b400836119ea9fc17 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 13 Feb 2015 15:10:21 -0800
 Subject: [PATCH] For each trace operation, include relationship to target
@@ -15,7 +15,7 @@ Some things to look at:
  .../WebCore/inspector/ElementTraceOperations.cpp   |  16 +++++++++
  Source/WebCore/inspector/ElementTraceOperations.h  |  15 ++++++++
  .../WebCore/inspector/InspectorDOMTracingAgent.cpp |  31 +++++++++++++++-
- .../Localizations/en.lproj/localizedStrings.js     | Bin 59098 -> 59646 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 59412 -> 59960 bytes
  .../UserInterface/Controllers/DOMTracingManager.js |  26 ++++++++++++--
  .../UserInterface/Models/ElementSnapshot.js        |   1 -
  .../Models/TraceOperationTimelineRecord.js         |  39 ++++++++++++++++++++-
@@ -325,16 +325,17 @@ index 1e67e91..b432b53 100644
  
  } // namespace Inspector
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index 1e7ababfbc016e2a9dffe721491edce348a84342..bfe86546e17532581740baac6581e884f4bd6604 100644
+index e6a58809c8cd96671d49447fd786140a12450109..74ed863039a68687a23e145622861480847d243f 100644
 GIT binary patch
-delta 293
-zcmcb0migaB<_&&gipdPA48;s34EYR23`z{K3<?akK&-^z$dJbXmYb~DXgGO+D9dI)
-zv2W^=rvwS`A}e#5JTXXkvYD;k<Tg8#$?KeWCjYZz+uUWR;iBsaG*^Kkgdq`VayrnK
-z5)|{%WG4&q>rQ^sq_O!{laB;r-ekr}!ay={lHq2x*<wQ8i9p?%KsV+AO$50Wx4A(;
-zn{t45;#3c|DPbkcW~;Tgq*yZ<k{EI(3n~b+1_Lcfnk;zQbh6nAvCUd1Hpl@0L1IZ-
+delta 273
+zcmbPofqBOj<_&&gs>uwg48;s34EYR23`z{K3<?akK&-^z$dJbXmz(TZr8{|nD9dI)
+zu?CIFQ~U%bm)Qt_>18&0lMC!wCX3h`Og`hxvzgCc&qdo4Xrcl`2ty*!%ygjnB`7AN
+z$WESkNq@6VvybFt5jO#5KZg9tjd%4Yf0)d&xnqu)kY^%LZzj-fc|h|(Zp3YB5YV0+
+opp7`xgY22SVKd9-IqNn_F=sL)P1Zjn&X_rQzM|=7pOYu#0OoZ_jQ{`u
 
-delta 39
-xcmV+?0NDTj(F5Ae1F%jOv!oXGC$soIZbY-dgLD|PdYl##vktG=8nZac#vYF+6C?lt
+delta 51
+zcmV-30L=fm)B}{z1F%jOv!oV)D3ioLG?Rct470*NE=03RgiIN;+?^H@vv9Dm8k3aE
+J7PE-UupUg47bXAz
 
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
 index e207d62..3422942 100644

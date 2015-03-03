@@ -1,4 +1,4 @@
-From 6e4e033464499ce2bfb94eb5ad8d81421e90b20d Mon Sep 17 00:00:00 2001
+From 9f1d9a08737177ad63759c5613930f1992c82857 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 27 Feb 2015 11:09:08 -0800
 Subject: [PATCH] [Scry] Collect and dump target element's effective properties

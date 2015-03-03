@@ -1,4 +1,4 @@
-From 3d2136f57444de92a57be63d245442ada7c5a180 Mon Sep 17 00:00:00 2001
+From 8744873817b59e37c40b8404b3d5a71b130936a3 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 15 Jan 2015 13:51:04 -0800
 Subject: [PATCH] Stub out an agent for new DOMTracing domain.
@@ -103,10 +103,10 @@ index 32898c7..dfbca65 100644
      inspector/InspectorLayerTreeAgent.cpp
      inspector/InspectorNodeFinder.cpp
 diff --git a/Source/WebCore/WebCore.xcodeproj/project.pbxproj b/Source/WebCore/WebCore.xcodeproj/project.pbxproj
-index b1141dc..605d1bf 100644
+index 703a9f5..45bb7dc 100644
 --- a/Source/WebCore/WebCore.xcodeproj/project.pbxproj
 +++ b/Source/WebCore/WebCore.xcodeproj/project.pbxproj
-@@ -5558,20 +5558,22 @@
+@@ -5559,20 +5559,22 @@
  		C348612315FDE21E007A1CC9 /* InputTypeNames.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C348612115FDE21E007A1CC9 /* InputTypeNames.cpp */; };
  		C348612415FDE21E007A1CC9 /* InputTypeNames.h in Headers */ = {isa = PBXBuildFile; fileRef = C348612215FDE21E007A1CC9 /* InputTypeNames.h */; };
  		C375D7FD16639519006184AB /* TypeAhead.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C375D7FB16639519006184AB /* TypeAhead.cpp */; };
@@ -129,7 +129,7 @@ index b1141dc..605d1bf 100644
  		C4E657FE1A97FBED00479C15 /* InspectorStyleRuleSet.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F71A97FBED00479C15 /* InspectorStyleRuleSet.h */; };
  		C4E657FF1A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C4E657F81A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp */; };
  		C4E658001A97FBED00479C15 /* InspectorStylesheetRuleSet.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F91A97FBED00479C15 /* InspectorStylesheetRuleSet.h */; };
-@@ -13034,20 +13036,22 @@
+@@ -13035,20 +13037,22 @@
  		C348612215FDE21E007A1CC9 /* InputTypeNames.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InputTypeNames.h; sourceTree = "<group>"; };
  		C375D7FB16639519006184AB /* TypeAhead.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TypeAhead.cpp; sourceTree = "<group>"; };
  		C375D7FC16639519006184AB /* TypeAhead.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TypeAhead.h; sourceTree = "<group>"; };
@@ -152,7 +152,7 @@ index b1141dc..605d1bf 100644
  		C4E657F71A97FBED00479C15 /* InspectorStyleRuleSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStyleRuleSet.h; sourceTree = "<group>"; };
  		C4E657F81A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = InspectorStylesheetRuleSet.cpp; sourceTree = "<group>"; };
  		C4E657F91A97FBED00479C15 /* InspectorStylesheetRuleSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStylesheetRuleSet.h; sourceTree = "<group>"; };
-@@ -15301,20 +15305,22 @@
+@@ -15302,20 +15306,22 @@
  				7AB0B1BF1211A62200A76940 /* InspectorDatabaseAgent.h */,
  				F3F5CF1212ED81B30084C569 /* InspectorDatabaseInstrumentation.h */,
  				41F062130F5F192600A07EAC /* InspectorDatabaseResource.cpp */,
@@ -175,7 +175,7 @@ index b1141dc..605d1bf 100644
  				7A54857D14E02D51006AE05A /* InspectorHistory.cpp */,
  				7A54857E14E02D51006AE05A /* InspectorHistory.h */,
  				7ACD88D114C08BD60084EDD2 /* InspectorIndexedDBAgent.cpp */,
-@@ -24714,20 +24720,21 @@
+@@ -24716,20 +24722,21 @@
  				A871DB250A150BD600B12A68 /* HTMLTableSectionElement.h in Headers */,
  				D66817FB166FE6D700FA07B4 /* HTMLTemplateElement.h in Headers */,
  				A81369D6097374F600D74463 /* HTMLTextAreaElement.h in Headers */,
@@ -197,7 +197,7 @@ index b1141dc..605d1bf 100644
  				862F12A018C1DD02005C54AF /* HysteresisActivity.h in Headers */,
  				B275356E0B053814002CE64F /* Icon.h in Headers */,
  				97E4029013A696ED00913D67 /* IconController.h in Headers */,
-@@ -29396,20 +29403,21 @@
+@@ -29398,20 +29405,21 @@
  				3571883EEF618793751E4089 /* RenderMathMLMenclose.cpp in Sources */,
  				439046DF12DA25E800AF80A2 /* RenderMathMLOperator.cpp in Sources */,
  				439046DF12DA25E800BF80A3 /* RenderMathMLRadicalOperator.cpp in Sources */,

@@ -1,0 +1,258 @@
+From f80fb3c21c1904e5863efebd3e0a132f565f8fe9 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Wed, 4 Mar 2015 17:34:20 -0800
+Subject: [PATCH] [Scry] TimelineViews should be updated with current time and
+ filters if they are selected (even if not displayed in the view container).
+
+---
+ .../UserInterface/Views/NavigationSidebarPanel.js  |  4 +-
+ .../Views/TimelineRecordingContentView.js          | 50 ++++++++++++----------
+ 2 files changed, 30 insertions(+), 24 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Views/NavigationSidebarPanel.js b/Source/WebInspectorUI/UserInterface/Views/NavigationSidebarPanel.js
+index 4a1f930..642f61c 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/NavigationSidebarPanel.js
++++ b/Source/WebInspectorUI/UserInterface/Views/NavigationSidebarPanel.js
+@@ -514,22 +514,22 @@ WebInspector.NavigationSidebarPanel.prototype = {
+             this.applyFiltersToTreeElement(currentTreeElement);
+             currentTreeElement = currentTreeElement.traverseNextTreeElement(false, null, dontPopulate);
+         }
+ 
+         this._checkForEmptyFilterResults();
+         this._updateContentOverflowShadowVisibility();
+ 
+         // Filter may have hidden the selected resource in the timeline view, which should now notify its listeners.
+         if (selectedTreeElement && selectedTreeElement.hidden !== selectionWasHidden) {
+             var currentContentView = WebInspector.contentBrowser.currentContentView;
+-            if (currentContentView instanceof WebInspector.TimelineRecordingContentView && typeof currentContentView.currentTimelineView.filterUpdated === "function")
+-                currentContentView.currentTimelineView.filterUpdated();
++            if (currentContentView instanceof WebInspector.TimelineRecordingContentView && typeof currentContentView.timelineViewForSelectedTimeline.filterUpdated === "function")
++                currentContentView.timelineViewForSelectedTimeline.filterUpdated();
+         }
+     },
+ 
+     _treeElementAddedOrChanged: function(treeElement)
+     {
+         // Don't populate if we don't have any active filters.
+         // We only need to populate when a filter needs to reveal.
+         var dontPopulate = !this._filterBar.hasActiveFilters();
+ 
+         // Apply the filters to the tree element and its descendants.
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
+index f0d7d0b..1685e17 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
+@@ -158,24 +158,29 @@ WebInspector.TimelineRecordingContentView.prototype = {
+         var currentContentView = this._contentViewContainer.currentContentView;
+         return currentContentView && currentContentView.supportsSave;
+     },
+ 
+     get saveData()
+     {
+         var currentContentView = this._contentViewContainer.currentContentView;
+         return currentContentView && currentContentView.saveData || null;
+     },
+ 
+-    get currentTimelineView()
++    get timelineViewForSelectedTimeline()
+     {
+-        var contentView = this._contentViewContainer.currentContentView;
+-        return (contentView instanceof WebInspector.TimelineView) ? contentView : null;
++        // This could return the timeline view even if it is not currently visible in the view container.
++        // Since this timeline view's content outline could be showing in the timeline sidebar, we need
++        // to keep its current time range, filters, etc in sync even if the data grid is not visible.
++        if (!WebInspector.timelineSidebarPanel.selectedTimeline)
++            return null;
++
++        return this._timelineViewMap.get(WebInspector.timelineSidebarPanel.selectedTimeline);
+     },
+ 
+     shown: function()
+     {
+         this._timelineOverview.shown();
+         this._contentViewContainer.shown();
+         this._clearTimelineNavigationItem.enabled = this._recording.isWritable();
+ 
+         if (!this._updating && WebInspector.timelineManager.activeRecording === this._recording && WebInspector.timelineManager.isCapturing())
+             this._startUpdatingCurrentTime();
+@@ -224,55 +229,56 @@ WebInspector.TimelineRecordingContentView.prototype = {
+ 
+         var currentContentView = this._contentViewContainer.currentContentView;
+         if (currentContentView)
+             currentContentView.updateLayout();
+     },
+ 
+     saveToCookie: function(cookie)
+     {
+         cookie.type = WebInspector.ContentViewCookieType.Timelines;
+ 
+-        var timelineView = this.currentTimelineView;
+-        if (!timelineView) {
++        var visibleView = this._contentViewContainer.currentContentView;
++        if (!visibleView || visibleView === this._overviewTimelineView)
++            cookie[WebInspector.TimelineRecordingContentView.SelectedTimelineTypeCookieKey] = WebInspector.TimelineRecordingContentView.OverviewTimelineViewCookieValue;
++        else if (visibleView.representedObject instanceof WebInspector.Timeline)
++            cookie[WebInspector.TimelineRecordingContentView.SelectedTimelineTypeCookieKey] = visibleView.representedObject.type;
++        else {
+             // FIXME: this does not save container subview state into a cookie. This could be done by saving
+             // that content view's state into the same cookie, possibly using prefixes if collisions could happen.
+-        } else if (timelineView === this._overviewTimelineView)
+-            cookie[WebInspector.TimelineRecordingContentView.SelectedTimelineTypeCookieKey] = WebInspector.TimelineRecordingContentView.OverviewTimelineViewCookieValue;
+-        else if (timelineView.representedObject instanceof WebInspector.Timeline)
+-            cookie[WebInspector.TimelineRecordingContentView.SelectedTimelineTypeCookieKey] = timelineView.representedObject.type;
++        }
+     },
+ 
+     restoreFromCookie: function(cookie)
+     {
+         var timelineType = cookie[WebInspector.TimelineRecordingContentView.SelectedTimelineTypeCookieKey];
+         // FIXME: this does not save container subview state into a cookie. This could be done by saving
+         // that content view's state into the same cookie, possibly using prefixes if collisions could happen.
+         if (!timelineType)
+             return;
+ 
+         if (timelineType === WebInspector.TimelineRecordingContentView.OverviewTimelineViewCookieValue)
+             this.showOverviewTimelineView();
+         else
+             this.showTimelineViewForTimeline(this.representedObject.timelines.get(timelineType));
+     },
+ 
+     filterDidChange: function()
+     {
+-        if (!this.currentTimelineView)
++        if (!this.timelineViewForSelectedTimeline)
+             return;
+ 
+-        this.currentTimelineView.filterDidChange();
++        this.timelineViewForSelectedTimeline.filterDidChange();
+     },
+ 
+     matchTreeElementAgainstCustomFilters: function(treeElement)
+     {
+-        if (this.currentTimelineView && !this.currentTimelineView.matchTreeElementAgainstCustomFilters(treeElement))
++        if (this.timelineViewForSelectedTimeline && !this.timelineViewForSelectedTimeline.matchTreeElementAgainstCustomFilters(treeElement))
+             return false;
+ 
+         var startTime = this._timelineOverview.selectionStartTime;
+         var endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
+         var currentTime = this._currentTime || this._recording.startTime;
+ 
+         function checkTimeBounds(itemStartTime, itemEndTime)
+         {
+             itemStartTime = itemStartTime || currentTime;
+             itemEndTime = itemEndTime || currentTime;
+@@ -316,21 +322,21 @@ WebInspector.TimelineRecordingContentView.prototype = {
+         }
+ 
+         console.error("Unknown TreeElement, can't filter by time.");
+         return true;
+     },
+ 
+     // Private
+ 
+     _currentContentViewDidChange: function(event)
+     {
+-        var timelineView = this.currentTimelineView;
++        var timelineView = this.timelineViewForSelectedTimeline;
+         if (timelineView) {
+             WebInspector.timelineSidebarPanel.contentTreeOutline = timelineView.navigationSidebarTreeOutline;
+             WebInspector.timelineSidebarPanel.contentTreeOutlineLabel = timelineView.navigationSidebarTreeOutlineLabel;
+ 
+             timelineView.startTime = this._timelineOverview.selectionStartTime;
+             timelineView.endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
+             timelineView.currentTime = this._currentTime;
+         }
+ 
+         this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
+@@ -395,29 +401,29 @@ WebInspector.TimelineRecordingContentView.prototype = {
+             for (var timelineView of this._timelineViewMap.values())
+                 timelineView.zeroTime = startTime;
+ 
+             delete this._startTimeNeedsReset;
+         }
+ 
+         this._timelineOverview.endTime = Math.max(endTime, currentTime);
+ 
+         this._currentTime = currentTime;
+         this._timelineOverview.currentTime = currentTime;
+-        if (this.currentTimelineView)
+-            this.currentTimelineView.currentTime = currentTime;
++        if (this.timelineViewForSelectedTimeline)
++            this.timelineViewForSelectedTimeline.currentTime = currentTime;
+ 
+         WebInspector.timelineSidebarPanel.updateFilter();
+ 
+         // Force a layout now since we are already in an animation frame and don't need to delay it until the next.
+         this._timelineOverview.updateLayoutIfNeeded();
+-        if (this.currentTimelineView)
+-            this.currentTimelineView.updateLayoutIfNeeded();
++        if (this.timelineViewForSelectedTimeline)
++            this.timelineViewForSelectedTimeline.updateLayoutIfNeeded();
+     },
+ 
+     _startUpdatingCurrentTime: function()
+     {
+         console.assert(!this._updating);
+         if (this._updating)
+             return;
+ 
+         if (!isNaN(this._currentTime)) {
+             // We have a current time already, so we likely need to jump into the future to a better current time.
+@@ -518,21 +524,21 @@ WebInspector.TimelineRecordingContentView.prototype = {
+         this._timelineCountChanged();
+     },
+ 
+     _timelineRemoved: function(event)
+     {
+         var timeline = event.data.timeline;
+         console.assert(timeline instanceof WebInspector.Timeline, timeline);
+         console.assert(this._timelineViewMap.has(timeline), timeline);
+ 
+         var timelineView = this._timelineViewMap.take(timeline);
+-        if (this.currentTimelineView === timelineView)
++        if (this.timelineViewForSelectedTimeline === timelineView)
+             this.showOverviewTimelineView();
+ 
+         this._pathComponentMap.delete(timeline);
+ 
+         this._timelineCountChanged();
+     },
+ 
+     _timelineCountChanged: function()
+     {
+         var previousPathComponent = null;
+@@ -577,27 +583,27 @@ WebInspector.TimelineRecordingContentView.prototype = {
+     _recordingUnloaded: function(event)
+     {
+         console.assert(!this._updating);
+ 
+         WebInspector.timelineManager.removeEventListener(WebInspector.TimelineManager.Event.CapturingStarted, this._capturingStarted, this);
+         WebInspector.timelineManager.removeEventListener(WebInspector.TimelineManager.Event.CapturingStopped, this._capturingStopped, this);
+     },
+ 
+     _timeRangeSelectionChanged: function(event)
+     {
+-        if (this.currentTimelineView) {
+-            this.currentTimelineView.startTime = this._timelineOverview.selectionStartTime;
+-            this.currentTimelineView.endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
++        if (this.timelineViewForSelectedTimeline) {
++            this.timelineViewForSelectedTimeline.startTime = this._timelineOverview.selectionStartTime;
++            this.timelineViewForSelectedTimeline.endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
+         }
+ 
+         // Delay until the next frame to stay in sync with the current timeline view's time-based layout changes.
+         requestAnimationFrame(function() {
+-            var selectedTreeElement = this.currentTimelineView && this.currentTimelineView.navigationSidebarTreeOutline ? this.currentTimelineView.navigationSidebarTreeOutline.selectedTreeElement : null;
++            var selectedTreeElement = this.timelineViewForSelectedTimeline && this.timelineViewForSelectedTimeline.navigationSidebarTreeOutline ? this.timelineViewForSelectedTimeline.navigationSidebarTreeOutline.selectedTreeElement : null;
+             var selectionWasHidden = selectedTreeElement && selectedTreeElement.hidden;
+ 
+             WebInspector.timelineSidebarPanel.updateFilter();
+ 
+             if (selectedTreeElement && selectedTreeElement.hidden !== selectionWasHidden)
+                 this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
+         }.bind(this));
+     }
+ };
+-- 
+2.2.2
+

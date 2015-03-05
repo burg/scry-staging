@@ -1,4 +1,4 @@
-From a8b5c84cab3c5a632c5511ded38a6a22b1480bca Mon Sep 17 00:00:00 2001
+From 15e3d9aeb65a46ae9a3758f996b5ecddd9b8c2ed Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 21:44:02 -0800
 Subject: [PATCH] Show a content view for snapshot images.
@@ -145,10 +145,10 @@ index 3fdcd1c..7a4216a 100644
 -
 -WebInspector.TimelineManager.prototype.__proto__ = WebInspector.Object.prototype;
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 1c6cb20..aaf41bb 100644
+index 141d9b9..2d3de65 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -381,20 +381,21 @@
+@@ -382,20 +382,21 @@
      <script src="Views/DebuggerSidebarPanel.js"></script>
      <script src="Views/DefaultDashboardView.js"></script>
      <script src="Views/DetailsSection.js"></script>
@@ -171,10 +171,10 @@ index 1c6cb20..aaf41bb 100644
      <script src="Views/FolderTreeElement.js"></script>
      <script src="Views/FontResourceContentView.js"></script>
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ContentView.js b/Source/WebInspectorUI/UserInterface/Views/ContentView.js
-index 4fea660..6119fb2 100644
+index a95091b..24ab03d 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ContentView.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/ContentView.js
-@@ -65,20 +65,23 @@ WebInspector.ContentView = function(representedObject)
+@@ -80,20 +80,23 @@ WebInspector.ContentView = function(representedObject)
  
          if (representedObject instanceof WebInspector.DOMTree)
              return new WebInspector.FrameDOMTreeContentView(representedObject);
@@ -198,7 +198,7 @@ index 4fea660..6119fb2 100644
  
      // Concrete object instantiation.
      console.assert(this.constructor !== WebInspector.ContentView && this instanceof WebInspector.ContentView);
-@@ -119,20 +122,22 @@ WebInspector.ContentView.isViewable = function(representedObject)
+@@ -136,20 +139,22 @@ WebInspector.ContentView.isViewable = function(representedObject)
      if (representedObject instanceof WebInspector.IndexedDatabaseObjectStoreIndex)
          return true;
      if (representedObject instanceof WebInspector.ApplicationCacheFrame)
@@ -273,7 +273,7 @@ index 0000000..64d5cff
 +    __proto__: WebInspector.ContentView.prototype,
 +};
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js
-index 2c7f4df..28e8014 100644
+index dee6dc3..173784e 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js
 @@ -217,26 +217,29 @@ WebInspector.ElementTrackingTimelineView.prototype = {

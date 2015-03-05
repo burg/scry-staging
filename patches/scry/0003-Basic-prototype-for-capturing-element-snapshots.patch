@@ -1,4 +1,4 @@
-From 24347182e9bfdbb73dceb660899849adb1ce51b1 Mon Sep 17 00:00:00 2001
+From e1a44b3bd1d5fc34ca0ba004c08d3cc908cfc966 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 23 Jan 2015 15:03:00 -0800
 Subject: [PATCH] Basic prototype for capturing element snapshots.
@@ -1260,7 +1260,7 @@ index 0000000..49203aa
 +    }
 +};
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 96b5f84..7d38d84 100644
+index 2ec409a..fff68b7 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -181,20 +181,21 @@
@@ -1307,7 +1307,7 @@ index 96b5f84..7d38d84 100644
      <script src="Models/IndexedDatabaseObjectStoreIndex.js"></script>
      <script src="Models/IssueMessage.js"></script>
      <script src="Models/KeyboardShortcut.js"></script>
-@@ -485,20 +487,21 @@
+@@ -486,20 +488,21 @@
      <script src="Controllers/AnalyzerManager.js"></script>
      <script src="Controllers/ApplicationCacheManager.js"></script>
      <script src="Controllers/BasicBlockAnnotator.js"></script>

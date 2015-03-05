@@ -1,4 +1,4 @@
-From 47aea4bc72fe5c55fd2336ec0a0b467a17b79c13 Mon Sep 17 00:00:00 2001
+From 0142d002c9e84156684f964e65456fa97c061890 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Tue, 3 Mar 2015 11:22:41 -0800
 Subject: [PATCH] [Scry] Show element snapshots in the tracking timeline.

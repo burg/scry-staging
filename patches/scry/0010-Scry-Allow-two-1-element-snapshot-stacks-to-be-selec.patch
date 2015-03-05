@@ -1,4 +1,4 @@
-From ba426911cca722d4e48ec09198332e25ca4bb9a0 Mon Sep 17 00:00:00 2001
+From eaffce2f4cac45a019f1ab9d4e5275061bcc478e Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 2 Mar 2015 14:55:06 -0800
 Subject: [PATCH] [Scry] Allow two 1-element snapshot stacks to be selected at

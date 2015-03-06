@@ -1,7 +1,7 @@
-From 0142d002c9e84156684f964e65456fa97c061890 Mon Sep 17 00:00:00 2001
+From 694574ba41e0fe05722bd3a3a0ba4540c5e4779e Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Tue, 3 Mar 2015 11:22:41 -0800
-Subject: [PATCH] [Scry] Show element snapshots in the tracking timeline.
+Subject: [PATCH] Show element snapshots in the tracking timeline.
 
 ---
  .../Views/ElementTrackingTimelineOverviewGraph.js  | 18 +++++++++++++++-
@@ -224,5 +224,5 @@ index ef291af..9ffb76c 100644
      },
  
 -- 
-2.2.2
+2.2.1
 

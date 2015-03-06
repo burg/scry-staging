@@ -1,7 +1,7 @@
-From 051ea21354cdfcad172f34ddf622ea4dfea0113a Mon Sep 17 00:00:00 2001
+From 5a552c1e84e0c76047e44b31f8fe405a571be0ea Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 2 Mar 2015 14:05:51 -0800
-Subject: [PATCH] [Scry] WIP: create TimelineRecordStack elements for snapshot
+Subject: [PATCH] WIP: create TimelineRecordStack elements for snapshot
  records.
 
 TODO: needs better algorithm for placement
@@ -506,5 +506,5 @@ index 0000000..3abad47
 +    }
 +};
 -- 
-2.2.2
+2.2.1
 

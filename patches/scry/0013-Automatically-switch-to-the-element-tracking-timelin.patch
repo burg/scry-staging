@@ -1,8 +1,8 @@
-From ceac1ab6a9cdcc6a659da243b0a7ca630ad7527b Mon Sep 17 00:00:00 2001
+From f853d2e6511025e1825d67a1bf12fa7fb44a87d8 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 4 Mar 2015 16:19:32 -0800
-Subject: [PATCH] [Scry] Automatically switch to the element tracking timeline
- when starting tracking.
+Subject: [PATCH] Automatically switch to the element tracking timeline when
+ starting tracking.
 
 ---
  .../WebInspectorUI/UserInterface/Views/DOMTreeElement.js | 16 ++++++++++++++--
@@ -50,5 +50,5 @@ index 7d4aecb..c099001 100644
              return false;
  
 -- 
-2.2.2
+2.2.1
 

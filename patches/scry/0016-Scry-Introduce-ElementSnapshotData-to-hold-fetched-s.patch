@@ -1,0 +1,168 @@
+From 317761a5daccc3efc99937aff878561f2c243c26 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Thu, 5 Mar 2015 11:06:58 -0800
+Subject: [PATCH] [Scry] Introduce ElementSnapshotData to hold fetched snapshot
+ data.
+
+- This allows ElementSnapshotDiff to reference its data without async waits.
+- It matches explicit "header/payload" patterns used elsewhere (without *Header suffix).
+---
+ .../UserInterface/Models/ElementSnapshot.js        | 57 +++++++++++++---------
+ .../Views/ElementSnapshotContentView.js            |  4 +-
+ .../Views/ElementTrackingTimelineOverviewGraph.js  |  4 +-
+ 3 files changed, 39 insertions(+), 26 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+index e7a2d09..374b7f0 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+@@ -16,53 +16,66 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
++WebInspector.ElementSnapshotData = function(snapshotId, payload)
++{
++    this._snapshotId = snapshotId;
++    this._imageDataURL = payload.imageData;
++}
++
++WebInspector.ElementSnapshotData.prototype = {
++    constructor: WebInspector.ElementSnapshotData,
++    __proto__: WebInspector.Object.prototype,
++
++    get contentURL()
++    {
++        const maximumDataURLSize = 1024 * 1024; // 1 MiB
++
++        if (!this._imageDataURL)
++            return null;
++
++        if (this._imageDataURL.length > maximumDataURLSize) {
++            console.error("Element snapshot too large " + Number.bytesToString(this._imageDataURL.length) + "for data url.");
++            return null;
++        }
++
++        return this._imageDataURL;
++    }
++}
++
+ WebInspector.ElementSnapshot = function(payload)
+ {
+     this.nodeId = payload.nodeId;
+     this.snapshotId = payload.snapshotId; // Used when making queries to the backend.
+     this.elapsedTime = payload.elapsedTimestamp;
+     this.boundingRect = WebInspector.Rect.fromObject(payload.boundingBox);
+ 
+     // Assigned when a record for the snapshot is added to an ElementTrackingTimeline instance.
+     this.ordinal = NaN;
+ 
+     this._payloadPromise = null;
+ }
+ 
+ WebInspector.ElementSnapshot.prototype = {
+     constructor: WebInspector.ElementSnapshot,
+     __proto__: WebInspector.Object.prototype,
+ 
+-    fetchImageData: function()
+-    {
+-        if (!this._payloadPromise)
+-            this._payloadPromise = DOMTracingAgent.getSnapshotPayload.promise(this.snapshotId);
+-
+-        return this._payloadPromise.then(function(result) {
+-            this._imageDataURL = result.payload.imageData;
+-            return this._imageDataURL;
+-        }.bind(this));
+-    },
+-
+-    get contentURL()
++    fetchData: function()
+     {
+-        const maximumDataURLSize = 1024 * 1024; // 1 MiB
+-
+-        if (!this._imageDataURL)
+-            return null;
+-
+-        if (this._imageDataURL.length > maximumDataURLSize) {
+-            console.error("Element snapshot too large " + Number.bytesToString(this._imageDataURL.length) + "for data url.");
+-            return null;
++        if (!this._payloadPromise) {
++            this._payloadPromise = DOMTracingAgent.getSnapshotPayload.promise(this.snapshotId)
++                .then(function(response) {
++                    console.assert(response.payload.snapshotId === this.snapshotId);
++                    return new WebInspector.ElementSnapshotData(this.snapshotId, response.payload);
++                }.bind(this));
+         }
+ 
+-        return this._imageDataURL;
+-    },
++        return this._payloadPromise;
++    }
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+index 81514c5..90de295 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+@@ -29,22 +29,22 @@ WebInspector.ElementSnapshotContentView = function(snapshot)
+ 
+     this._imageElement = document.createElement("img");
+     this._imageElement.style.width = snapshot.boundingRect.size.width + 'px';
+     this._imageElement.style.height = snapshot.boundingRect.size.height + 'px';
+     this.element.appendChild(this._imageElement);
+ 
+     var displayName = WebInspector.UIString("Snapshot %d").format(snapshot.ordinal || " ");
+     var classNames = ["resource-icon", "resource-type-image"]; // Hack to use the DocumentImage icon for now.
+     this._pathComponent = new WebInspector.HierarchicalPathComponent(displayName, classNames, snapshot, false, false);
+ 
+-    snapshot.fetchImageData().then(function(data) {
+-        this._imageElement.src = this.representedObject.contentURL;
++    snapshot.fetchData().then(function(data) {
++        this._imageElement.src = data.contentURL;
+     }.bind(this));
+ };
+ 
+ WebInspector.ElementSnapshotContentView.StyleClassName = "element-snapshot";
+ 
+ WebInspector.ElementSnapshotContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotContentView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+     get selectionPathComponents()
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+index d11cf3a..11b6897 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+@@ -106,22 +106,22 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+             if (records.length !== 1)
+                 stack.selected = false;
+             else if (this._selectedRecords.indexOf(records[0]) !== -1)
+                 stack.selected = true;
+             else
+                 stack.selected = false;
+ 
+             if (records.length) {
+                 var snapshot = records[0].snapshot;
+                 console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+-                snapshot.fetchImageData().then(function(contentURL) {
+-                    stack.previewContentURL = contentURL;
++                snapshot.fetchData().then(function(data) {
++                    stack.previewContentURL = data.contentURL;
+                 });
+             }
+ 
+             ++stackIndex;
+         }
+ 
+         WebInspector.TimelineRecordStack.createStacksForVisibleRecords(this.representedObject.snapshotRecords, secondsPerPixel, this, createStack.bind(this));
+         // Neuter any remaining objects not used in this layout iteration.
+         for (; stackIndex < this._timelineRecordStacks.length; ++stackIndex)
+             this._timelineRecordStacks[stackIndex].records = null;
+-- 
+2.2.1
+

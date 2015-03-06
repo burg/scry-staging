@@ -1,7 +1,7 @@
-From ad2d3682a28036c8b4f6d6061c1f379f42c4bcb9 Mon Sep 17 00:00:00 2001
+From 8856871fd455385feeb060262099844f763423ae Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 4 Mar 2015 15:46:47 -0800
-Subject: [PATCH] [Scry] Show the ElementSnapshotContentView inside the
+Subject: [PATCH] Show the ElementSnapshotContentView inside the
  TimelineRecordingContentView's container.
 
  - Construct path components that include the selected timeline and components for the container's content view.
@@ -522,5 +522,5 @@ index de6bd63..1fb712b 100644
          WebInspector.contentBrowser.showContentView(this._displayedContentView);
      },
 -- 
-2.2.2
+2.2.1
 

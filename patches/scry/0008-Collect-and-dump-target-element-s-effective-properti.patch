@@ -1,8 +1,8 @@
-From 1985de0b5739eb14bf8fd0432b3844c353e94a87 Mon Sep 17 00:00:00 2001
+From 19a6b9f57beebadf75e178beadda44e14576ee98 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 27 Feb 2015 11:09:08 -0800
-Subject: [PATCH] [Scry] Collect and dump target element's effective properties
- and their sources in a 'style snapshot'.
+Subject: [PATCH] Collect and dump target element's effective properties and
+ their sources in a 'style snapshot'.
 
 ---
  Source/JavaScriptCore/inspector/protocol/CSS.json  |   1 +
@@ -822,5 +822,5 @@ index 493ea1b..e1ffba5 100644
  } // namespace Inspector
  
 -- 
-2.2.2
+2.2.1
 

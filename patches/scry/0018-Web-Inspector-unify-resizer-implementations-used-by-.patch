@@ -1,0 +1,902 @@
+From bebd08aea9fd22ec5f06be6ca1cff447285dbf54 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Fri, 6 Mar 2015 11:57:52 -0800
+Subject: [PATCH] Web Inspector: unify resizer implementations used by DataGrid
+ and Sidebar https://bugs.webkit.org/show_bug.cgi?id=142407
+
+Reviewed by NOBODY (OOPS!).
+
+Both of these implementations do the same thing slightly differently. Unify the code
+and use the "glass pane" technique to preserve cursor while dragging over links or text.
+
+This patch implements vertical and horizontal rule orientations. Further refactorings
+to use this class may need to add "Indeterminate" orientation to support moving the inspector
+window by its fake toolbar element.
+
+* UserInterface/Main.html:
+* UserInterface/Views/DataGrid.css:
+(.data-grid .resizer):
+(.data-grid-resizer): Deleted.
+* UserInterface/Views/DataGrid.js: Store Resizer instances rather than resizer elements.
+Use symbols to secretly store neighbor column ids on the resizer objects. Stop using
+WebInspector.elementDragStart, as I would like to deprecate it in favor of Resizer instances.
+
+(WebInspector.DataGrid):
+(WebInspector.DataGrid.prototype._positionResizerElements):
+(WebInspector.DataGrid.prototype.resizerDragStarted):
+(WebInspector.DataGrid.prototype.resizerDragging):
+(WebInspector.DataGrid.prototype.resizerDragEnded):
+(WebInspector.DataGrid.prototype._startResizerDragging): Deleted.
+(WebInspector.DataGrid.prototype._resizerDragging): Deleted.
+(WebInspector.DataGrid.prototype._endResizerDragging): Deleted.
+* UserInterface/Views/Resizer.css:
+(.resizer):
+(.resizer.vertical-rule):
+(.resizer.horizontal-rule):
+(.glass-pane-for-drag):
+* UserInterface/Views/Resizer.js: Added.
+(WebInspector.Resizer):
+(WebInspector.Resizer.prototype.get element):
+(WebInspector.Resizer.prototype.get orientation):
+(WebInspector.Resizer.prototype.get initialPosition):
+(WebInspector.Resizer.prototype._currentPosition):
+(WebInspector.Resizer.prototype._resizerMouseDown):
+(WebInspector.Resizer.prototype._resizerMouseMoved):
+(WebInspector.Resizer.prototype._resizerMouseUp):
+* UserInterface/Views/Sidebar.css:
+(.sidebar > .resizer): Deleted.
+* UserInterface/Views/Sidebar.js:
+(WebInspector.Sidebar):
+(WebInspector.Sidebar.prototype.resizerDragStarted):
+(WebInspector.Sidebar.prototype.resizerDragging):
+(WebInspector.Sidebar.prototype.resizerDragEnded):
+(WebInspector.Sidebar.prototype._navigationItemSelected):
+(WebInspector.Sidebar.prototype._resizerMouseDown): Deleted.
+(WebInspector.Sidebar.prototype._resizerMouseMoved): Deleted.
+(WebInspector.Sidebar.prototype._resizerMouseUp): Deleted.
+---
+ Source/WebInspectorUI/ChangeLog                    |  56 ++++++++
+ Source/WebInspectorUI/UserInterface/Main.html      |   2 +
+ .../UserInterface/Views/DataGrid.css               |   7 +-
+ .../WebInspectorUI/UserInterface/Views/DataGrid.js |  85 +++++------
+ .../Views/{Sidebar.css => Resizer.css}             |  74 +++-------
+ .../WebInspectorUI/UserInterface/Views/Resizer.js  | 159 +++++++++++++++++++++
+ .../WebInspectorUI/UserInterface/Views/Sidebar.css |  11 --
+ .../WebInspectorUI/UserInterface/Views/Sidebar.js  |  63 ++------
+ 8 files changed, 289 insertions(+), 168 deletions(-)
+ copy Source/WebInspectorUI/UserInterface/Views/{Sidebar.css => Resizer.css} (59%)
+ create mode 100644 Source/WebInspectorUI/UserInterface/Views/Resizer.js
+
+diff --git a/Source/WebInspectorUI/ChangeLog b/Source/WebInspectorUI/ChangeLog
+index 0d95bd5..0326fda 100644
+--- a/Source/WebInspectorUI/ChangeLog
++++ b/Source/WebInspectorUI/ChangeLog
+@@ -1,10 +1,66 @@
++2015-03-06  Brian J. Burg  <burg@cs.washington.edu>
++
++        Web Inspector: unify resizer implementations used by DataGrid and Sidebar
++        https://bugs.webkit.org/show_bug.cgi?id=142407
++
++        Reviewed by NOBODY (OOPS!).
++
++        Both of these implementations do the same thing slightly differently. Unify the code
++        and use the "glass pane" technique to preserve cursor while dragging over links or text.
++
++        This patch implements vertical and horizontal rule orientations. Further refactorings
++        to use this class may need to add "Indeterminate" orientation to support moving the inspector
++        window by its fake toolbar element.
++
++        * UserInterface/Main.html:
++        * UserInterface/Views/DataGrid.css:
++        (.data-grid .resizer):
++        (.data-grid-resizer): Deleted.
++        * UserInterface/Views/DataGrid.js: Store Resizer instances rather than resizer elements.
++        Use symbols to secretly store neighbor column ids on the resizer objects. Stop using
++        WebInspector.elementDragStart, as I would like to deprecate it in favor of Resizer instances.
++
++        (WebInspector.DataGrid):
++        (WebInspector.DataGrid.prototype._positionResizerElements):
++        (WebInspector.DataGrid.prototype.resizerDragStarted):
++        (WebInspector.DataGrid.prototype.resizerDragging):
++        (WebInspector.DataGrid.prototype.resizerDragEnded):
++        (WebInspector.DataGrid.prototype._startResizerDragging): Deleted.
++        (WebInspector.DataGrid.prototype._resizerDragging): Deleted.
++        (WebInspector.DataGrid.prototype._endResizerDragging): Deleted.
++        * UserInterface/Views/Resizer.css:
++        (.resizer):
++        (.resizer.vertical-rule):
++        (.resizer.horizontal-rule):
++        (.glass-pane-for-drag):
++        * UserInterface/Views/Resizer.js: Added.
++        (WebInspector.Resizer):
++        (WebInspector.Resizer.prototype.get element):
++        (WebInspector.Resizer.prototype.get orientation):
++        (WebInspector.Resizer.prototype.get initialPosition):
++        (WebInspector.Resizer.prototype._currentPosition):
++        (WebInspector.Resizer.prototype._resizerMouseDown):
++        (WebInspector.Resizer.prototype._resizerMouseMoved):
++        (WebInspector.Resizer.prototype._resizerMouseUp):
++        * UserInterface/Views/Sidebar.css:
++        (.sidebar > .resizer): Deleted.
++        * UserInterface/Views/Sidebar.js:
++        (WebInspector.Sidebar):
++        (WebInspector.Sidebar.prototype.resizerDragStarted):
++        (WebInspector.Sidebar.prototype.resizerDragging):
++        (WebInspector.Sidebar.prototype.resizerDragEnded):
++        (WebInspector.Sidebar.prototype._navigationItemSelected):
++        (WebInspector.Sidebar.prototype._resizerMouseDown): Deleted.
++        (WebInspector.Sidebar.prototype._resizerMouseMoved): Deleted.
++        (WebInspector.Sidebar.prototype._resizerMouseUp): Deleted.
++
+ 2015-03-04  Brian J. Burg  <burg@cs.washington.edu>
+ 
+         Web Inspector: TimelineViews should be displayed in a ContentViewContainer
+         https://bugs.webkit.org/show_bug.cgi?id=142290
+ 
+         Reviewed by Timothy Hatcher.
+ 
+         TimelineRecordingContentView has a bunch of logic to manage the currently visible TimelineView.
+         This could be delegated to a ContentViewContainer to simplify the logic. It also opens the possibility
+         for other views to be displayed beneath the timeline overview graphs when it makes sense to do so.
+diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
+index 69c98ce..c8f483a 100644
+--- a/Source/WebInspectorUI/UserInterface/Main.html
++++ b/Source/WebInspectorUI/UserInterface/Main.html
+@@ -104,20 +104,21 @@
+     <link rel="stylesheet" href="Views/ObjectTreeMapEntryTreeElement.css">
+     <link rel="stylesheet" href="Views/ObjectTreePropertyTreeElement.css">
+     <link rel="stylesheet" href="Views/OverviewTimelineView.css">
+     <link rel="stylesheet" href="Views/PathComponentIcons.css">
+     <link rel="stylesheet" href="Views/Popover.css">
+     <link rel="stylesheet" href="Views/ProbeDetailsSidebarPanel.css">
+     <link rel="stylesheet" href="Views/ProbeSetDataGrid.css">
+     <link rel="stylesheet" href="Views/QuickConsole.css">
+     <link rel="stylesheet" href="Views/RadioButtonNavigationItem.css">
+     <link rel="stylesheet" href="Views/ReplayDashboardView.css">
++    <link rel="stylesheet" href="Views/Resizer.css">
+     <link rel="stylesheet" href="Views/ResourceIcons.css">
+     <link rel="stylesheet" href="Views/ResourceSidebarPanel.css">
+     <link rel="stylesheet" href="Views/ResourceTreeElement.css">
+     <link rel="stylesheet" href="Views/RulesStyleDetailsPanel.css">
+     <link rel="stylesheet" href="Views/ScopeBar.css">
+     <link rel="stylesheet" href="Views/ScriptContentView.css">
+     <link rel="stylesheet" href="Views/ScriptTimelineOverviewGraph.css">
+     <link rel="stylesheet" href="Views/ScriptTimelineView.css">
+     <link rel="stylesheet" href="Views/SearchBar.css">
+     <link rel="stylesheet" href="Views/SearchIcons.css">
+@@ -444,20 +445,21 @@
+     <script src="Views/ProbeDetailsSidebarPanel.js"></script>
+     <script src="Views/ProbeSetDataGrid.js"></script>
+     <script src="Views/ProbeSetDataGridNode.js"></script>
+     <script src="Views/ProbeSetDetailsSection.js"></script>
+     <script src="Views/ProfileNodeDataGridNode.js"></script>
+     <script src="Views/ProfileNodeTreeElement.js"></script>
+     <script src="Views/QuickConsole.js"></script>
+     <script src="Views/QuickConsoleNavigationBar.js"></script>
+     <script src="Views/RadioButtonNavigationItem.js"></script>
+     <script src="Views/ReplayDashboardView.js"></script>
++    <script src="Views/Resizer.js"></script>
+     <script src="Views/ResourceClusterContentView.js"></script>
+     <script src="Views/ResourceDetailsSidebarPanel.js"></script>
+     <script src="Views/ResourceSidebarPanel.js"></script>
+     <script src="Views/ResourceTimelineDataGridNode.js"></script>
+     <script src="Views/ResourceTimelineDataGridNodePathComponent.js"></script>
+     <script src="Views/RulesStyleDetailsPanel.js"></script>
+     <script src="Views/ScopeBar.js"></script>
+     <script src="Views/ScopeBarItem.js"></script>
+     <script src="Views/ScopeChainDetailsSidebarPanel.js"></script>
+     <script src="Views/ScopeVariableTreeElement.js"></script>
+diff --git a/Source/WebInspectorUI/UserInterface/Views/DataGrid.css b/Source/WebInspectorUI/UserInterface/Views/DataGrid.css
+index 416484c..79ab83c 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/DataGrid.css
++++ b/Source/WebInspectorUI/UserInterface/Views/DataGrid.css
+@@ -295,18 +295,13 @@ body.mac-platform.legacy .data-grid:focus tr.selected {
+ 
+     display: none;
+ 
+     margin-left: 2px;
+ }
+ 
+ .data-grid tr:matches(.selected, :hover) .go-to-arrow {
+     display: block;
+ }
+ 
+-.data-grid-resizer {
+-    position: absolute;
+-    top: 0;
+-    bottom: 0;
+-    width: 5px;
++.data-grid .resizer {
+     z-index: 500;
+-    cursor: col-resize;
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/DataGrid.js b/Source/WebInspectorUI/UserInterface/Views/DataGrid.js
+index 6235c9f..de2eb9d 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/DataGrid.js
++++ b/Source/WebInspectorUI/UserInterface/Views/DataGrid.js
+@@ -34,21 +34,21 @@ WebInspector.DataGrid = function(columnsData, editCallback, deleteCallback, pref
+     this.children = [];
+     this.selectedNode = null;
+     this.expandNodesWhenArrowing = false;
+     this.root = true;
+     this.hasChildren = false;
+     this.expanded = true;
+     this.revealed = true;
+     this.selected = false;
+     this.dataGrid = this;
+     this.indentWidth = 15;
+-    this.resizerElements = [];
++    this.resizers = [];
+     this._columnWidthsInitialized = false;
+ 
+     this.element = document.createElement("div");
+     this.element.className = "data-grid";
+     this.element.tabIndex = 0;
+     this.element.addEventListener("keydown", this._keyDown.bind(this), false);
+     this.element.copyHandler = this;
+ 
+     this._headerTableElement = document.createElement("table");
+     this._headerTableElement.className = "header";
+@@ -105,20 +105,23 @@ WebInspector.DataGrid.Event = {
+     ExpandedNode: "datagrid-expanded-node",
+     CollapsedNode: "datagrid-collapsed-node"
+ };
+ 
+ WebInspector.DataGrid.SortOrder = {
+     Indeterminate: "data-grid-sort-order-indeterminate",
+     Ascending: "data-grid-sort-order-ascending",
+     Descending: "data-grid-sort-order-descending"
+ };
+ 
++WebInspector.DataGrid.LeftNeighboringColumnIDSymbol = Symbol("left-neighboring-column-id");
++WebInspector.DataGrid.RightNeighboringColumnIDSymbol = Symbol("right-neighboring-column-id");
++
+ WebInspector.DataGrid.SortColumnAscendingStyleClassName = "sort-ascending";
+ WebInspector.DataGrid.SortColumnDescendingStyleClassName = "sort-descending";
+ WebInspector.DataGrid.SortableColumnStyleClassName = "sortable";
+ 
+ WebInspector.DataGrid.createSortableDataGrid = function(columnNames, values)
+ {
+     var numColumns = columnNames.length;
+     if (!numColumns)
+         return null;
+ 
+@@ -655,57 +658,55 @@ WebInspector.DataGrid.prototype = {
+     },
+ 
+     scrollToLastRow: function()
+     {
+         this._scrollContainerElement.scrollTop = this._scrollContainerElement.scrollHeight - this._scrollContainerElement.offsetHeight;
+     },
+ 
+     _positionResizerElements: function()
+     {
+         var left = 0;
+-        var previousResizerElement = null;
++        var previousResizer = null;
+ 
+         // Make n - 1 resizers for n columns.
+         for (var i = 0; i < this.orderedColumns.length - 1; ++i) {
+-            var resizerElement = this.resizerElements[i];
+-
+-            if (!resizerElement) {
+-                // This is the first call to updateWidth, so the resizers need
+-                // to be created.
+-                resizerElement = document.createElement("div");
+-                resizerElement.classList.add("data-grid-resizer");
++            // Create a new resizer if one does not exist for this column.
++            if (i === this.resizers.length) {
++                var resizerDelegate = this;
++                resizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
++                this.resizers[i] = resizer;
+                 // This resizer is associated with the column to its right.
+-                resizerElement.addEventListener("mousedown", this._startResizerDragging.bind(this), false);
+-                this.element.appendChild(resizerElement);
+-                this.resizerElements[i] = resizerElement;
++                this.element.appendChild(resizer.element);
+             }
+ 
++            var resizer = this.resizers[i];
++
+             // Get the width of the cell in the first (and only) row of the
+             // header table in order to determine the width of the column, since
+             // it is not possible to query a column for its width.
+             left += this._headerTableBodyElement.rows[0].cells[i].offsetWidth;
+ 
+             if (this._isColumnVisible(this.orderedColumns[i])) {
+-                resizerElement.style.removeProperty("display");
+-                resizerElement.style.left = left + "px";
+-                resizerElement.leftNeighboringColumnID = i;
+-                if (previousResizerElement)
+-                    previousResizerElement.rightNeighboringColumnID = i;
+-                previousResizerElement = resizerElement;
++                resizer.element.style.removeProperty("display");
++                resizer.element.style.left = left + "px";
++                resizer[WebInspector.DataGrid.LeftNeighboringColumnIDSymbol] = i;
++                if (previousResizer)
++                    previousResizer[WebInspector.DataGrid.RightNeighboringColumnIDSymbol] = i;
++                previousResizer = resizer;
+             } else {
+-                resizerElement.style.setProperty("display", "none");
+-                resizerElement.leftNeighboringColumnID = 0;
+-                resizerElement.rightNeighboringColumnID = 0;
++                resizer.element.style.setProperty("display", "none");
++                resizer[WebInspector.DataGrid.LeftNeighboringColumnIDSymbol] = 0;
++                resizer[WebInspector.DataGrid.RightNeighboringColumnIDSymbol] = 0;
+             }
+         }
+-        if (previousResizerElement)
+-            previousResizerElement.rightNeighboringColumnID = this.orderedColumns.length - 1;
++        if (previousResizer)
++            previousResizer[WebInspector.DataGrid.RightNeighboringColumnIDSymbol] = this.orderedColumns.length - 1;
+     },
+ 
+     addPlaceholderNode: function()
+     {
+         if (this.placeholderNode)
+             this.placeholderNode.makeNormal();
+ 
+         var emptyData = {};
+         for (var identifier of this.columns.keys())
+             emptyData[identifier] = "";
+@@ -1235,91 +1236,83 @@ WebInspector.DataGrid.prototype = {
+         if (!this._resizeMethod)
+             return WebInspector.DataGrid.ResizeMethod.Nearest;
+         return this._resizeMethod;
+     },
+ 
+     set resizeMethod(method)
+     {
+         this._resizeMethod = method;
+     },
+ 
+-    _startResizerDragging: function(event)
++    resizerDragStarted: function(resizer)
+     {
+-        if (event.button !== 0 || event.ctrlKey)
+-            return;
++        if (!resizer[WebInspector.DataGrid.RightNeighboringColumnIDSymbol])
++            return true; // Abort the drag;
+ 
+-        this._currentResizer = event.target;
+-        if (!this._currentResizer.rightNeighboringColumnID)
+-            return;
+-
+-        WebInspector.elementDragStart(this._currentResizer, this._resizerDragging.bind(this),
+-            this._endResizerDragging.bind(this), event, "col-resize");
++        this._currentResizer = resizer;
+     },
+ 
+-    _resizerDragging: function(event)
++    resizerDragging: function(resizer, positionDelta)
+     {
+-        if (event.button !== 0)
+-            return;
+-
+-        var resizer = this._currentResizer;
+-        if (!resizer)
++        console.assert(resizer === this._currentResizer, resizer, this._currentResizer);
++        if (resizer != this._currentResizer)
+             return;
+ 
+         // Constrain the dragpoint to be within the containing div of the
+         // datagrid.
+-        var dragPoint = event.clientX - this.element.totalOffsetLeft;
++        var dragPoint = (resizer.initialPosition - positionDelta) - this.element.totalOffsetLeft;
+         // Constrain the dragpoint to be within the space made up by the
+         // column directly to the left and the column directly to the right.
+-        var leftCellIndex = resizer.leftNeighboringColumnID;
+-        var rightCellIndex = resizer.rightNeighboringColumnID;
++        var leftCellIndex = resizer[WebInspector.DataGrid.LeftNeighboringColumnIDSymbol];
++        var rightCellIndex = resizer[WebInspector.DataGrid.RightNeighboringColumnIDSymbol];
+         var firstRowCells = this._headerTableBodyElement.rows[0].cells;
+         var leftEdgeOfPreviousColumn = 0;
+         for (var i = 0; i < leftCellIndex; i++)
+             leftEdgeOfPreviousColumn += firstRowCells[i].offsetWidth;
+ 
+         // Differences for other resize methods
+         if (this.resizeMethod === WebInspector.DataGrid.ResizeMethod.Last) {
+-            rightCellIndex = this.resizerElements.length;
++            rightCellIndex = this.resizers.length;
+         } else if (this.resizeMethod === WebInspector.DataGrid.ResizeMethod.First) {
+             leftEdgeOfPreviousColumn += firstRowCells[leftCellIndex].offsetWidth - firstRowCells[0].offsetWidth;
+             leftCellIndex = 0;
+         }
+ 
+         var rightEdgeOfNextColumn = leftEdgeOfPreviousColumn + firstRowCells[leftCellIndex].offsetWidth + firstRowCells[rightCellIndex].offsetWidth;
+ 
+         // Give each column some padding so that they don't disappear.
+         var leftMinimum = leftEdgeOfPreviousColumn + this.ColumnResizePadding;
+         var rightMaximum = rightEdgeOfNextColumn - this.ColumnResizePadding;
+ 
+         dragPoint = Number.constrain(dragPoint, leftMinimum, rightMaximum);
+ 
+-        resizer.style.left = (dragPoint - this.CenterResizerOverBorderAdjustment) + "px";
++        resizer.element.style.left = (dragPoint - this.CenterResizerOverBorderAdjustment) + "px";
+ 
+         var percentLeftColumn = (((dragPoint - leftEdgeOfPreviousColumn) / this._dataTableElement.offsetWidth) * 100) + "%";
+         this._headerTableColumnGroupElement.children[leftCellIndex].style.width = percentLeftColumn;
+         this._dataTableColumnGroupElement.children[leftCellIndex].style.width = percentLeftColumn;
+ 
+         var percentRightColumn = (((rightEdgeOfNextColumn - dragPoint) / this._dataTableElement.offsetWidth) * 100) + "%";
+         this._headerTableColumnGroupElement.children[rightCellIndex].style.width =  percentRightColumn;
+         this._dataTableColumnGroupElement.children[rightCellIndex].style.width = percentRightColumn;
+ 
+         this._positionResizerElements();
+         event.preventDefault();
+         this.dispatchEventToListeners(WebInspector.DataGrid.Event.DidLayout);
+     },
+ 
+-    _endResizerDragging: function(event)
++    resizerDragEnded: function(resizer)
+     {
+-        if (event.button !== 0)
++        console.assert(resizer === this._currentResizer, resizer, this._currentResizer);
++        if (resizer != this._currentResizer)
+             return;
+ 
+-        WebInspector.elementDragEnd(event);
+         this._currentResizer = null;
+         this.dispatchEventToListeners(WebInspector.DataGrid.Event.DidLayout);
+     },
+ 
+     ColumnResizePadding: 10,
+ 
+     CenterResizerOverBorderAdjustment: 3,
+ }
+ 
+ WebInspector.DataGrid.ResizeMethod = {
+diff --git a/Source/WebInspectorUI/UserInterface/Views/Sidebar.css b/Source/WebInspectorUI/UserInterface/Views/Resizer.css
+similarity index 59%
+copy from Source/WebInspectorUI/UserInterface/Views/Sidebar.css
+copy to Source/WebInspectorUI/UserInterface/Views/Resizer.css
+index dccb566..8b33fd3 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/Sidebar.css
++++ b/Source/WebInspectorUI/UserInterface/Views/Resizer.css
+@@ -1,12 +1,12 @@
+ /*
+- * Copyright (C) 2013 Apple Inc. All rights reserved.
++ * Copyright (C) 2015 University of Washington.
+  *
+  * Redistribution and use in source and binary forms, with or without
+  * modification, are permitted provided that the following conditions
+  * are met:
+  * 1. Redistributions of source code must retain the above copyright
+  *    notice, this list of conditions and the following disclaimer.
+  * 2. Redistributions in binary form must reproduce the above copyright
+  *    notice, this list of conditions and the following disclaimer in the
+  *    documentation and/or other materials provided with the distribution.
+  *
+@@ -16,81 +16,41 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-.sidebar {
+-    position: relative;
+-
+-    background-color: rgb(242, 242, 242);
+-}
+-
+-body.mac-platform.legacy .sidebar {
+-    background-color: rgb(227, 231, 235);
+-}
+-
+-.sidebar.collapsed {
+-    width: 0 !important;
+-    border: none !important;
+-}
+-
+-body.mac-platform.legacy.window-inactive .sidebar {
+-    background-color: rgb(231, 231, 231);
+-}
+-
+-.sidebar > .panel {
++.resizer {
+     position: absolute;
+-    top: 0;
+-    left: 0;
+-    right: 0;
+-    bottom: 0;
+-
+-    display: none;
+-
+-    overflow: hidden;
+-
+-    z-index: 0; /* Workaround so that scroll bars appear above position:sticky section headers. */
++    z-index: 1000;
+ }
+ 
+-.sidebar > .panel.selected {
+-    display: block;
+-}
+-
+-.sidebar > .resizer {
+-    position: absolute;
++.resizer.vertical-rule {
+     top: 0;
+     bottom: 0;
+     width: 5px;
+ 
+-    z-index: 100;
+-
+     cursor: col-resize;
+ }
+ 
+-.sidebar.right > .resizer {
+-    left: -3px;
+-}
+-
+-.sidebar.left > .resizer {
+-    right: -3px;
+-}
+-
+-.sidebar.collapsed {
+-    display: none;
+-}
++.resizer.horizontal-rule {
++    left: 0;
++    right: 0;
++    height: 5px;
+ 
+-.sidebar.left {
+-    border-right: 1px solid rgb(179, 179, 179);
++    cursor: row-resize;
+ }
+ 
+-.sidebar.right {
+-    border-left: 1px solid rgb(179, 179, 179);
+-}
++.glass-pane-for-drag {
++    position: absolute;
++    top: 0;
++    bottom: 0;
++    left: 0;
++    right: 0;
+ 
+-body.mac-platform.legacy .sidebar.right {
+-    background-color: rgb(231, 231, 231);
++    opacity: 0;
++    z-index: 1;
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/Resizer.js b/Source/WebInspectorUI/UserInterface/Views/Resizer.js
+new file mode 100644
+index 0000000..47866f4
+--- /dev/null
++++ b/Source/WebInspectorUI/UserInterface/Views/Resizer.js
+@@ -0,0 +1,159 @@
++/*
++ * Copyright (C) 2015 University of Washington.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++WebInspector.Resizer = function(ruleOrientation, delegate) {
++    WebInspector.Object.call(this);
++
++    console.assert(delegate);
++
++    this._delegate = delegate;
++    this._orientation = ruleOrientation;
++    this._element = document.createElement("div");
++    this._element.classList.add(WebInspector.Resizer.StyleClassName);
++
++    if (this._orientation === WebInspector.Resizer.RuleOrientation.Horizontal)
++        this._element.classList.add(WebInspector.Resizer.HorizontalRuleStyleClassName);
++    else if (this._orientation === WebInspector.Resizer.RuleOrientation.Vertical)
++        this._element.classList.add(WebInspector.Resizer.VerticalRuleStyleClassName);
++
++    this._element.addEventListener("mousedown", this._resizerMouseDown.bind(this), false);
++    this._resizerMouseMovedEventListener = this._resizerMouseMoved.bind(this);
++    this._resizerMouseUpEventListener = this._resizerMouseUp.bind(this);
++};
++
++WebInspector.Resizer.RuleOrientation = {
++    Horizontal: "resizer-rule-orientation-horizontal",
++    Vertical: "resizer-rule-orientation-vertical",
++};
++
++WebInspector.Resizer.StyleClassName = "resizer";
++WebInspector.Resizer.HorizontalRuleStyleClassName = "horizontal-rule";
++WebInspector.Resizer.VerticalRuleStyleClassName = "vertical-rule";
++WebInspector.Resizer.GlassPaneStyleClassName = "glass-pane-for-drag";
++
++WebInspector.Resizer.prototype = {
++    constructor: WebInspector.Resizer,
++    __proto__: WebInspector.Object.prototype,
++
++    // Public
++
++    get element()
++    {
++        return this._element;
++    },
++
++    get orientation()
++    {
++        return this._orientation;
++    },
++
++    get initialPosition()
++    {
++        return this._resizerMouseDownPosition || NaN;
++    },
++
++    // Private
++
++    _currentPosition: function()
++    {
++        if (this._orientation === WebInspector.Resizer.RuleOrientation.Vertical)
++            return event.pageX;
++        if (this._orientation === WebInspector.Resizer.RuleOrientation.Horizontal)
++            return event.pageY;
++
++        console.assert(false, "Should not be reached!");
++    },
++
++    _resizerMouseDown: function(event)
++    {
++        if (event.button !== 0 || event.ctrlKey)
++            return;
++
++        var delegateRequestedAbort = false;
++        if (typeof this._delegate.resizerDragStarted === "function")
++            delegateRequestedAbort = this._delegate.resizerDragStarted(this, event.target);
++
++        if (delegateRequestedAbort)
++            return;
++
++        if (this._orientation === WebInspector.Resizer.RuleOrientation.Vertical)
++            document.body.style.cursor = "col-resize";
++        else {
++             console.assert(this._orientation === WebInspector.Resizer.RuleOrientation.Horizontal);
++            document.body.style.cursor = "row-resize";
++        }
++
++        this._resizerMouseDownPosition = this._currentPosition();
++
++        // Register these listeners on the document so we can track the mouse if it leaves the resizer.
++        document.addEventListener("mousemove", this._resizerMouseMovedEventListener, false);
++        document.addEventListener("mouseup", this._resizerMouseUpEventListener, false);
++
++        event.preventDefault();
++        event.stopPropagation();
++
++        // Install a global "glass pane" which prevents cursor from changing during the drag interaction.
++        // The cursor could change when hovering over links, text, or other elements with cursor cues.
++        // FIXME: when Pointer Events support is available this could be implemented by drawing the cursor ourselves.
++        if (WebInspector._elementDraggingGlassPane)
++            WebInspector._elementDraggingGlassPane.parentElement.removeChild(WebInspector._elementDraggingGlassPane);
++
++        var glassPaneElement = document.createElement("div");
++        glassPaneElement.className = WebInspector.Resizer.GlassPaneStyleClassName;
++        document.body.appendChild(glassPaneElement);
++        WebInspector._elementDraggingGlassPane = glassPaneElement;
++    },
++
++    _resizerMouseMoved: function(event)
++    {
++        event.preventDefault();
++        event.stopPropagation();
++
++        if (typeof this._delegate.resizerDragging === "function")
++            this._delegate.resizerDragging(this, this._resizerMouseDownPosition - this._currentPosition());
++    },
++
++    _resizerMouseUp: function(event)
++    {
++        if (event.button !== 0 || event.ctrlKey)
++            return;
++
++        document.body.style.removeProperty("cursor");
++
++        if (WebInspector._elementDraggingGlassPane) {
++            WebInspector._elementDraggingGlassPane.parentElement.removeChild(WebInspector._elementDraggingGlassPane);
++            delete WebInspector._elementDraggingGlassPane;
++        }
++
++        document.removeEventListener("mousemove", this._resizerMouseMovedEventListener, false);
++        document.removeEventListener("mouseup", this._resizerMouseUpEventListener, false);
++
++        event.preventDefault();
++        event.stopPropagation();
++
++        if (typeof this._delegate.resizerDragStarted === "function")
++            this._delegate.resizerDragEnded(this);
++    }
++};
+diff --git a/Source/WebInspectorUI/UserInterface/Views/Sidebar.css b/Source/WebInspectorUI/UserInterface/Views/Sidebar.css
+index dccb566..05e0d75 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/Sidebar.css
++++ b/Source/WebInspectorUI/UserInterface/Views/Sidebar.css
+@@ -53,31 +53,20 @@ body.mac-platform.legacy.window-inactive .sidebar {
+ 
+     overflow: hidden;
+ 
+     z-index: 0; /* Workaround so that scroll bars appear above position:sticky section headers. */
+ }
+ 
+ .sidebar > .panel.selected {
+     display: block;
+ }
+ 
+-.sidebar > .resizer {
+-    position: absolute;
+-    top: 0;
+-    bottom: 0;
+-    width: 5px;
+-
+-    z-index: 100;
+-
+-    cursor: col-resize;
+-}
+-
+ .sidebar.right > .resizer {
+     left: -3px;
+ }
+ 
+ .sidebar.left > .resizer {
+     right: -3px;
+ }
+ 
+ .sidebar.collapsed {
+     display: none;
+diff --git a/Source/WebInspectorUI/UserInterface/Views/Sidebar.js b/Source/WebInspectorUI/UserInterface/Views/Sidebar.js
+index e07be64..f77cae2 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/Sidebar.js
++++ b/Source/WebInspectorUI/UserInterface/Views/Sidebar.js
+@@ -31,38 +31,36 @@ WebInspector.Sidebar = function(element, side, sidebarPanels, role, label) {
+ 
+     this._element = element || document.createElement("div");
+     this._element.classList.add(WebInspector.Sidebar.StyleClassName);
+     this._element.classList.add(WebInspector.Sidebar.CollapsedStyleClassName);
+     this._element.classList.add(this._side);
+ 
+     this._element.setAttribute("role", role || "group");
+     if (label)
+         this._element.setAttribute("aria-label", label);
+ 
+-    this._resizeElement = document.createElement("div");
+-    this._resizeElement.classList.add(WebInspector.Sidebar.ResizeElementStyleClassName);
+-    this._resizeElement.addEventListener("mousedown", this._resizerMouseDown.bind(this), false);
+-    this._element.insertBefore(this._resizeElement, this._element.firstChild);
++    var resizerDelegate = this;
++    this._resizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
++    this._element.insertBefore(this._resizer.element, this._element.firstChild);
+ 
+     this._sidebarPanels = [];
+ 
+     if (sidebarPanels) {
+         for (var i = 0; i < sidebarPanels.length; ++i)
+             this.addSidebarPanel(sidebarPanels[i]);
+     }
+ };
+ 
+ WebInspector.Object.addConstructorFunctions(WebInspector.Sidebar);
+ 
+ WebInspector.Sidebar.StyleClassName = "sidebar";
+ WebInspector.Sidebar.CollapsedStyleClassName = "collapsed";
+-WebInspector.Sidebar.ResizeElementStyleClassName = "resizer";
+ WebInspector.Sidebar.AbsoluteMinimumWidth = 200;
+ 
+ WebInspector.Sidebar.Sides = {};
+ WebInspector.Sidebar.Sides.Right = "right";
+ WebInspector.Sidebar.Sides.Left = "left";
+ 
+ WebInspector.Sidebar.Event = {
+     SidebarPanelSelected: "sidebar-sidebar-panel-selected",
+     CollapsedStateDidChange: "sidebar-sidebar-collapsed-state-did-change",
+     WidthDidChange: "sidebar-width-did-change",
+@@ -243,72 +241,41 @@ WebInspector.Sidebar.prototype = {
+                 if (this._sidebarPanels[i].identifier === sidebarPanelOrIdentifierOrIndex) {
+                     sidebarPanel = this._sidebarPanels[i];
+                     break;
+                 }
+             }
+         }
+ 
+         return sidebarPanel;
+     },
+ 
+-    // Private
+-
+-    _navigationItemSelected: function(event)
+-    {
+-        this.selectedSidebarPanel = event.target.selectedNavigationItem ? event.target.selectedNavigationItem.identifier : null;
+-    },
++    // Protected
+ 
+-    _resizerMouseDown: function(event)
++    resizerDragStarted: function(resizer)
+     {
+-        if (event.button !== 0 || event.ctrlKey)
+-            return;
+-
+-        document.body.style.cursor = "col-resize";
+-
+-        this._resizerMouseMovedEventListener = this._resizerMouseMoved.bind(this);
+-        this._resizerMouseUpEventListener = this._resizerMouseUp.bind(this);
+-
+         this._widthBeforeResize = this.width;
+-        this._resizerMouseDownX = event.pageX;
+-
+-        // Register these listeners on the document so we can track the mouse if it leaves the resizer.
+-        document.addEventListener("mousemove", this._resizerMouseMovedEventListener, false);
+-        document.addEventListener("mouseup", this._resizerMouseUpEventListener, false);
+-
+-        event.preventDefault();
+-        event.stopPropagation();
+     },
+ 
+-    _resizerMouseMoved: function(event)
++    resizerDragging: function(resizer, positionDelta)
+     {
+-        var deltaX = this._resizerMouseDownX - event.pageX;
+-
+         if (this._side === WebInspector.Sidebar.Sides.Left)
+-            deltaX *= -1;
++            positionDelta *= -1;
+ 
+-        var newWidth = deltaX + this._widthBeforeResize;
++        var newWidth = positionDelta + this._widthBeforeResize;
+         this.width = newWidth;
+         this.collapsed = (newWidth < (this.minimumWidth / 2));
+-
+-        event.preventDefault();
+-        event.stopPropagation();
+     },
+ 
+-    _resizerMouseUp: function(event)
++    resizerDragEnded: function(resizer)
+     {
+-        if (event.button !== 0 || event.ctrlKey)
+-            return;
+-
+-        document.body.style.removeProperty("cursor");
+-
+-        document.removeEventListener("mousemove", this._resizerMouseMovedEventListener, false);
+-        document.removeEventListener("mouseup", this._resizerMouseUpEventListener, false);
++        delete this._widthBeforeResize;
++    },
+ 
+-        delete this._resizerMouseMovedEventListener;
+-        delete this._resizerMouseUpEventListener;
++    // Private
+ 
+-        event.preventDefault();
+-        event.stopPropagation();
++    _navigationItemSelected: function(event)
++    {
++        this.selectedSidebarPanel = event.target.selectedNavigationItem ? event.target.selectedNavigationItem.identifier : null;
+     }
+ };
+ 
+ WebInspector.Sidebar.prototype.__proto__ = WebInspector.Object.prototype;
+-- 
+2.2.2
+

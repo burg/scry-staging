@@ -1,4 +1,4 @@
-From 7952ebd1991876612cbb0bd23cdf03e497571f6a Mon Sep 17 00:00:00 2001
+From bcea13a67f9067edc6f2031941cb40c4ad231cc3 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 5 Mar 2015 16:51:28 -0800
 Subject: [PATCH] WIP: snapshot diff model and views
@@ -286,5 +286,5 @@ index 0000000..ea08ebd
 +
 +WebInspector.ElementSnapshotDiffDetailsClusterContentView.prototype.__proto__ = WebInspector.ClusterContentView.prototype;
 -- 
-2.2.1
+2.2.2
 

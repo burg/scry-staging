@@ -1,8 +1,7 @@
-From 317761a5daccc3efc99937aff878561f2c243c26 Mon Sep 17 00:00:00 2001
+From f3ea72359a2eb8145c1599524f0af451bdec3054 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 5 Mar 2015 11:06:58 -0800
-Subject: [PATCH] [Scry] Introduce ElementSnapshotData to hold fetched snapshot
- data.
+Subject: [PATCH] Introduce ElementSnapshotData to hold fetched snapshot data.
 
 - This allows ElementSnapshotDiff to reference its data without async waits.
 - It matches explicit "header/payload" patterns used elsewhere (without *Header suffix).
@@ -164,5 +163,5 @@ index d11cf3a..11b6897 100644
          for (; stackIndex < this._timelineRecordStacks.length; ++stackIndex)
              this._timelineRecordStacks[stackIndex].records = null;
 -- 
-2.2.1
+2.2.2
 

@@ -1,4 +1,4 @@
-From 69ecc5b12703d0e6f29b5198f3147eb278006bd6 Mon Sep 17 00:00:00 2001
+From 2ca1240796606aa5595c4793180f64dacc645e37 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 4 Mar 2015 17:34:20 -0800
 Subject: [PATCH] TimelineViews should be updated with current time and filters
@@ -254,5 +254,5 @@ index f0d7d0b..1685e17 100644
      }
  };
 -- 
-2.2.1
+2.2.2
 

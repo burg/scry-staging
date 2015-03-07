@@ -1,4 +1,4 @@
-From a041a60bbbb5da09c0b7f015c4d48db0d3bed0b6 Mon Sep 17 00:00:00 2001
+From a0adc4a96b675d9782dbad9e8ae241519c6125ac Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 18 Feb 2015 12:56:05 -0800
 Subject: [PATCH] Refactor CSSAgent to use wrapper views, and assorted other
@@ -6207,5 +6207,5 @@ index 0000000..83a55b8
 +
 +#endif // InspectorStylesheetRuleSet_h
 -- 
-2.2.1
+2.2.2
 

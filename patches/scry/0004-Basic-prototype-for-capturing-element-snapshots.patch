@@ -1,4 +1,4 @@
-From db11b438be4b9643f1276df0729e0477a411646a Mon Sep 17 00:00:00 2001
+From b2d153de2f36e4e04e11dee7f1d1265646f4e85e Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 23 Jan 2015 15:03:00 -0800
 Subject: [PATCH] Basic prototype for capturing element snapshots.
@@ -126,10 +126,11 @@ index 9559dc0..acfcb83 100644
      ]
  }
 diff --git a/Source/WTF/wtf/WeakPtr.h b/Source/WTF/wtf/WeakPtr.h
-index 34a1b91..9ec7907 100644
+index 03607f9..287d092 100644
 --- a/Source/WTF/wtf/WeakPtr.h
 +++ b/Source/WTF/wtf/WeakPtr.h
-@@ -95,20 +95,21 @@ public:
+@@ -94,20 +94,21 @@ public:
+     WeakPtr() : m_ref(WeakReference<T>::create(nullptr)) { }
      WeakPtr(const WeakPtr& o) : m_ref(o.m_ref.copyRef()) { }
      template<typename U> WeakPtr(const WeakPtr<U>& o) : m_ref(o.m_ref.copyRef()) { }
  
@@ -137,7 +138,6 @@ index 34a1b91..9ec7907 100644
      operator bool() const { return m_ref->get(); }
  
      WeakPtr& operator=(const WeakPtr& o) { m_ref = o.m_ref.copyRef(); return *this; }
-     template<typename U> WeakPtr& operator=(const WeakPtr<U>& o) { m_ref = o.m_ref.copyRef(); return *this; }
      WeakPtr& operator=(std::nullptr_t) { m_ref = WeakReference<T>::create(nullptr); return *this; }
  
 +    T& operator*() const { return *m_ref->get(); }
@@ -1260,7 +1260,7 @@ index 0000000..49203aa
 +    }
 +};
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index afa57be..6ecf0f1 100644
+index 3b44198..6785fd5 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -182,20 +182,21 @@
@@ -1307,7 +1307,7 @@ index afa57be..6ecf0f1 100644
      <script src="Models/IndexedDatabaseObjectStoreIndex.js"></script>
      <script src="Models/IssueMessage.js"></script>
      <script src="Models/KeyboardShortcut.js"></script>
-@@ -488,20 +490,21 @@
+@@ -489,20 +491,21 @@
      <script src="Controllers/AnalyzerManager.js"></script>
      <script src="Controllers/ApplicationCacheManager.js"></script>
      <script src="Controllers/BasicBlockAnnotator.js"></script>
@@ -1476,5 +1476,5 @@ index 806b203..7d4aecb 100644
              return false;
  
 -- 
-2.3.1
+2.2.2
 

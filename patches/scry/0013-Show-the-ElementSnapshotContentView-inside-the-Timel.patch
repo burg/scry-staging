@@ -1,4 +1,4 @@
-From 440b6a9d23bbf978082430728595d433cb2f2566 Mon Sep 17 00:00:00 2001
+From 3fbb0f219fe65792ad2c69ed434be08e5d863735 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 4 Mar 2015 15:46:47 -0800
 Subject: [PATCH] Show the ElementSnapshotContentView inside the
@@ -522,5 +522,5 @@ index de6bd63..1fb712b 100644
          WebInspector.contentBrowser.showContentView(this._displayedContentView);
      },
 -- 
-2.3.1
+2.2.2
 

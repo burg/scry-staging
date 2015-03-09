@@ -1,4 +1,4 @@
-From 9fd2f13e572c8a3fcae836455818729a62c36df6 Mon Sep 17 00:00:00 2001
+From 58de108b8a0dd51acec4e5ca31d3b6ca84106337 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 21:44:02 -0800
 Subject: [PATCH] Show a content view for snapshot images.
@@ -91,7 +91,7 @@ index 215ce07..a2c48ba 100644
      }
  };
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js b/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
-index 3fdcd1c..7a4216a 100644
+index b78eb5a..5416730 100644
 --- a/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
 +++ b/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
 @@ -41,33 +41,36 @@ WebInspector.TimelineManager = function()
@@ -145,10 +145,10 @@ index 3fdcd1c..7a4216a 100644
 -
 -WebInspector.TimelineManager.prototype.__proto__ = WebInspector.Object.prototype;
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index c32a92d..c2eafd2 100644
+index 31dd079..d5a6922 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -383,20 +383,21 @@
+@@ -384,20 +384,21 @@
      <script src="Views/DebuggerSidebarPanel.js"></script>
      <script src="Views/DefaultDashboardView.js"></script>
      <script src="Views/DetailsSection.js"></script>
@@ -309,5 +309,5 @@ index dee6dc3..173784e 100644
          }
  
 -- 
-2.3.1
+2.2.2
 

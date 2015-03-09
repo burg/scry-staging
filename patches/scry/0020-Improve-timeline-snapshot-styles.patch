@@ -1,4 +1,4 @@
-From 1f6d6f1f216e7440c69810e94b4cad01b42f9b44 Mon Sep 17 00:00:00 2001
+From efd96d89ad08250ab60f9e37e8ee0400bae92a0b Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sun, 8 Mar 2015 16:13:36 -0700
 Subject: [PATCH] Improve timeline snapshot styles.
@@ -177,5 +177,5 @@ index 9ffb76c..5d3680c 100644
          newPosition = newPosition.toFixed(2);
  
 -- 
-2.3.1
+2.2.2
 

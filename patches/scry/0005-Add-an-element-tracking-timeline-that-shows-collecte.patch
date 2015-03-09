@@ -1,4 +1,4 @@
-From 682440dfb22018d8df95bd10b844b43666f9898f Mon Sep 17 00:00:00 2001
+From 0c54fe517fab0b7da9ce52c7f89f6a449a9df25b Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 09:45:51 -0800
 Subject: [PATCH] Add an element tracking timeline that shows collected
@@ -121,7 +121,7 @@ index 49203aa..215ce07 100644
      },
  
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js b/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
-index aa653a3..3fdcd1c 100644
+index 9701114..b78eb5a 100644
 --- a/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
 +++ b/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
 @@ -85,24 +85,25 @@ WebInspector.TimelineManager.prototype = {
@@ -152,7 +152,7 @@ index aa653a3..3fdcd1c 100644
          // NOTE: Always stop immediately instead of waiting for a Timeline.recordingStopped event.
          // This way the UI feels as responsive to a stop as possible.
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 6ecf0f1..c32a92d 100644
+index 6785fd5..31dd079 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -66,20 +66,21 @@
@@ -200,7 +200,7 @@ index 6ecf0f1..c32a92d 100644
      <script src="Models/IndexedDatabaseObjectStoreIndex.js"></script>
      <script src="Models/IssueMessage.js"></script>
      <script src="Models/KeyboardShortcut.js"></script>
-@@ -380,20 +383,23 @@
+@@ -381,20 +384,23 @@
      <script src="Views/DebuggerSidebarPanel.js"></script>
      <script src="Views/DefaultDashboardView.js"></script>
      <script src="Views/DetailsSection.js"></script>
@@ -422,7 +422,7 @@ index ea5c081..f45c4a5 100644
  WebInspector.Rect.prototype = {
      constructor: WebInspector.Rect,
 diff --git a/Source/WebInspectorUI/UserInterface/Models/Timeline.js b/Source/WebInspectorUI/UserInterface/Models/Timeline.js
-index ed0ba5e..8bc58f5 100644
+index e435e99..112f38d 100644
 --- a/Source/WebInspectorUI/UserInterface/Models/Timeline.js
 +++ b/Source/WebInspectorUI/UserInterface/Models/Timeline.js
 @@ -22,20 +22,22 @@
@@ -1372,5 +1372,5 @@ index e7dbcae..3ca86a9 100644
      this._currentTime = 0;
  };
 -- 
-2.3.1
+2.2.2
 

@@ -1,4 +1,4 @@
-From afa655799afe41f0453e09ab86a3d9bc5317673f Mon Sep 17 00:00:00 2001
+From fda4f17e9310c9805f587c5cc7e2edd6d67f1b15 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sun, 8 Mar 2015 14:59:06 -0700
 Subject: [PATCH] Convert the snapshot content view to be a cluster content
@@ -41,7 +41,7 @@ index 0000000..92b81de
 +    <path d="M 8 10.5 C 9.10456955 10.5 10 9.60456955 10 8.5 C 10 7.39543045 9.10456955 6.5 8 6.5 C 6.89543045 6.5 6 7.39543045 6 8.5 C 6 9.60456955 6.89543045 10.5 8 10.5 Z" fill="none" stroke="black"/>
 +</svg>
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 21b9a81..65ae59d 100644
+index ebc35ee..1327cb4 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -66,21 +66,23 @@
@@ -68,7 +68,7 @@ index 21b9a81..65ae59d 100644
      <link rel="stylesheet" href="Views/FormattedValue.css">
      <link rel="stylesheet" href="Views/GoToLineDialog.css">
      <link rel="stylesheet" href="Views/GradientSlider.css">
-@@ -389,20 +391,21 @@
+@@ -390,20 +392,21 @@
      <script src="Views/DetailsSection.js"></script>
      <script src="Views/DetailsSectionDataGridRow.js"></script>
      <script src="Views/DetailsSectionGroup.js"></script>
@@ -458,5 +458,5 @@ index 90de295..8145fe4 100644
 -    }
  };
 -- 
-2.3.1
+2.2.2
 

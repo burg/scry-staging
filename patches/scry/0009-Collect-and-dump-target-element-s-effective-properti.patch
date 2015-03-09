@@ -1,4 +1,4 @@
-From 3b469a71bf7d379e6e64cdf1f0b116865556728e Mon Sep 17 00:00:00 2001
+From 51e95abd77580c870d7260a86113876d0516ad31 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 27 Feb 2015 11:09:08 -0800
 Subject: [PATCH] Collect and dump target element's effective properties and
@@ -822,5 +822,5 @@ index 493ea1b..e1ffba5 100644
  } // namespace Inspector
  
 -- 
-2.3.1
+2.2.2
 

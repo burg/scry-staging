@@ -1,4 +1,4 @@
-From 031ec3ddb78a19a24e48cc3cc57054c74f925eda Mon Sep 17 00:00:00 2001
+From cb9df654c32cfc072e46b76f0e1b6c828883d9c0 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 2 Mar 2015 14:05:51 -0800
 Subject: [PATCH] WIP: create TimelineRecordStack elements for snapshot
@@ -18,7 +18,7 @@ TODO: needs better algorithm for placement
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
 
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 9baaaad..c8f483a 100644
+index 9afbfd8..8707f2a 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -130,20 +130,21 @@
@@ -43,7 +43,7 @@ index 9baaaad..c8f483a 100644
      <link rel="stylesheet" href="Controllers/CodeMirrorCompletionController.css">
      <link rel="stylesheet" href="Controllers/CodeMirrorDragToAdjustNumberController.css">
      <link rel="stylesheet" href="Controllers/CodeMirrorGradientEditingController.css">
-@@ -475,20 +476,21 @@
+@@ -476,20 +477,21 @@
      <script src="Views/SourceCodeTextEditor.js"></script>
      <script src="Views/SourceCodeTimelineTimelineDataGridNode.js"></script>
      <script src="Views/SourceCodeTimelineTreeElement.js"></script>
@@ -506,5 +506,5 @@ index 0000000..3abad47
 +    }
 +};
 -- 
-2.3.1
+2.2.2
 

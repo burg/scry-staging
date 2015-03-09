@@ -1,4 +1,4 @@
-From 36fbf38d1a694a34e2423072f2d53fbd600d143d Mon Sep 17 00:00:00 2001
+From 5fbbbf768f9b5bfeb6807de68dff86496940aa14 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 5 Mar 2015 16:51:28 -0800
 Subject: [PATCH] When two snapshots are selected, create an
@@ -133,7 +133,7 @@ index 0000000..de6453c
 +    <path d="M 8.5 10.5 L 12.5 10.5" stroke="rgb(208, 1, 27)" stroke-linecap="square"/>
 +</svg>
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index c8f483a..21b9a81 100644
+index 8707f2a..ebc35ee 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -66,20 +66,21 @@
@@ -180,7 +180,7 @@ index c8f483a..21b9a81 100644
      <script src="Models/IndexedDatabase.js"></script>
      <script src="Models/IndexedDatabaseObjectStore.js"></script>
      <script src="Models/IndexedDatabaseObjectStoreIndex.js"></script>
-@@ -386,20 +388,21 @@
+@@ -387,20 +389,21 @@
      <script src="Views/DefaultDashboardView.js"></script>
      <script src="Views/DetailsSection.js"></script>
      <script src="Views/DetailsSectionDataGridRow.js"></script>
@@ -856,5 +856,5 @@ index 1fb712b..75f38c8 100644
  
      hasCustomFilters: function()
 -- 
-2.3.1
+2.2.2
 

@@ -1,4 +1,4 @@
-From 71027d466b7abb689383c7a1b213117a51e2c87c Mon Sep 17 00:00:00 2001
+From 5cb7ded0133aee48afba36640dff9ce54b6460fd Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 12 Feb 2015 18:55:51 -0800
 Subject: [PATCH] Start collecting trace operations for attribute modify/remove
@@ -851,10 +851,10 @@ index 7a4216a..09acfb9 100644
  
      _startAutoCapturing: function(event)
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 2d3de65..1187c3d 100644
+index c2eafd2..9baaaad 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -285,20 +285,21 @@
+@@ -286,20 +286,21 @@
      <script src="Models/SourceCodeRevision.js"></script>
      <script src="Models/SourceCodeSearchMatchObject.js"></script>
      <script src="Models/SourceCodeTextRange.js"></script>
@@ -1295,5 +1295,5 @@ index b664cf7..de6bd63 100644
          }
  
 -- 
-2.2.2
+2.3.1
 

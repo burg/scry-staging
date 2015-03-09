@@ -1,4 +1,4 @@
-From d56624ff1327dd0e3aafee777d047cf5b7342a7b Mon Sep 17 00:00:00 2001
+From d336471d4fb68660ee86ed18638d538df171a382 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 4 Mar 2015 16:19:32 -0800
 Subject: [PATCH] Automatically switch to the element tracking timeline when
@@ -50,5 +50,5 @@ index 7d4aecb..c099001 100644
              return false;
  
 -- 
-2.2.2
+2.3.1
 

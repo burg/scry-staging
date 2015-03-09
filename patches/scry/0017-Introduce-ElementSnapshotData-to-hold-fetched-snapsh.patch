@@ -1,4 +1,4 @@
-From f3ea72359a2eb8145c1599524f0af451bdec3054 Mon Sep 17 00:00:00 2001
+From 639d76ec16b129bef98877a26f57fdc9e32b8e43 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 5 Mar 2015 11:06:58 -0800
 Subject: [PATCH] Introduce ElementSnapshotData to hold fetched snapshot data.
@@ -163,5 +163,5 @@ index d11cf3a..11b6897 100644
          for (; stackIndex < this._timelineRecordStacks.length; ++stackIndex)
              this._timelineRecordStacks[stackIndex].records = null;
 -- 
-2.2.2
+2.3.1
 

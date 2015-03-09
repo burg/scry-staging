@@ -1,0 +1,462 @@
+From afa655799afe41f0453e09ab86a3d9bc5317673f Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Sun, 8 Mar 2015 14:59:06 -0700
+Subject: [PATCH] Convert the snapshot content view to be a cluster content
+ view.
+
+---
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 60232 -> 60338 bytes
+ .../WebInspectorUI/UserInterface/Images/Camera.svg |   6 +
+ Source/WebInspectorUI/UserInterface/Main.html      |   3 +
+ ...ntentView.js => ElementSnapshotContentView.css} |  34 +-----
+ .../Views/ElementSnapshotContentView.js            | 134 ++++++++++++++++++---
+ ...iew.js => ElementSnapshotOutputContentView.css} |  48 ++++----
+ ...View.js => ElementSnapshotOutputContentView.js} |  27 ++---
+ 7 files changed, 167 insertions(+), 85 deletions(-)
+ create mode 100644 Source/WebInspectorUI/UserInterface/Images/Camera.svg
+ copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotContentView.js => ElementSnapshotContentView.css} (50%)
+ copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotContentView.js => ElementSnapshotOutputContentView.css} (50%)
+ copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotContentView.js => ElementSnapshotOutputContentView.js} (62%)
+
+diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
+index 95bab004ffa5ae57406a5b2a1e41d09acf64f95b..3f964dddf13c535b075756fc2d718fd14b1f713e 100644
+GIT binary patch
+delta 93
+zcmX?cjd{~`<_#uiCL5gP+5GOzB+1DpXV%$<F=R3nGn6tUGUPBQF!%#mB@6{%Qi&lJ
+WC}Io5N(?wuO%~+W-Q4i(1PcJC`x?mr
+
+delta 27
+lcmV+$0ObF&*8|Ab1F$sAlYr&~lh);`voy?}8MEr<$OP8S4~zf+
+
+diff --git a/Source/WebInspectorUI/UserInterface/Images/Camera.svg b/Source/WebInspectorUI/UserInterface/Images/Camera.svg
+new file mode 100644
+index 0000000..92b81de
+--- /dev/null
++++ b/Source/WebInspectorUI/UserInterface/Images/Camera.svg
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright © 2015 Apple Inc. All rights reserved. -->
++<svg viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg">
++    <path d="M 12.999 12 L 2.999 12 L 2.999 4.99999998 L 5.78025 4.99999998 C 6.43275 4.64566365 7.18525 4.42963279 7.999 4.42963279 C 8.81275 4.42963279 9.56525 4.64566365 10.21775 4.99999998 L 12.999 4.99999998 L 12.999 12 Z M 10.999 4 L 9.999 3 L 5.999 3 L 4.999 4 L 1.999 4 L 1.999 13 L 13.999 13 L 13.999 4 L 10.999 4 Z"/>
++    <path d="M 8 10.5 C 9.10456955 10.5 10 9.60456955 10 8.5 C 10 7.39543045 9.10456955 6.5 8 6.5 C 6.89543045 6.5 6 7.39543045 6 8.5 C 6 9.60456955 6.89543045 10.5 8 10.5 Z" fill="none" stroke="black"/>
++</svg>
+diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
+index 21b9a81..65ae59d 100644
+--- a/Source/WebInspectorUI/UserInterface/Main.html
++++ b/Source/WebInspectorUI/UserInterface/Main.html
+@@ -66,21 +66,23 @@
+     <link rel="stylesheet" href="Views/DefaultDashboardView.css">
+     <link rel="stylesheet" href="Views/DataGrid.css">
+     <link rel="stylesheet" href="Views/DatabaseContentView.css">
+     <link rel="stylesheet" href="Views/DatabaseIcon.css">
+     <link rel="stylesheet" href="Views/DatabaseTableContentView.css">
+     <link rel="stylesheet" href="Views/DatabaseTableIcon.css">
+     <link rel="stylesheet" href="Views/DebuggerSidebarPanel.css">
+     <link rel="stylesheet" href="Views/DetailsSection.css">
+     <link rel="stylesheet" href="Views/DividerNavigationItem.css">
+     <link rel="stylesheet" href="Views/Editing.css">
++    <link rel="stylesheet" href="Views/ElementSnapshotContentView.css">
+     <link rel="stylesheet" href="Views/ElementSnapshotDiffContentView.css">
++    <link rel="stylesheet" href="Views/ElementSnapshotOutputContentView.css">
+     <link rel="stylesheet" href="Views/ElementTrackingTimelineOverviewGraph.css">
+     <link rel="stylesheet" href="Views/EventListenerSectionGroup.css">
+     <link rel="stylesheet" href="Views/FilterBar.css">
+     <link rel="stylesheet" href="Views/FindBanner.css">
+     <link rel="stylesheet" href="Views/FlexibleSpaceNavigationItem.css">
+     <link rel="stylesheet" href="Views/FolderIcon.css">
+     <link rel="stylesheet" href="Views/FontResourceContentView.css">
+     <link rel="stylesheet" href="Views/FormattedValue.css">
+     <link rel="stylesheet" href="Views/GoToLineDialog.css">
+     <link rel="stylesheet" href="Views/GradientSlider.css">
+@@ -389,20 +391,21 @@
+     <script src="Views/DetailsSection.js"></script>
+     <script src="Views/DetailsSectionDataGridRow.js"></script>
+     <script src="Views/DetailsSectionGroup.js"></script>
+     <script src="Views/DetailsSectionPropertiesRow.js"></script>
+     <script src="Views/DetailsSectionSimpleRow.js"></script>
+     <script src="Views/DetailsSectionTextRow.js"></script>
+     <script src="Views/DividerNavigationItem.js"></script>
+     <script src="Views/EditingSupport.js"></script>
+     <script src="Views/ElementSnapshotContentView.js"></script>
+     <script src="Views/ElementSnapshotDiffContentView.js"></script>
++    <script src="Views/ElementSnapshotOutputContentView.js"></script>
+     <script src="Views/ElementTrackingTimelineDataGridNode.js"></script>
+     <script src="Views/ElementTrackingTimelineView.js"></script>
+     <script src="Views/ElementTrackingTimelineOverviewGraph.js"></script>
+     <script src="Views/EventListenerSection.js"></script>
+     <script src="Views/EventListenerSectionGroup.js"></script>
+     <script src="Views/FilterBar.js"></script>
+     <script src="Views/FindBanner.js"></script>
+     <script src="Views/FlexibleSpaceNavigationItem.js"></script>
+     <script src="Views/FolderTreeElement.js"></script>
+     <script src="Views/FontResourceContentView.js"></script>
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css
+similarity index 50%
+copy from Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+copy to Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css
+index 90de295..38e821c 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css
+@@ -1,12 +1,12 @@
+ /*
+- * Copyright (C) 2015 University of Washington. All rights reserved.
++ * Copyright (C) 2015 University of Washington.
+  *
+  * Redistribution and use in source and binary forms, with or without
+  * modification, are permitted provided that the following conditions
+  * are met:
+  * 1. Redistributions of source code must retain the above copyright
+  *    notice, this list of conditions and the following disclaimer.
+  * 2. Redistributions in binary form must reproduce the above copyright
+  *    notice, this list of conditions and the following disclaimer in the
+  *    documentation and/or other materials provided with the distribution.
+  *
+@@ -16,39 +16,13 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-WebInspector.ElementSnapshotContentView = function(snapshot)
+-{
+-    WebInspector.ContentView.call(this, snapshot, WebInspector.ElementSnapshotContentView.StyleClassName);
+-
+-    this._imageElement = document.createElement("img");
+-    this._imageElement.style.width = snapshot.boundingRect.size.width + 'px';
+-    this._imageElement.style.height = snapshot.boundingRect.size.height + 'px';
+-    this.element.appendChild(this._imageElement);
+-
+-    var displayName = WebInspector.UIString("Snapshot %d").format(snapshot.ordinal || " ");
+-    var classNames = ["resource-icon", "resource-type-image"]; // Hack to use the DocumentImage icon for now.
+-    this._pathComponent = new WebInspector.HierarchicalPathComponent(displayName, classNames, snapshot, false, false);
+-
+-    snapshot.fetchData().then(function(data) {
+-        this._imageElement.src = data.contentURL;
+-    }.bind(this));
+-};
+-
+-WebInspector.ElementSnapshotContentView.StyleClassName = "element-snapshot";
+-
+-WebInspector.ElementSnapshotContentView.prototype = {
+-    constructor: WebInspector.ElementSnapshotContentView,
+-    __proto__: WebInspector.ContentView.prototype,
+-
+-    get selectionPathComponents()
+-    {
+-        return [this._pathComponent];
+-    }
+-};
++.visual-output-icon > .icon {
++    content: url(../Images/Camera.svg);
++}
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+index 90de295..7e57375 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+@@ -18,37 +18,141 @@
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementSnapshotContentView = function(snapshot)
+ {
+-    WebInspector.ContentView.call(this, snapshot, WebInspector.ElementSnapshotContentView.StyleClassName);
++    WebInspector.ClusterContentView.call(this, snapshot);
+ 
+-    this._imageElement = document.createElement("img");
+-    this._imageElement.style.width = snapshot.boundingRect.size.width + 'px';
+-    this._imageElement.style.height = snapshot.boundingRect.size.height + 'px';
+-    this.element.appendChild(this._imageElement);
++    this._snapshot = snapshot;
+ 
+-    var displayName = WebInspector.UIString("Snapshot %d").format(snapshot.ordinal || " ");
+-    var classNames = ["resource-icon", "resource-type-image"]; // Hack to use the DocumentImage icon for now.
+-    this._pathComponent = new WebInspector.HierarchicalPathComponent(displayName, classNames, snapshot, false, false);
++    function createPathComponent(displayName, classNames, identifier)
++    {
++        var pathComponent = new WebInspector.HierarchicalPathComponent(displayName, classNames, identifier, false, true);
++        pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._pathComponentSelected, this);
++        return pathComponent;
++    }
++
++    this._visualOutputPathComponent = createPathComponent.call(this, WebInspector.UIString("Visual Output"), WebInspector.ElementSnapshotContentView.VisualOutputIconStyleClassName, WebInspector.ElementSnapshotContentView.VisualOutputIdentifier, false, false);
+ 
+-    snapshot.fetchData().then(function(data) {
+-        this._imageElement.src = data.contentURL;
+-    }.bind(this));
++    this._currentContentViewSetting = new WebInspector.Setting("element-snapshot-current-view", WebInspector.ElementSnapshotContentView.VisualOutputIdentifier);
+ };
+ 
+-WebInspector.ElementSnapshotContentView.StyleClassName = "element-snapshot";
++WebInspector.ElementSnapshotContentView.ContentViewIdentifierCookieKey = "element-snapshot-content-view-identifier";
++
++WebInspector.ElementSnapshotContentView.VisualOutputIdentifier = "visual-output";
++
++WebInspector.ElementSnapshotContentView.VisualOutputIconStyleClassName = "visual-output-icon";
+ 
+ WebInspector.ElementSnapshotContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotContentView,
+-    __proto__: WebInspector.ContentView.prototype,
++    __proto__: WebInspector.ClusterContentView.prototype,
++
++    // Public
+ 
+     get selectionPathComponents()
+     {
+-        return [this._pathComponent];
+-    }
++        var currentContentView = this._contentViewContainer.currentContentView;
++        if (!currentContentView)
++            return [];
++
++        // Append the current view's path components to the path component representing the current view.
++        var components = [this._pathComponentForContentView(currentContentView)];
++        return components.concat(currentContentView.selectionPathComponents);
++    },
++
++    get visualOutputContentView()
++    {
++        if (!this._visualOutputContentView)
++            this._visualOutputContentView = new WebInspector.ElementSnapshotOutputContentView(this._snapshot);
++
++        return this._visualOutputContentView;
++    },
++
++    shown: function()
++    {
++        WebInspector.ClusterContentView.prototype.shown.call(this);
++
++        if (this._shownInitialContent)
++            return;
++
++        this._showContentViewForIdentifier(this._currentContentViewSetting.value);
++    },
++
++    closed: function()
++    {
++        WebInspector.ClusterContentView.prototype.closed.call(this);
++
++        this._shownInitialContent = false;
++    },
++
++    saveToCookie: function(cookie)
++    {
++        cookie[WebInspector.ElementSnapshotContentView.ContentViewIdentifierCookieKey] = this._currentContentViewSetting.value;
++    },
++
++    restoreFromCookie: function(cookie)
++    {
++        var contentView = this._showContentViewForIdentifier(cookie[WebInspector.ElementSnapshotContentView.ContentViewIdentifierCookieKey]);
++        if (typeof contentView.revealPosition === "function" && "lineNumber" in cookie && "columnNumber" in cookie)
++            contentView.revealPosition(new WebInspector.SourceCodePosition(cookie.lineNumber, cookie.columnNumber));
++    },
++
++    showVisualOutput: function()
++    {
++        this._shownInitialContent = true;
++
++        return this._showContentViewForIdentifier(WebInspector.ElementSnapshotContentView.VisualOutputIdentifier);
++    },
++
++    // Private
++
++    _pathComponentForContentView: function(contentView)
++    {
++        console.assert(contentView);
++        if (!contentView)
++            return null;
++        if (contentView === this._visualOutputContentView)
++            return this._visualOutputPathComponent;
++        console.error("Unknown contentView.");
++        return null;
++    },
++
++    _identifierForContentView: function(contentView)
++    {
++        console.assert(contentView);
++        if (!contentView)
++            return null;
++        if (contentView === this._visualOutputContentView)
++            return WebInspector.ElementSnapshotContentView.VisualOutputIdentifier;
++        console.error("Unknown contentView.");
++        return null;
++    },
++
++    _showContentViewForIdentifier: function(identifier)
++    {
++        var contentViewToShow = null;
++
++        switch (identifier) {
++        case WebInspector.ElementSnapshotContentView.VisualOutputIdentifier:
++            contentViewToShow = this.visualOutputContentView;
++            break;
++        }
++        if (!contentViewToShow)
++            contentViewToShow = this.visualOutputContentView;
++
++        console.assert(contentViewToShow);
++
++        this._currentContentViewSetting.value = this._identifierForContentView(contentViewToShow);
++
++        return this.contentViewContainer.showContentView(contentViewToShow);
++    },
++
++    _pathComponentSelected: function(event)
++    {
++        this._showContentViewForIdentifier(event.data.pathComponent.representedObject);
++    },
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.css
+similarity index 50%
+copy from Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+copy to Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.css
+index 90de295..181b3f5 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.css
+@@ -1,12 +1,12 @@
+ /*
+- * Copyright (C) 2015 University of Washington. All rights reserved.
++ * Copyright (C) 2015 University of Washington.
+  *
+  * Redistribution and use in source and binary forms, with or without
+  * modification, are permitted provided that the following conditions
+  * are met:
+  * 1. Redistributions of source code must retain the above copyright
+  *    notice, this list of conditions and the following disclaimer.
+  * 2. Redistributions in binary form must reproduce the above copyright
+  *    notice, this list of conditions and the following disclaimer in the
+  *    documentation and/or other materials provided with the distribution.
+  *
+@@ -16,39 +16,39 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-WebInspector.ElementSnapshotContentView = function(snapshot)
+-{
+-    WebInspector.ContentView.call(this, snapshot, WebInspector.ElementSnapshotContentView.StyleClassName);
++.content-view.element-snapshot-output {
++    background-color: rgb(231, 231, 231);
+ 
+-    this._imageElement = document.createElement("img");
+-    this._imageElement.style.width = snapshot.boundingRect.size.width + 'px';
+-    this._imageElement.style.height = snapshot.boundingRect.size.height + 'px';
+-    this.element.appendChild(this._imageElement);
++    overflow-x: hidden;
++    overflow-y: auto;
+ 
+-    var displayName = WebInspector.UIString("Snapshot %d").format(snapshot.ordinal || " ");
+-    var classNames = ["resource-icon", "resource-type-image"]; // Hack to use the DocumentImage icon for now.
+-    this._pathComponent = new WebInspector.HierarchicalPathComponent(displayName, classNames, snapshot, false, false);
++    display: flex;
+ 
+-    snapshot.fetchData().then(function(data) {
+-        this._imageElement.src = data.contentURL;
+-    }.bind(this));
+-};
++    justify-content: center;
++}
+ 
+-WebInspector.ElementSnapshotContentView.StyleClassName = "element-snapshot";
++.content-view.element-snapshot-output img {
++    min-width: 0;
++    max-width: 100%;
+ 
+-WebInspector.ElementSnapshotContentView.prototype = {
+-    constructor: WebInspector.ElementSnapshotContentView,
+-    __proto__: WebInspector.ContentView.prototype,
++    -webkit-user-select: text;
++    -webkit-user-drag: auto;
+ 
+-    get selectionPathComponents()
+-    {
+-        return [this._pathComponent];
+-    }
+-};
++ /* A border is used instead of padding or margin so when there is overflow
++    there will be space on all sides. */
++    border: 15px solid transparent;
++
++    margin: auto 0;
++
++    background-image: url(../Images/Checkers.svg);
++    background-clip: content-box;
++    background-size: 14px;
++    background-color: #eee;
++}
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.js
+similarity index 62%
+copy from Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+copy to Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.js
+index 90de295..8145fe4 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.js
+@@ -16,39 +16,34 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-WebInspector.ElementSnapshotContentView = function(snapshot)
++WebInspector.ElementSnapshotOutputContentView = function(snapshot)
+ {
+-    WebInspector.ContentView.call(this, snapshot, WebInspector.ElementSnapshotContentView.StyleClassName);
++    WebInspector.ContentView.call(this, snapshot, WebInspector.ElementSnapshotOutputContentView.StyleClassName);
+ 
+-    this._imageElement = document.createElement("img");
+-    this._imageElement.style.width = snapshot.boundingRect.size.width + 'px';
+-    this._imageElement.style.height = snapshot.boundingRect.size.height + 'px';
+-    this.element.appendChild(this._imageElement);
++    this._imageElement = null;
+ 
+-    var displayName = WebInspector.UIString("Snapshot %d").format(snapshot.ordinal || " ");
+-    var classNames = ["resource-icon", "resource-type-image"]; // Hack to use the DocumentImage icon for now.
+-    this._pathComponent = new WebInspector.HierarchicalPathComponent(displayName, classNames, snapshot, false, false);
++    this.element.classList.add(WebInspector.ElementSnapshotOutputContentView.StyleClassName);
+ 
+     snapshot.fetchData().then(function(data) {
++        this._imageElement = document.createElement("img");
++        //this._imageElement.style.width = snapshot.boundingRect.size.width + 'px';
++        //this._imageElement.style.height = snapshot.boundingRect.size.height + 'px';
+         this._imageElement.src = data.contentURL;
++        this.element.appendChild(this._imageElement);
+     }.bind(this));
+ };
+ 
+-WebInspector.ElementSnapshotContentView.StyleClassName = "element-snapshot";
++WebInspector.ElementSnapshotOutputContentView.StyleClassName = "element-snapshot-output";
+ 
+-WebInspector.ElementSnapshotContentView.prototype = {
+-    constructor: WebInspector.ElementSnapshotContentView,
++WebInspector.ElementSnapshotOutputContentView.prototype = {
++    constructor: WebInspector.ElementSnapshotOutputContentView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+-    get selectionPathComponents()
+-    {
+-        return [this._pathComponent];
+-    }
+ };
+-- 
+2.3.1
+

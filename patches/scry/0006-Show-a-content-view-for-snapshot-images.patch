@@ -1,4 +1,4 @@
-From 7048d90fe51b99fccca6a328702d7146dab610bb Mon Sep 17 00:00:00 2001
+From 9fd2f13e572c8a3fcae836455818729a62c36df6 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 21:44:02 -0800
 Subject: [PATCH] Show a content view for snapshot images.
@@ -145,10 +145,10 @@ index 3fdcd1c..7a4216a 100644
 -
 -WebInspector.TimelineManager.prototype.__proto__ = WebInspector.Object.prototype;
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 141d9b9..2d3de65 100644
+index c32a92d..c2eafd2 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -382,20 +382,21 @@
+@@ -383,20 +383,21 @@
      <script src="Views/DebuggerSidebarPanel.js"></script>
      <script src="Views/DefaultDashboardView.js"></script>
      <script src="Views/DetailsSection.js"></script>
@@ -309,5 +309,5 @@ index dee6dc3..173784e 100644
          }
  
 -- 
-2.2.2
+2.3.1
 

@@ -1,27 +1,30 @@
-From 31fe84560546b938374c23ead52abc83825e0fc9 Mon Sep 17 00:00:00 2001
+From 36fbf38d1a694a34e2423072f2d53fbd600d143d Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
-Date: Fri, 6 Mar 2015 15:34:40 -0800
+Date: Thu, 5 Mar 2015 16:51:28 -0800
 Subject: [PATCH] When two snapshots are selected, create an
  ElementSnapshotDiff and show it as a subview.
 
 ---
  .../Localizations/en.lproj/localizedStrings.js     | Bin 60058 -> 60232 bytes
- .../UserInterface/Controllers/DOMTracingManager.js |  32 ++++++
- .../WebInspectorUI/UserInterface/Images/Diff.svg   |  12 +++
+ .../UserInterface/Controllers/DOMTracingManager.js |  32 +++
+ .../WebInspectorUI/UserInterface/Images/Diff.svg   |  12 ++
  Source/WebInspectorUI/UserInterface/Main.html      |   3 +
  .../UserInterface/Models/ElementSnapshot.js        |   2 +-
- .../UserInterface/Models/ElementSnapshotDiff.js    |   1 +
+ .../UserInterface/Models/ElementSnapshotDiff.js    |  39 ++++
  .../UserInterface/Views/ContentView.js             |   5 +
- .../ElementSnapshotDiffContentView.css}            |  21 ++--
- .../Views/ElementSnapshotDiffContentView.js        | 111 +++++++++++++++++++++
+ .../Views/ElementSnapshotDiffContentView.css       |  37 ++++
+ .../Views/ElementSnapshotDiffContentView.js        | 111 ++++++++++
+ ...ElementSnapshotDiffDetailsClusterContentView.js | 225 +++++++++++++++++++++
  .../Views/ElementTrackingTimelineOverviewGraph.js  |   5 +-
- .../WebInspectorUI/UserInterface/Views/Resizer.js  |  12 ++-
+ .../WebInspectorUI/UserInterface/Views/Resizer.js  |  12 +-
  .../UserInterface/Views/TimelineIcons.css          |   4 +
- .../UserInterface/Views/TimelineSidebarPanel.js    |   8 ++
- 13 files changed, 199 insertions(+), 17 deletions(-)
+ .../UserInterface/Views/TimelineSidebarPanel.js    |   8 +
+ 14 files changed, 489 insertions(+), 6 deletions(-)
  create mode 100644 Source/WebInspectorUI/UserInterface/Images/Diff.svg
- copy Source/WebInspectorUI/UserInterface/{Models/ElementSnapshotDiff.js => Views/ElementSnapshotDiffContentView.css} (71%)
+ create mode 100644 Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js
+ create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
+ create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffDetailsClusterContentView.js
 
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
 index 67b8305a6ce04eaac144648dbebbd2410fa0d506..95bab004ffa5ae57406a5b2a1e41d09acf64f95b 100644
@@ -227,30 +230,50 @@ index 374b7f0..3481654 100644
      {
          const maximumDataURLSize = 1024 * 1024; // 1 MiB
 diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js
-index 18af8fd..897e37e 100644
---- a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js
+new file mode 100644
+index 0000000..897e37e
+--- /dev/null
 +++ b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js
-@@ -20,19 +20,20 @@
-  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
-  * THE POSSIBILITY OF SUCH DAMAGE.
-  */
- 
- WebInspector.ElementSnapshotDiff = function(preState, postState)
- {
-     console.assert(preState instanceof WebInspector.ElementSnapshotData, preState);
-     console.assert(postState instanceof WebInspector.ElementSnapshotData, postState);
+@@ -0,0 +1,39 @@
++/*
++ * Copyright (C) 2015 University of Washington. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++WebInspector.ElementSnapshotDiff = function(preState, postState)
++{
++    console.assert(preState instanceof WebInspector.ElementSnapshotData, preState);
++    console.assert(postState instanceof WebInspector.ElementSnapshotData, postState);
 +    console.assert(preState !== postState, "Cannot diff a snapshot with itself.");
- 
-     this.preState = preState;
-     this.postState = postState;
- }
- 
- WebInspector.ElementSnapshotDiff.prototype = {
-     constructor: WebInspector.ElementSnapshotDiff,
-     __proto__: WebInspector.Object.prototype,
- }
++
++    this.preState = preState;
++    this.postState = postState;
++}
++
++WebInspector.ElementSnapshotDiff.prototype = {
++    constructor: WebInspector.ElementSnapshotDiff,
++    __proto__: WebInspector.Object.prototype,
++}
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ContentView.js b/Source/WebInspectorUI/UserInterface/Views/ContentView.js
 index 24ab03d..5f1c1b6 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ContentView.js
@@ -302,45 +325,37 @@ index 24ab03d..5f1c1b6 100644
  WebInspector.ContentView.Event = {
      SelectionPathComponentsDidChange: "content-view-selection-path-components-did-change",
      SupplementalRepresentedObjectsDidChange: "content-view-supplemental-represented-objects-did-change",
-diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
-similarity index 71%
-copy from Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js
-copy to Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
-index 18af8fd..4d1d342 100644
---- a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
+new file mode 100644
+index 0000000..4d1d342
+--- /dev/null
 +++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
-@@ -1,12 +1,12 @@
- /*
-- * Copyright (C) 2015 University of Washington. All rights reserved.
+@@ -0,0 +1,37 @@
++/*
 + * Copyright (C) 2015 University of Washington.
-  *
-  * Redistribution and use in source and binary forms, with or without
-  * modification, are permitted provided that the following conditions
-  * are met:
-  * 1. Redistributions of source code must retain the above copyright
-  *    notice, this list of conditions and the following disclaimer.
-  * 2. Redistributions in binary form must reproduce the above copyright
-  *    notice, this list of conditions and the following disclaimer in the
-  *    documentation and/or other materials provided with the distribution.
-  *
-@@ -16,23 +16,22 @@
-  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
-  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
-  * THE POSSIBILITY OF SUCH DAMAGE.
-  */
- 
--WebInspector.ElementSnapshotDiff = function(preState, postState)
--{
--    console.assert(preState instanceof WebInspector.ElementSnapshotData, preState);
--    console.assert(postState instanceof WebInspector.ElementSnapshotData, postState);
--
--    this.preState = preState;
--    this.postState = postState;
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
 +.content-view.element-snapshot-diff .split-pane {
 +    position: absolute;
 +    top: 0;
@@ -348,14 +363,11 @@ index 18af8fd..4d1d342 100644
 +    left: 0;
 +    right: 0;
 +    background-color: #fff;
- }
- 
--WebInspector.ElementSnapshotDiff.prototype = {
--    constructor: WebInspector.ElementSnapshotDiff,
--    __proto__: WebInspector.Object.prototype,
++}
++
 +.content-view.element-snapshot-diff .resizer {
 +    border-left: 1px solid rgb(179, 179, 179);
- }
++}
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
 new file mode 100644
 index 0000000..8bb4e43
@@ -473,6 +485,237 @@ index 0000000..8bb4e43
 +        this._postimageElement.style.left = "%.5f".format(this._centerPercent * 100) + '%';
 +    }
 +};
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffDetailsClusterContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffDetailsClusterContentView.js
+new file mode 100644
+index 0000000..ea08ebd
+--- /dev/null
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffDetailsClusterContentView.js
+@@ -0,0 +1,225 @@
++/*
++ * Copyright (C) 2013 Apple Inc. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++WebInspector.ElementSnapshotDiffDetailsClusterContentView = function(snapshotDiff)
++{
++    console.assert(snapshotDiff instanceof WebInspector.ElemenSnapshotDiff, snapshotDiff);
++
++    WebInspector.ClusterContentView.call(this, snapshotDiff);
++
++    this._snapshotDiff = snapshotDiff;
++
++    function createPathComponent(displayName, className, identifier)
++    {
++        var pathComponent = new WebInspector.HierarchicalPathComponent(displayName, className, identifier, false, true);
++        pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._pathComponentSelected, this);
++        return pathComponent;
++    }
++
++    this._styleDiffPathComponent = createPathComponent.call(this, WebInspector.UIString("Style Changes"), WebInspector.ElementSnapshotDiffDetailsClusterContentView.StyleChangesIconStyleClassName, WebInspector.ElementSnapshotDiffDetailsClusterContentView.StyleChangesIdentifier);
++    this._domDiffPathComponent = createPathComponent.call(this, WebInspector.UIString("DOM Changes"), WebInspector.ElementSnapshotDiffDetailsClusterContentView.DOMChangesIconStyleClassName, WebInspector.ElementSnapshotDiffDetailsClusterContentView.DOMChangesIdentifier);
++
++    this._styleDiffPathComponent.nextSibling = this._domDiffPathComponent;
++    this._domDiffPathComponent.previousSibling = this._styleDiffPathComponent;
++};
++
++WebInspector.ElementSnapshotDiffDetailsClusterContentView.ContentViewIdentifierCookieKey = "element-snapshot-diff-cluster-content-view-identifier";
++
++WebInspector.ElementSnapshotDiffDetailsClusterContentView.StyleChangesIconStyleClassName = "style-changes-icon";
++WebInspector.ElementSnapshotDiffDetailsClusterContentView.DOMChangesIconStyleClassName = "dom-changes-icon";
++WebInspector.ElementSnapshotDiffDetailsClusterContentView.StyleChangesIdentifier = "style-changes";
++WebInspector.ElementSnapshotDiffDetailsClusterContentView.DOMChangesIdentifier = "dom-changes";
++
++WebInspector.ElementSnapshotDiffDetailsClusterContentView.prototype = {
++    constructor: WebInspector.ElementSnapshotDiffDetailsClusterContentView,
++
++    // Public
++
++    get allowedNavigationSidebarPanels()
++    {
++        return WebInspector.timelineSidebarPanel.identifier;
++    },
++
++    get styleChangesContentView()
++    {
++        if (!this._styleChangesContentView)
++            this._styleChangesContentView = new WebInspector.StyleChangesContentView(this, this._snapshotDiff);
++
++        return this._styleChangesContentView;
++    },
++
++    get domChangesContentView()
++    {
++        if (!this._domChangesContentView)
++            this._domChangesContentView = new WebInspector.DOMChangesContentView(this, this._snapshotDiff);
++
++        return this._domChangesContentView;
++    },
++
++    get selectionPathComponents()
++    {
++        var currentContentView = this._contentViewContainer.currentContentView;
++        if (!currentContentView)
++            return [];
++
++        // Append the current view's path components to the path component representing the current view.
++        var components = [this._pathComponentForContentView(currentContentView)];
++        return components.concat(currentContentView.selectionPathComponents);
++    },
++
++    shown: function()
++    {
++        WebInspector.ClusterContentView.prototype.shown.call(this);
++
++        this._contentViewContainer.shown();
++    },
++
++    closed: function()
++    {
++        WebInspector.ClusterContentView.prototype.closed.call(this);
++
++        this._contentViewContainer.closeAllContentViews();
++    },
++
++    saveToCookie: function(cookie)
++    {
++        // FIXME: implement                                         
++        //cookie[WebInspector.ElementSnapshotDiffDetailsClusterContentView.ContentViewIdentifierCookieKey] = this._currentContentViewSetting.value;
++    },
++
++    restoreFromCookie: function(cookie)
++    {
++        // FIXME: implement                                            
++        var contentView = this._showContentViewForIdentifier(cookie[WebInspector.ElementSnapshotDiffDetailsClusterContentView.ContentViewIdentifierCookieKey]);
++    },
++
++    showRequest: function()
++    {
++        this._shownInitialContent = true;
++
++        return this._showContentViewForIdentifier(WebInspector.ElementSnapshotDiffDetailsClusterContentView.RequestIdentifier);
++    },
++
++    showResponse: function(positionToReveal, textRangeToSelect, forceUnformatted)
++    {
++        this._shownInitialContent = true;
++
++        if (!this._resource.finished) {
++            this._positionToReveal = positionToReveal;
++            this._textRangeToSelect = textRangeToSelect;
++            this._forceUnformatted = forceUnformatted;
++        }
++
++        var responseContentView = this._showContentViewForIdentifier(WebInspector.ElementSnapshotDiffDetailsClusterContentView.ResponseIdentifier);
++        if (typeof responseContentView.revealPosition === "function")
++            responseContentView.revealPosition(positionToReveal, textRangeToSelect, forceUnformatted);
++        return responseContentView;
++    },
++
++    // Private
++
++    _pathComponentForContentView: function(contentView)
++    {
++        console.assert(contentView);
++        if (!contentView)
++            return null;
++        if (contentView === this._requestContentView)
++            return this._requestPathComponent;
++        if (contentView === this._styleChangesContentView)
++            return this._responsePathComponent;
++        console.error("Unknown contentView.");
++        return null;
++    },
++
++    _identifierForContentView: function(contentView)
++    {
++        console.assert(contentView);
++        if (!contentView)
++            return null;
++        if (contentView === this._requestContentView)
++            return WebInspector.ElementSnapshotDiffDetailsClusterContentView.RequestIdentifier;
++        if (contentView === this._styleChangesContentView)
++            return WebInspector.ElementSnapshotDiffDetailsClusterContentView.ResponseIdentifier;
++        console.error("Unknown contentView.");
++        return null;
++    },
++
++    _showContentViewForIdentifier: function(identifier)
++    {
++        var contentViewToShow = null;
++
++        switch (identifier) {
++        case WebInspector.ElementSnapshotDiffDetailsClusterContentView.RequestIdentifier:
++            contentViewToShow = this._canShowRequestContentView() ? this.requestContentView : null;
++            break;
++        case WebInspector.ElementSnapshotDiffDetailsClusterContentView.ResponseIdentifier:
++            contentViewToShow = this.responseContentView;
++            break;
++        }
++
++        if (!contentViewToShow)
++            contentViewToShow = this.responseContentView;
++
++        console.assert(contentViewToShow);
++
++        this._currentContentViewSetting.value = this._identifierForContentView(contentViewToShow);
++
++        return this.contentViewContainer.showContentView(contentViewToShow);
++    },
++
++    _pathComponentSelected: function(event)
++    {
++        this._showContentViewForIdentifier(event.data.pathComponent.representedObject);
++    },
++
++    _resourceTypeDidChange: function(event)
++    {
++        // Since resource views are based on the type, we need to make a new content view and tell the container to replace this
++        // content view with the new one. Make a new ResourceContentView which will use the new resource type to make the correct
++        // concrete ResourceContentView subclass.
++
++        var currentResponseContentView = this._styleChangesContentView;
++        if (!currentResponseContentView)
++            return;
++
++        delete this._styleChangesContentView;
++
++        this.contentViewContainer.replaceContentView(currentResponseContentView, this.responseContentView);
++    },
++
++    _resourceLoadingDidFinish: function(event)
++    {
++        if ("_positionToReveal" in this) {
++            if (this._contentViewContainer.currentContentView === this._styleChangesContentView)
++                this._styleChangesContentView.revealPosition(this._positionToReveal, this._textRangeToSelect, this._forceUnformatted);
++
++            delete this._positionToReveal;
++            delete this._textRangeToSelect;
++            delete this._forceUnformatted;
++        }
++    }
++};
++
++WebInspector.ElementSnapshotDiffDetailsClusterContentView.prototype.__proto__ = WebInspector.ClusterContentView.prototype;
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
 index 11b6897..8ed4547 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
@@ -613,5 +856,5 @@ index 1fb712b..75f38c8 100644
  
      hasCustomFilters: function()
 -- 
-2.2.2
+2.3.1
 

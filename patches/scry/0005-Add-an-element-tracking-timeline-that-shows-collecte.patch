@@ -1,4 +1,4 @@
-From cd48dcedff7eee7ef9a73d1ec14598a8f5300152 Mon Sep 17 00:00:00 2001
+From 682440dfb22018d8df95bd10b844b43666f9898f Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 09:45:51 -0800
 Subject: [PATCH] Add an element tracking timeline that shows collected
@@ -152,7 +152,7 @@ index aa653a3..3fdcd1c 100644
          // NOTE: Always stop immediately instead of waiting for a Timeline.recordingStopped event.
          // This way the UI feels as responsive to a stop as possible.
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index fff68b7..141d9b9 100644
+index 6ecf0f1..c32a92d 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -66,20 +66,21 @@
@@ -177,7 +177,7 @@ index fff68b7..141d9b9 100644
      <link rel="stylesheet" href="Views/GoToLineDialog.css">
      <link rel="stylesheet" href="Views/GradientSlider.css">
      <link rel="stylesheet" href="Views/HierarchicalPathComponent.css">
-@@ -233,20 +234,22 @@
+@@ -234,20 +235,22 @@
      <script src="Models/DOMNode.js"></script>
      <script src="Models/DOMNodeStyles.js"></script>
      <script src="Models/DOMSearchMatchObject.js"></script>
@@ -200,7 +200,7 @@ index fff68b7..141d9b9 100644
      <script src="Models/IndexedDatabaseObjectStoreIndex.js"></script>
      <script src="Models/IssueMessage.js"></script>
      <script src="Models/KeyboardShortcut.js"></script>
-@@ -379,20 +382,23 @@
+@@ -380,20 +383,23 @@
      <script src="Views/DebuggerSidebarPanel.js"></script>
      <script src="Views/DefaultDashboardView.js"></script>
      <script src="Views/DetailsSection.js"></script>
@@ -1372,5 +1372,5 @@ index e7dbcae..3ca86a9 100644
      this._currentTime = 0;
  };
 -- 
-2.2.2
+2.3.1
 

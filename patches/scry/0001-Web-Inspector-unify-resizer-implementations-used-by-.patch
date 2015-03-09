@@ -1,4 +1,4 @@
-From bebd08aea9fd22ec5f06be6ca1cff447285dbf54 Mon Sep 17 00:00:00 2001
+From a2b2a5d1efce20fce9ce4e11f2b833754b469c0e Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 6 Mar 2015 11:57:52 -0800
 Subject: [PATCH] Web Inspector: unify resizer implementations used by DataGrid
@@ -139,10 +139,10 @@ index 0d95bd5..0326fda 100644
          This could be delegated to a ContentViewContainer to simplify the logic. It also opens the possibility
          for other views to be displayed beneath the timeline overview graphs when it makes sense to do so.
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 69c98ce..c8f483a 100644
+index 2ec409a..afa57be 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -104,20 +104,21 @@
+@@ -103,20 +103,21 @@
      <link rel="stylesheet" href="Views/ObjectTreeMapEntryTreeElement.css">
      <link rel="stylesheet" href="Views/ObjectTreePropertyTreeElement.css">
      <link rel="stylesheet" href="Views/OverviewTimelineView.css">
@@ -164,7 +164,7 @@ index 69c98ce..c8f483a 100644
      <link rel="stylesheet" href="Views/ScriptTimelineView.css">
      <link rel="stylesheet" href="Views/SearchBar.css">
      <link rel="stylesheet" href="Views/SearchIcons.css">
-@@ -444,20 +445,21 @@
+@@ -433,20 +434,21 @@
      <script src="Views/ProbeDetailsSidebarPanel.js"></script>
      <script src="Views/ProbeSetDataGrid.js"></script>
      <script src="Views/ProbeSetDataGridNode.js"></script>
@@ -898,5 +898,5 @@ index e07be64..f77cae2 100644
  
  WebInspector.Sidebar.prototype.__proto__ = WebInspector.Object.prototype;
 -- 
-2.2.2
+2.3.1
 

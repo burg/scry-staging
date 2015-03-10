@@ -1,4 +1,4 @@
-From aff0fe56865ccd2b90fa7f74674a5487225dda33 Mon Sep 17 00:00:00 2001
+From 53720eea8b2f76468e5aa3c98a667f1f809f4a32 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 18 Feb 2015 12:56:05 -0800
 Subject: [PATCH] Refactor CSSAgent to use wrapper views, and assorted other
@@ -24,13 +24,13 @@ Tighten unique/pointer/reference types and modernize some enums.
  Source/WebCore/inspector/InspectorStyleProperty.h  |   72 ++
  Source/WebCore/inspector/InspectorStyleRule.cpp    |  125 ++
  Source/WebCore/inspector/InspectorStyleRule.h      |   98 ++
- Source/WebCore/inspector/InspectorStyleRuleSet.cpp |  223 ++++
- Source/WebCore/inspector/InspectorStyleRuleSet.h   |  127 ++
+ Source/WebCore/inspector/InspectorStyleRuleSet.cpp |  236 ++++
+ Source/WebCore/inspector/InspectorStyleRuleSet.h   |  130 ++
  Source/WebCore/inspector/InspectorStyleSheet.cpp   | 1354 --------------------
  Source/WebCore/inspector/InspectorStyleSheet.h     |  277 ----
  .../inspector/InspectorStylesheetRuleSet.cpp       |  339 +++++
  .../WebCore/inspector/InspectorStylesheetRuleSet.h |  179 +++
- 24 files changed, 2819 insertions(+), 1961 deletions(-)
+ 24 files changed, 2835 insertions(+), 1961 deletions(-)
  create mode 100644 Source/WebCore/inspector/InspectorCSSId.h
  create mode 100644 Source/WebCore/inspector/InspectorInlineStyleRuleSet.cpp
  create mode 100644 Source/WebCore/inspector/InspectorInlineStyleRuleSet.h
@@ -3673,10 +3673,10 @@ index 0000000..c4a8272
 +#endif // InspectorStyleRule_h
 diff --git a/Source/WebCore/inspector/InspectorStyleRuleSet.cpp b/Source/WebCore/inspector/InspectorStyleRuleSet.cpp
 new file mode 100644
-index 0000000..b1b3ff7
+index 0000000..315838cf
 --- /dev/null
 +++ b/Source/WebCore/inspector/InspectorStyleRuleSet.cpp
-@@ -0,0 +1,223 @@
+@@ -0,0 +1,236 @@
 +/*
 + * Copyright (C) 2010, Google Inc. All rights reserved.
 + * Copyright (C) 2015 University of Washington.
@@ -3778,6 +3778,19 @@ index 0000000..b1b3ff7
 +        flattenStyleRules(ruleList.item(i), result);
 +}
 +
++RefPtr<StaticCSSRuleList> ParsedRuleSetData::ruleListForStylesheet(StylesheetRuleSet& stylesheet)
++{
++    RefPtr<StaticCSSRuleList> ruleList = StaticCSSRuleList::create();
++    Vector<RefPtr<CSSRule>>& rules = ruleList->rules();
++    for (unsigned i = 0, size = stylesheet.pageStylesheet().length(); i < size; ++i) {
++        CSSRule* item = stylesheet.pageStylesheet().item(i);
++        if (item->type() == CSSRule::CHARSET_RULE)
++            continue;
++        rules.append(item);
++    }
++    return WTF::move(ruleList);
++}
++
 +std::unique_ptr<ParsedRuleSetData> ParsedRuleSetData::create(StylesheetRuleSet& stylesheet)
 +{
 +    String originalStylesheetText;
@@ -3807,8 +3820,8 @@ index 0000000..b1b3ff7
 +    flattenSourceData(*sourceData, *flattenedSourceData);
 +
 +    auto flattenedRules = std::make_unique<StyleRuleList>();
-+    if (RefPtr<CSSRuleList> ruleTree = stylesheet.pageStylesheet().cssRules())
-+        flattenStyleRules(*ruleTree, *flattenedRules);
++    if (RefPtr<StaticCSSRuleList> ruleList = ruleListForStylesheet(stylesheet))
++        flattenStyleRules(*ruleList, *flattenedRules);
 +
 +    return std::make_unique<ParsedRuleSetData>(stylesheetText, WTF::move(flattenedSourceData), WTF::move(flattenedRules));
 +}
@@ -3902,10 +3915,10 @@ index 0000000..b1b3ff7
 +} // namespace Inspector
 diff --git a/Source/WebCore/inspector/InspectorStyleRuleSet.h b/Source/WebCore/inspector/InspectorStyleRuleSet.h
 new file mode 100644
-index 0000000..381a259
+index 0000000..bed17dd
 --- /dev/null
 +++ b/Source/WebCore/inspector/InspectorStyleRuleSet.h
-@@ -0,0 +1,127 @@
+@@ -0,0 +1,130 @@
 +/*
 + * Copyright (C) 2010, Google Inc. All rights reserved.
 + * Copyright (C) 2015 University of Washington.
@@ -3947,6 +3960,7 @@ index 0000000..381a259
 +class CSSStyleRule;
 +class Document;
 +class Element;
++class StaticCSSRuleList;
 +
 +typedef Vector<RefPtr<CSSStyleRule>> StyleRuleList;
 +}
@@ -3987,6 +4001,8 @@ index 0000000..381a259
 +    }
 +
 +private:
++    static RefPtr<WebCore::StaticCSSRuleList> ruleListForStylesheet(StylesheetRuleSet&);
++    
 +    String m_sourceText;
 +    std::unique_ptr<Vector<size_t>> m_lineEndings;
 +    std::unique_ptr<WebCore::RuleSourceDataList> m_flattenedSourceData;
@@ -6207,5 +6223,5 @@ index 0000000..83a55b8
 +
 +#endif // InspectorStylesheetRuleSet_h
 -- 
-2.3.1
+2.3.2
 

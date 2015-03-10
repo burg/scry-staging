@@ -1,4 +1,4 @@
-From b72d0f4596b774604c28e971ca785acc87f2fb97 Mon Sep 17 00:00:00 2001
+From 9ecafda7422eaabda2fe3d83620d0f709520933b Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Tue, 10 Mar 2015 08:54:26 -0700
 Subject: [PATCH] WIP: effective style in frontend
@@ -9,9 +9,13 @@ Subject: [PATCH] WIP: effective style in frontend
  .../UserInterface/Models/EffectivePropertyData.js  | 86 ++++++++++++++++++++++
  .../UserInterface/Models/EffectiveStyleData.js     | 51 +++++++++++++
  .../UserInterface/Models/ElementSnapshot.js        |  5 ++
- 5 files changed, 146 insertions(+), 2 deletions(-)
+ .../Views/ElementSnapshotStyleContentView.css      | 27 +++++++
+ .../Views/ElementSnapshotStyleContentView.js       | 44 +++++++++++
+ 7 files changed, 217 insertions(+), 2 deletions(-)
  create mode 100644 Source/WebInspectorUI/UserInterface/Models/EffectivePropertyData.js
  create mode 100644 Source/WebInspectorUI/UserInterface/Models/EffectiveStyleData.js
+ create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.css
+ create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
 
 diff --git a/Source/JavaScriptCore/inspector/protocol/DOMTracing.json b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
 index 5e3f530..b220b11 100644
@@ -246,6 +250,89 @@ index 23fb55d..4a0071e 100644
 +        return this._effectiveStyle;
      }
  }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.css b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.css
+new file mode 100644
+index 0000000..9746074
+--- /dev/null
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.css
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) 2015 University of Washington.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++.content-view.element-snapshot-style {
++}
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
+new file mode 100644
+index 0000000..d1b572f
+--- /dev/null
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (C) 2015 University of Washington. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++WebInspector.ElementSnapshotStyleContentView = function(snapshot)
++{
++    console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
++    WebInspector.ContentView.call(this, snapshot, WebInspector.ElementSnapshotStyleContentView.StyleClassName);
++
++    this.element.classList.add(WebInspector.ElementSnapshotStyleContentView.StyleClassName);
++
++    this._imageElement = document.createElement("img");
++    this._imageElement.src = snapshot.contentURL;
++    this.element.appendChild(this._imageElement);
++};
++
++WebInspector.ElementSnapshotStyleContentView.StyleClassName = "element-snapshot-style";
++
++WebInspector.ElementSnapshotStyleContentView.prototype = {
++    constructor: WebInspector.ElementSnapshotStyleContentView,
++    __proto__: WebInspector.ContentView.prototype,
++
++};
 -- 
-2.3.1
+2.3.2
 

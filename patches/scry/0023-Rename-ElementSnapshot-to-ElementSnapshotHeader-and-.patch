@@ -1,4 +1,4 @@
-From bc882f5660b5b5cb523d93e62550a3b524e9ec84 Mon Sep 17 00:00:00 2001
+From 6e97ec4b0f15dc063daf2e0af608e191e126bd0e Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Mar 2015 10:57:03 -0700
 Subject: [PATCH] Rename ElementSnapshot to ElementSnapshotHeader, and
@@ -720,5 +720,5 @@ index 75f38c8..2b34ccc 100644
  
      showSubviewForRepresentedObject: function(representedObject)
 -- 
-2.3.1
+2.3.2
 

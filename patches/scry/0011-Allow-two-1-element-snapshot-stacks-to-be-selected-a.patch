@@ -1,4 +1,4 @@
-From 5fe344929cfa4a1cfc3446177147ad0f028132cd Mon Sep 17 00:00:00 2001
+From 39d5c1daa32d9b69f75b44191aa7409c611825e3 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 2 Mar 2015 14:55:06 -0800
 Subject: [PATCH] Allow two 1-element snapshot stacks to be selected at a time.
@@ -219,5 +219,5 @@ index 3abad47..ef291af 100644
          // If this bar has no time info, return early.
          if (isNaN(barStartTime))
 -- 
-2.3.1
+2.3.2
 

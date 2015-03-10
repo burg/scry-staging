@@ -1,4 +1,4 @@
-From 8e668d776ab84249f4dd9690e4e986270106bf0a Mon Sep 17 00:00:00 2001
+From 2cc4b225d385b528320c94d5e6618084ed03b987 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 15 Jan 2015 13:51:04 -0800
 Subject: [PATCH] Stub out an agent for new DOMTracing domain.
@@ -681,5 +681,5 @@ index f91a685..37f6efb 100644
  
  #endif // !defined(InstrumentingAgents_h)
 -- 
-2.2.2
+2.3.1
 

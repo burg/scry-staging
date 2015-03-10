@@ -1,0 +1,251 @@
+From b72d0f4596b774604c28e971ca785acc87f2fb97 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Tue, 10 Mar 2015 08:54:26 -0700
+Subject: [PATCH] WIP: effective style in frontend
+
+---
+ .../inspector/protocol/DOMTracing.json             |  4 +-
+ Source/WebInspectorUI/UserInterface/Main.html      |  2 +
+ .../UserInterface/Models/EffectivePropertyData.js  | 86 ++++++++++++++++++++++
+ .../UserInterface/Models/EffectiveStyleData.js     | 51 +++++++++++++
+ .../UserInterface/Models/ElementSnapshot.js        |  5 ++
+ 5 files changed, 146 insertions(+), 2 deletions(-)
+ create mode 100644 Source/WebInspectorUI/UserInterface/Models/EffectivePropertyData.js
+ create mode 100644 Source/WebInspectorUI/UserInterface/Models/EffectiveStyleData.js
+
+diff --git a/Source/JavaScriptCore/inspector/protocol/DOMTracing.json b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
+index 5e3f530..b220b11 100644
+--- a/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
++++ b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
+@@ -37,28 +37,28 @@
+                 { "name": "styleData", "$ref": "EffectiveStyle", "description": "Effective style for element based on properties contributed from inline styles and rules." }
+             ]
+         },
+         {
+             "id": "EffectiveStyle",
+             "type": "object",
+             "properties": [
+                 { "name": "elements", "type": "array", "items": { "$ref": "ElementEntry" }, "description": "Elements that contributed styles from rules and inline styles, ordered from target element to root." },
+                 { "name": "properties", "type": "array", "items": { "$ref": "PropertyEntry"}, "description": "Effective properties for the target element." }
+             ],
+-            "description": "Describes the effective styles for the target element and where the style properties came from."
++            "description": "Describes the effective style properties for the target element, with cross-references to the elements that contributed properties via inline styles and matched rules"
+         },
+         {
+             "id": "PropertyEntry",
+             "type": "object",
+             "properties": [
+                 { "name": "property", "$ref": "CSS.CSSProperty", "description": "A property that forms part of the effective element style." },
+-                { "name": "sourceRule", "$ref": "CSS.CSSRuleId", "optional": true, "description": "If property was contributed by a rule, the rule's identifier at time of snapshot."},
++                { "name": "sourceRule", "$ref": "CSS.CSSRuleId", "optional": true, "description": "If property was contributed by a rule that matched the target or target's ancestor element, the rule's identifier at time of snapshot. This identifier cross-references to a MatchedRule's CSSRuleId for the element that matched the rule."},
+                 { "name": "sourceElement", "$ref": "DOM.NodeId", "optional": true, "description": "If property was contributed by an element's inline style, the element's identifier at time of snapshot."}
+             ],
+             "description": "An effective style property contributed by a rule or inline style."
+          },
+         {
+             "id": "ElementEntry",
+             "type": "object",
+             "properties": [
+                 { "name": "nodeId", "$ref": "DOM.NodeId", "description": "Id for the ancestor element that contributed inherited styles."},
+                 { "name": "inlineStyle", "$ref": "CSS.CSSStyle", "optional": true, "description": "The ancestor element's inline style, if any, in the style inheritance chain." },
+diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
+index 1327cb4..d8b9482 100644
+--- a/Source/WebInspectorUI/UserInterface/Main.html
++++ b/Source/WebInspectorUI/UserInterface/Main.html
+@@ -238,20 +238,22 @@
+     <script src="Models/CookieStorageObject.js"></script>
+     <script src="Models/DOMNode.js"></script>
+     <script src="Models/DOMNodeStyles.js"></script>
+     <script src="Models/DOMSearchMatchObject.js"></script>
+     <script src="Models/DOMStorageObject.js"></script>
+     <script src="Models/DOMTree.js"></script>
+     <script src="Models/DatabaseObject.js"></script>
+     <script src="Models/DatabaseTableObject.js"></script>
+     <script src="Models/DebuggerDashboard.js"></script>
+     <script src="Models/DefaultDashboard.js"></script>
++    <script src="Models/EffectivePropertyData.js"></script>
++    <script src="Models/EffectiveStyleData.js"></script>
+     <script src="Models/ElementSnapshot.js"></script>
+     <script src="Models/ElementSnapshotDiff.js"></script>
+     <script src="Models/ElementTrackingTimeline.js"></script>
+     <script src="Models/ElementTrackingTimelineRecord.js"></script>
+     <script src="Models/ExecutionContext.js"></script>
+     <script src="Models/ExecutionContextList.js"></script>
+     <script src="Models/Frame.js"></script>
+     <script src="Models/Geometry.js"></script>
+     <script src="Models/Gradient.js"></script>
+     <script src="Models/IndexedDatabase.js"></script>
+diff --git a/Source/WebInspectorUI/UserInterface/Models/EffectivePropertyData.js b/Source/WebInspectorUI/UserInterface/Models/EffectivePropertyData.js
+new file mode 100644
+index 0000000..49fb465
+--- /dev/null
++++ b/Source/WebInspectorUI/UserInterface/Models/EffectivePropertyData.js
+@@ -0,0 +1,86 @@
++/*
++ * Copyright (C) 2013 Apple Inc. All rights reserved.
++ * Copyright (C) 2015 University of Washington.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++WebInspector.EffectivePropertyData = function(data)
++{
++    this._text = data.text || "";
++    this._name = data.name || "";
++    this._value = data.value || "";
++    this._priority = data.priority || null;
++}
++
++WebInspector.EffectivePropertyData.fromPayload = function(payload)
++{
++    // Convert from protocol values to model values/enums.
++    var relevantData = {
++        "text": payload.property.text,
++        "name": payload.property.name,
++        "value": payload.property.value,
++        "priority": payload.property.priority,
++    };
++
++    return new WebInspector.EffectivePropertyData(relevantData);
++}
++
++WebInspector.EffectivePropertyData.prototype = {
++    constructor: WebInspector.EffectivePropertyData,
++    __proto__: WebInspector.Object.prototype,
++
++    get synthesizedText()
++    {
++        var name = this.name;
++        if (!name)
++            return "";
++
++        var priority = this.priority;
++        return name + ": " + this.value.trim() + (priority ? " !" + priority : "") + ";";
++    },
++
++    get text()
++    {
++        return this._text || this.synthesizedText;
++    },
++
++    get name()
++    {
++        return this._name;
++    },
++
++    get value()
++    {
++        return this._value;
++    },
++
++    get important()
++    {
++        return this.priority === "important";
++    },
++
++    get priority()
++    {
++        return this._priority;
++    },
++}
+diff --git a/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleData.js b/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleData.js
+new file mode 100644
+index 0000000..dcfd317
+--- /dev/null
++++ b/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleData.js
+@@ -0,0 +1,51 @@
++/*
++ * Copyright (C) 2015 University of Washington.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++WebInspector.EffectiveStyleData = function(properties)
++{
++    this._properties = properties;
++
++    var styleText = [];
++    for (var property of this._properties)
++        styleText.push(property.text);
++
++    console.log(styleText);
++}
++
++WebInspector.EffectiveStyleData.fromPayload = function(payload)
++{
++    var parsedProperties = payload.properties.map(WebInspector.EffectivePropertyData.fromPayload);
++    return new WebInspector.EffectiveStyleData(parsedProperties);
++}
++
++WebInspector.EffectiveStyleData.prototype = {
++    constructor: WebInspector.EffectiveStyleData,
++    __proto__: WebInspector.Object.prototype,
++
++    get properties()
++    {
++        return this._properties.slice();
++    }
++}
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+index 23fb55d..4a0071e 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+@@ -87,12 +87,17 @@ WebInspector.ElementSnapshot.prototype = {
+ 
+         if (!this._imageDataURL)
+             return null;
+ 
+         if (this._imageDataURL.length > maximumDataURLSize) {
+             console.error("Element snapshot too large " + Number.bytesToString(this._imageDataURL.length) + "for data url.");
+             return null;
+         }
+ 
+         return this._imageDataURL;
++    },
++
++    get effectiveStyle()
++    {
++        return this._effectiveStyle;
+     }
+ }
+-- 
+2.3.1
+

@@ -1,4 +1,4 @@
-From 3bdcb4aa4b502cd3e3dd9daa1c522a03bbfa94e6 Mon Sep 17 00:00:00 2001
+From 6e37271a2308bea53e88c822e7f1324e025b7403 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 6 Mar 2015 11:57:52 -0800
 Subject: [PATCH] Web Inspector: unify resizer implementations used by DataGrid
@@ -826,5 +826,5 @@ index e07be64..f77cae2 100644
  
  WebInspector.Sidebar.prototype.__proto__ = WebInspector.Object.prototype;
 -- 
-2.2.2
+2.3.1
 

@@ -1,4 +1,4 @@
-From 5fbbbf768f9b5bfeb6807de68dff86496940aa14 Mon Sep 17 00:00:00 2001
+From 73ff59c0d43721eb19e13de45001afe1ee8fbecc Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 5 Mar 2015 16:51:28 -0800
 Subject: [PATCH] When two snapshots are selected, create an
@@ -856,5 +856,5 @@ index 1fb712b..75f38c8 100644
  
      hasCustomFilters: function()
 -- 
-2.2.2
+2.3.1
 

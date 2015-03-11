@@ -1,4 +1,4 @@
-From 0b39e214c0d408873c5685320e81c391d07f6ea1 Mon Sep 17 00:00:00 2001
+From ae90d84ec4a0469427d365a2230e843f756e978b Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 4 Mar 2015 15:46:47 -0800
 Subject: [PATCH] Show the ElementSnapshotContentView inside the
@@ -7,7 +7,7 @@ Subject: [PATCH] Show the ElementSnapshotContentView inside the
  - Construct path components that include the selected timeline and components for the container's content view.
  - Add icons and tasteful titles/subtitles for Element Snapshot path components and "Output Changed" record tree elements.
 ---
- .../Localizations/en.lproj/localizedStrings.js     | Bin 59960 -> 60058 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 60148 -> 60246 bytes
  .../UserInterface/Models/ElementSnapshot.js        |   5 ++-
  .../Models/ElementTrackingTimeline.js              |   5 +++
  .../Views/ElementSnapshotContentView.js            |   9 +++++
@@ -20,13 +20,13 @@ Subject: [PATCH] Show the ElementSnapshotContentView inside the
  10 files changed, 85 insertions(+), 24 deletions(-)
 
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index 74ed863039a68687a23e145622861480847d243f..67b8305a6ce04eaac144648dbebbd2410fa0d506 100644
+index 7dd834895a2cae6f0a25c96dd189e9ec8e4f3d8c..0b5c2a8937d127b2ef6d475a8d5010628efcd03e 100644
 GIT binary patch
-delta 52
-zcmdmSg?ZLh<_%X)bLTN6G88ZrGh{I2Pd+Fi${WmpEb?E{c(TG7p3V18N67&I@w5_*
+delta 48
+ucmexzmHFB=<_#0haOW{3G88ZrGh{I2Pd+Fi${WmpEb?E{cyr&GG&umbKM?f*
 
-delta 14
-WcmbPrm3hY%<_%X)Z#FxVA_o9FX$Ob^
+delta 18
+acmcb1jrq$}<_#0hOm;ZSwfWDPC^-OStO_Ln
 
 diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
 index eac2127..e7a2d09 100644

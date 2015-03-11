@@ -1,11 +1,11 @@
-From 82131c86d6cfb157344a164e4f72de71e3c89718 Mon Sep 17 00:00:00 2001
+From 760bdf584fb956ba52632de6938607edbc5a16dd Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sun, 8 Mar 2015 14:59:06 -0700
 Subject: [PATCH] Convert the snapshot content view to be a cluster content
  view.
 
 ---
- .../Localizations/en.lproj/localizedStrings.js     | Bin 60232 -> 60338 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 60420 -> 60526 bytes
  .../WebInspectorUI/UserInterface/Images/Camera.svg |   6 +
  Source/WebInspectorUI/UserInterface/Main.html      |   3 +
  ...ntentView.js => ElementSnapshotContentView.css} |  34 +-----
@@ -19,14 +19,14 @@ Subject: [PATCH] Convert the snapshot content view to be a cluster content
  copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotContentView.js => ElementSnapshotOutputContentView.js} (62%)
 
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index 95bab004ffa5ae57406a5b2a1e41d09acf64f95b..3f964dddf13c535b075756fc2d718fd14b1f713e 100644
+index 26f0a63aab8db18dbe9874442f1f8fef160bec9e..f0b7b5656fd134877ae3812be85ffad7dbbb6e06 100644
 GIT binary patch
-delta 93
-zcmX?cjd{~`<_#uiCL5gP+5GOzB+1DpXV%$<F=R3nGn6tUGUPBQF!%#mB@6{%Qi&lJ
-WC}Io5N(?wuO%~+W-Q4i(1PcJC`x?mr
+delta 89
+zcmZp<!Tjz9^M(&+HqSddPjd2yGwXnu#j=>8lp&EJhe3hCAIK_UC;*d646#5FTOd|q
+U2xG`(z@lohAiwTro98E30M?KjssI20
 
-delta 27
-lcmV+$0ObF&*8|Ab1F$sAlYr&~lh);`voy?}8MEr<$OP8S4~zf+
+delta 26
+kcmV+#0OkMg*aL*v1F-PSlaA)Dv+&HG8ItG@v$W^B1l_t21ONa4
 
 diff --git a/Source/WebInspectorUI/UserInterface/Images/Camera.svg b/Source/WebInspectorUI/UserInterface/Images/Camera.svg
 new file mode 100644

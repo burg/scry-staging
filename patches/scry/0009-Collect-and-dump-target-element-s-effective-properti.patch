@@ -1,4 +1,4 @@
-From 945d0db86e2c0216d8bc0c880217ec326351ea11 Mon Sep 17 00:00:00 2001
+From fce70978080acf459cb4e62e98f0bb59352716c9 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 27 Feb 2015 11:09:08 -0800
 Subject: [PATCH] Collect and dump target element's effective properties and
@@ -6,16 +6,16 @@ Subject: [PATCH] Collect and dump target element's effective properties and
 
 ---
  Source/JavaScriptCore/inspector/protocol/CSS.json  |   1 +
- .../inspector/protocol/DOMTracing.json             |  32 +++-
+ .../inspector/protocol/DOMTracing.json             |  33 +++-
  Source/WebCore/inspector/InspectorCSSAgent.cpp     |   1 +
  Source/WebCore/inspector/InspectorController.cpp   |   6 +-
- .../WebCore/inspector/InspectorDOMTracingAgent.cpp | 208 ++++++++++++++++++++-
+ .../WebCore/inspector/InspectorDOMTracingAgent.cpp | 210 ++++++++++++++++++++-
  .../WebCore/inspector/InspectorDOMTracingAgent.h   |  21 ++-
  .../inspector/InspectorStyleDeclaration.cpp        |  24 +++
  .../WebCore/inspector/InspectorStyleDeclaration.h  |   5 +
  .../WebCore/inspector/InspectorStyleProperty.cpp   |   6 +
  Source/WebCore/inspector/InspectorStyleProperty.h  |   2 +
- 10 files changed, 289 insertions(+), 17 deletions(-)
+ 10 files changed, 292 insertions(+), 17 deletions(-)
 
 diff --git a/Source/JavaScriptCore/inspector/protocol/CSS.json b/Source/JavaScriptCore/inspector/protocol/CSS.json
 index aef4a02..25a7900 100644
@@ -44,10 +44,10 @@ index aef4a02..25a7900 100644
              "properties": [
                  { "name": "rule", "$ref": "CSSRule", "description": "CSS rule in the match." },
 diff --git a/Source/JavaScriptCore/inspector/protocol/DOMTracing.json b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
-index 191aabf..5e3f530 100644
+index 191aabf..c68f475 100644
 --- a/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
 +++ b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
-@@ -26,24 +26,54 @@
+@@ -26,24 +26,55 @@
                  { "name": "snapshotId", "$ref": "SnapshotId" },
                  { "name": "boundingBox", "$ref": "FloatRect", "description": "Bounding box for the element's fragments in root view (global, absolute) coordinates." },
                  { "name": "elapsedTimestamp", "type": "number", "description": "Elapsed time since the start of page execution when the snapshot was created." }
@@ -67,6 +67,7 @@ index 191aabf..5e3f530 100644
 +            "id": "EffectiveStyle",
 +            "type": "object",
 +            "properties": [
++                { "name": "targetElement", "$ref": "DOM.NodeId", "description": "The id for the element that was snapshotted."},
 +                { "name": "elements", "type": "array", "items": { "$ref": "ElementEntry" }, "description": "Elements that contributed styles from rules and inline styles, ordered from target element to root." },
 +                { "name": "properties", "type": "array", "items": { "$ref": "PropertyEntry"}, "description": "Effective properties for the target element." }
 +            ],
@@ -178,7 +179,7 @@ index 8cb943b..625519f 100644
  
      auto consoleAgentPtr = std::make_unique<PageConsoleAgent>(m_injectedScriptManager.get(), m_domAgent);
 diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-index b432b53..ea45b37 100644
+index b432b53..890e821 100644
 --- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 @@ -25,41 +25,54 @@
@@ -236,7 +237,7 @@ index b432b53..ea45b37 100644
  {
  }
  
-@@ -71,42 +84,214 @@ bool operator==(const ElementSnapshot& a, const ElementSnapshot& b)
+@@ -71,42 +84,216 @@ bool operator==(const ElementSnapshot& a, const ElementSnapshot& b)
      // These are root frame view coordinates, so scrolling will not affect equality.
      if (a.boundingBox != b.boundingBox)
          return false;
@@ -306,7 +307,7 @@ index b432b53..ea45b37 100644
 +    std::bitset<numCSSProperties> propertyIsClaimed;
 +    HashMap<CSSPropertyID, WebCore::StyleRule*> winningRuleMap;
 +    HashMap<CSSPropertyID, Element*> winningInlineStyleMap;
-+    HashMap<Element*, Vector<WebCore::StyleRule*>> rulesToKeepForElement;
++    HashMap<Element*, std::unique_ptr<Vector<RefPtr<WebCore::StyleRule>>>> rulesToKeepForElement;
 +    HashSet<Element*> elementsWithUsefulInlineStyle;
 +
 +    StyleResolver& styleResolver = targetElement.document().ensureStyleResolver();
@@ -364,10 +365,10 @@ index b432b53..ea45b37 100644
 +                continue;
 +
 +            if (!rulesToKeepForElement.contains(element))
-+                rulesToKeepForElement.set(element, Vector<WebCore::StyleRule*>());
++                rulesToKeepForElement.set(element, std::make_unique<Vector<RefPtr<WebCore::StyleRule>>>());
 +
-+            auto rulesToKeep = rulesToKeepForElement.get(element);
-+            rulesToKeep.append(rule.get());
++            if (Vector<RefPtr<WebCore::StyleRule>>* rulesToKeep = rulesToKeepForElement.get(element))
++                rulesToKeep->append(WTF::move(rule));
 +        }
 +        // TODO: add matched pseudo style rules. See CSSAgent. It could be folded into above.
 +    }
@@ -378,9 +379,10 @@ index b432b53..ea45b37 100644
 +    for (Element* element = &targetElement; element; element = element->parentElement()) {
 +        auto matchedRulesArray = Inspector::Protocol::Array<Inspector::Protocol::CSS::RuleMatch>::create();
 +
-+        const Vector<WebCore::StyleRule*>& rulesToKeep = rulesToKeepForElement.get(element);
-+        for (WebCore::StyleRule* rule : rulesToKeep)
-+            matchedRulesArray->addItem(m_cssAgent->buildObjectForMatchedRule(*rule, *element));
++        if (const Vector<RefPtr<WebCore::StyleRule>>* rulesToKeep = rulesToKeepForElement.get(element)) {
++            for (RefPtr<WebCore::StyleRule> rule : *rulesToKeep)
++                matchedRulesArray->addItem(m_cssAgent->buildObjectForMatchedRule(*rule, *element));
++        }
 +
 +        auto elementObject = Inspector::Protocol::DOMTracing::ElementEntry::create()
 +            .setNodeId(m_domAgent->pushNodePathToFrontend(element))
@@ -435,6 +437,7 @@ index b432b53..ea45b37 100644
 +    }
 +
 +    auto effectiveStyleObject = Inspector::Protocol::DOMTracing::EffectiveStyle::create()
++        .setTargetElement(m_domAgent->pushNodePathToFrontend(&targetElement))
 +        .setElements(WTF::move(elementsArray))
 +        .setProperties(WTF::move(propertiesArray))
 +        .release();
@@ -452,7 +455,7 @@ index b432b53..ea45b37 100644
  
  void DOMTracingAgent::willDestroyFrontendAndBackend(DisconnectReason)
  {
-@@ -154,36 +339,37 @@ void DOMTracingAgent::stopTracking(ErrorString& error, int nodeId)
+@@ -154,36 +341,37 @@ void DOMTracingAgent::stopTracking(ErrorString& error, int nodeId)
  
  void DOMTracingAgent::getSnapshotPayload(ErrorString& error, int snapshotId, RefPtr<Inspector::Protocol::DOMTracing::ElementSnapshotPayload>& out_snapshotPayload)
  {
@@ -498,7 +501,7 @@ index b432b53..ea45b37 100644
      // If the target node was in this frame, its document will soon be detached.
      if (!m_targetElement || m_targetElement->document().frame() == &frame)
          setTargetElement(nullptr);
-@@ -334,22 +520,24 @@ void DOMTracingAgent::commitSnapshot(std::unique_ptr<ElementSnapshot> snapshot)
+@@ -334,22 +522,24 @@ void DOMTracingAgent::commitSnapshot(std::unique_ptr<ElementSnapshot> snapshot)
      // Empty snapshots are loaded when tracking is stopped. Don't save those.
      if (m_currentSnapshot && m_currentSnapshot->snapshotId) {
          uint64_t key = m_currentSnapshot->snapshotId;

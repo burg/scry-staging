@@ -1,11 +1,11 @@
-From a4d78b609a1abc05c7506ddc222880e7346d0f29 Mon Sep 17 00:00:00 2001
+From cf451aba7286c09ad0983003d4f998edcc7d1de9 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 5 Mar 2015 16:51:28 -0800
 Subject: [PATCH] When two snapshots are selected, create an
  ElementSnapshotDiff and show it as a subview.
 
 ---
- .../Localizations/en.lproj/localizedStrings.js     | Bin 60058 -> 60232 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 60246 -> 60420 bytes
  .../UserInterface/Controllers/DOMTracingManager.js |  32 +++
  .../WebInspectorUI/UserInterface/Images/Diff.svg   |  12 ++
  Source/WebInspectorUI/UserInterface/Main.html      |   3 +
@@ -27,14 +27,14 @@ Subject: [PATCH] When two snapshots are selected, create an
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffDetailsClusterContentView.js
 
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index 67b8305a6ce04eaac144648dbebbd2410fa0d506..95bab004ffa5ae57406a5b2a1e41d09acf64f95b 100644
+index 0b5c2a8937d127b2ef6d475a8d5010628efcd03e..26f0a63aab8db18dbe9874442f1f8fef160bec9e 100644
 GIT binary patch
-delta 146
-zcmbPrmHEUq<_#ui>cbc^8B!U_859_t88R3W8S)s?f&5}1UxOhS$V+4>0P->z@)=6N
-lqN)rj48jT^Qj<Z6Ar`347KoJ?$TVm2!n1~(&CaCA0RaD;9#;SW
+delta 153
+zcmcb1jk)Cp^M(&+>cbc^8B!U_859_t88R3W8S)s?f&5}1UxOhS$V+4>0P->z@)=6N
+sqN)rj48jT^Qj<Z6Ar`347KoJ?$TWwEA!YKzBl?pa&T?)3b0$g-06!@r4*&oF
 
-delta 18
-acmX?cjd|8p<_#uiCL5gP+5GNIlpFwB$_YgP
+delta 14
+WcmZp<!F=r+^M(&+HqSeoCI<jMD+nC`
 
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
 index 3422942..be8152b 100644

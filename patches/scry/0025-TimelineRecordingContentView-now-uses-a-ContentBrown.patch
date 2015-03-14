@@ -1,4 +1,4 @@
-From 094252298455d485ea71c94cf3de64ed01b86783 Mon Sep 17 00:00:00 2001
+From c2e3c51ab0121eb3b97eec8a0a6ab57f5dbcbae0 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 11 Mar 2015 14:03:02 -0700
 Subject: [PATCH] TimelineRecordingContentView now uses a ContentBrownser.
@@ -217,7 +217,7 @@ index 2c2a1a3..8a0071a 100644
      background-size: 100% 40px;
  }
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
-index 1685e17..618ff58 100644
+index 55cbd94..633eb1c 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
 @@ -29,23 +29,24 @@ WebInspector.TimelineRecordingContentView = function(recording)
@@ -381,13 +381,13 @@ index 1685e17..618ff58 100644
          return currentContentView && currentContentView.saveData || null;
      },
  
-     get timelineViewForSelectedTimeline()
+     get lastShownTimelineView()
      {
          // This could return the timeline view even if it is not currently visible in the view container.
          // Since this timeline view's content outline could be showing in the timeline sidebar, we need
          // to keep its current time range, filters, etc in sync even if the data grid is not visible.
          if (!WebInspector.timelineSidebarPanel.selectedTimeline)
-             return null;
+             return this._overviewTimelineView;
  
          return this._timelineViewMap.get(WebInspector.timelineSidebarPanel.selectedTimeline);
      },
@@ -507,7 +507,7 @@ index 1685e17..618ff58 100644
 +
      _currentContentViewDidChange: function(event)
      {
-         var timelineView = this.timelineViewForSelectedTimeline;
+         var timelineView = this.lastShownTimelineView;
          if (timelineView) {
              WebInspector.timelineSidebarPanel.contentTreeOutline = timelineView.navigationSidebarTreeOutline;
              WebInspector.timelineSidebarPanel.contentTreeOutlineLabel = timelineView.navigationSidebarTreeOutlineLabel;

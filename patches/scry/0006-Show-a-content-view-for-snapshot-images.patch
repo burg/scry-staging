@@ -1,4 +1,4 @@
-From 557eb021d74558447606fcb10f61d91277a8d2e7 Mon Sep 17 00:00:00 2001
+From c392fb7f52f807cb28d0841d639f52ec18b7658b Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 21:44:02 -0800
 Subject: [PATCH] Show a content view for snapshot images.

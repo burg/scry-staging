@@ -1,4 +1,4 @@
-From 7f791cc0cc084a1ebbf631da79747072a163669e Mon Sep 17 00:00:00 2001
+From 1560cfbad4ad3b885905bb1f17d67814c7d1d792 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 5 Mar 2015 10:41:44 -0800
 Subject: [PATCH] Clicking a snapshot in timeline should show its content view.

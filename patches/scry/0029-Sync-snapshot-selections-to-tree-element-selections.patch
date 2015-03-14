@@ -1,0 +1,428 @@
+From e8b8e32cad86682523102ec7ef03bb58dd252487 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Fri, 13 Mar 2015 12:05:10 -0700
+Subject: [PATCH] Sync snapshot selections to tree element selections.
+
+---
+ .../UserInterface/Models/ElementSnapshot.js        |  5 ++
+ .../Views/ElementSnapshotDiffContentView.js        | 48 ++----------------
+ .../Views/ElementTrackingTimelineOverviewGraph.js  | 58 +++++++++++++++-------
+ .../Views/TimelineRecordingContentView.js          | 15 ++++--
+ 4 files changed, 60 insertions(+), 66 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+index defb810..d521232 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+@@ -88,20 +88,25 @@ WebInspector.ElementSnapshot.prototype = {
+     get snapshotId()
+     {
+         return this._header.snapshotId;
+     },
+ 
+     get ordinal()
+     {
+         return this._header.ordinal;
+     },
+ 
++    get header()
++    {
++        return this._header;
++    },
++
+     get contentURL()
+     {
+         const maximumDataURLSize = 1024 * 1024; // 1 MiB
+ 
+         if (!this._imageDataURL)
+             return null;
+ 
+         if (this._imageDataURL.length > maximumDataURLSize) {
+             console.error("Element snapshot too large " + Number.bytesToString(this._imageDataURL.length) + "for data url.");
+             return null;
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
+index 21cb0bb..cb06887 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
+@@ -45,36 +45,20 @@ WebInspector.ElementSnapshotDiffContentView = function(snapshotDiff)
+ 
+     this._outputPathComponent = createClusterPathComponent.call(this, WebInspector.UIString("Visual Output"), WebInspector.ElementSnapshotDiffContentView.VisualOutputIconStyleClassName, WebInspector.ElementSnapshotDiffContentView.VisualOutputIdentifier, false, false);
+     this._stylePathComponent = createClusterPathComponent.call(this, WebInspector.UIString("Effective Style"), WebInspector.ElementSnapshotDiffContentView.EffectiveStyleIconStyleClassName, WebInspector.ElementSnapshotDiffContentView.EffectiveStyleIdentifier, false, false);
+ 
+     this._outputPathComponent.nextSibling = this._stylePathComponent;
+     this._stylePathComponent.previousSibling = this._outputPathComponent;
+ 
+     this._currentContentViewSetting = new WebInspector.Setting("element-snapshot-diff-current-view", WebInspector.ElementSnapshotDiffContentView.VisualOutputIdentifier);
+ 
+     this.element.classList.add(WebInspector.ElementSnapshotDiffContentView.StyleClassName);
+-
+-    var resizerDelegate = this;
+-    this._resizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
+-    this.element.appendChild(this._resizer.element);
+-
+-    this._preimageElement = document.createElement("img");
+-    this._preimageElement.className = WebInspector.ElementSnapshotDiffContentView.SplitPaneStyleClassName;
+-    this._preimageElement.src = this._preState.contentURL;
+-    this.element.appendChild(this._preimageElement);
+-
+-    this._postimageElement = document.createElement("img");
+-    this._postimageElement.className = WebInspector.ElementSnapshotDiffContentView.SplitPaneStyleClassName;
+-    this._postimageElement.src = this._postState.contentURL;
+-    this.element.appendChild(this._postimageElement);
+-
+-    this._repositionSplitPanes(0.5);
+ };
+ 
+ WebInspector.ElementSnapshotDiffContentView.VisualOutputIdentifier = "visual-output";
+ WebInspector.ElementSnapshotDiffContentView.EffectiveStyleIdentifier = "effective-style";
+ 
+ WebInspector.ElementSnapshotDiffContentView.IconStyleClassName = "snapshot-diff-icon";
+ WebInspector.ElementSnapshotDiffContentView.VisualOutputIconStyleClassName = "visual-output-icon";
+ WebInspector.ElementSnapshotDiffContentView.EffectiveStyleIconStyleClassName = "effective-style-icon";
+ 
+ WebInspector.ElementSnapshotDiffContentView.StyleClassName = "element-snapshot-diff";
+@@ -94,20 +78,25 @@ WebInspector.ElementSnapshotDiffContentView.prototype = {
+         var components = [this._pathComponent, this._pathComponentForContentView(currentContentView)];
+         return components.concat(currentContentView.selectionPathComponents);
+     },
+ 
+     // Disallow the quick console from popping up, we need a lot of space.
+     get supportsSplitContentBrowser()
+     {
+         return false;
+     },
+ 
++    get supplementalRepresentedObjects()
++    {
++        return [this._preState, this._postState];
++    },
++
+     get visualOutputContentView()
+     {
+         if (!this._visualOutputContentView)
+             this._visualOutputContentView = new WebInspector.ElementSnapshotDiffOutputContentView(this._snapshotDiff);
+ 
+         return this._visualOutputContentView;
+     },
+ 
+     get effectiveStyleContentView()
+     {
+@@ -151,47 +140,20 @@ WebInspector.ElementSnapshotDiffContentView.prototype = {
+         return this._showContentViewForIdentifier(WebInspector.ElementSnapshotDiffContentView.VisualOutputIdentifier);
+     },
+ 
+     showEffectiveStyle: function()
+     {
+         this._shownInitialContent = true;
+ 
+         return this._showContentViewForIdentifier(WebInspector.ElementSnapshotDiffContentView.EffectiveStyleIdentifier);
+     },
+ 
+-    // Protected
+-
+-    resizerDragStarted: function(resizer)
+-    {
+-        this._centerOffsetBeforeDrag = resizer.initialPosition - this.element.totalOffsetLeft;
+-    },
+-
+-    resizerDragging: function(resizer, positionDelta)
+-    {
+-        var availableWidth = this.element.offsetWidth;
+-        var centerPercent = (this._centerOffsetBeforeDrag - positionDelta) / availableWidth;
+-        this._repositionSplitPanes(Number.constrain(centerPercent, 0.01, 0.99));
+-    },
+-
+-    // Private
+-
+-    _repositionSplitPanes: function(centerPercent)
+-    {
+-        if (centerPercent === this._centerPercent)
+-            return;
+-
+-        this._centerPercent = centerPercent || 0.5;
+-        this._resizer.element.style.left = "%.5f".format(this._centerPercent * 100) + '%';
+-        this._preimageElement.style.right = "%.5f".format((1.0 - this._centerPercent) * 100) + '%';
+-        this._postimageElement.style.left = "%.5f".format(this._centerPercent * 100) + '%';
+-    },
+-
+     _pathComponentForContentView: function(contentView)
+     {
+         console.assert(contentView);
+         if (!contentView)
+             return null;
+         if (contentView === this._visualOutputContentView)
+             return this._outputPathComponent;
+         if (contentView === this._effectiveStyleContentView)
+             return this._stylePathComponent;
+         console.error("Unknown contentView.");
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+index 7f3d2eb..c8ec0f6 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+@@ -29,21 +29,23 @@ WebInspector.ElementTrackingTimelineOverviewGraph = function(timeline)
+ 
+     this.element.classList.add(WebInspector.ElementTrackingTimelineOverviewGraph.StyleClassName);
+ 
+     this.element.addEventListener("click", this._timelineGraphClicked.bind(this));
+ 
+     this.representedObject = timeline;
+     this.representedObject.addEventListener(WebInspector.Timeline.Event.RecordAdded, this._timelineRecordAdded, this);
+ 
+     this._timelineRecordStacks = [];
+ 
+-    this._selectedRecords = [];
++    this._selectedSnapshots = [];
++
++    WebInspector.ContentView.addEventListener(WebInspector.ContentView.Event.SupplementalRepresentedObjectsDidChange, this._supplementalRepresentedObjectsDidChange, this);
+ 
+     this.reset();
+ };
+ 
+ WebInspector.ElementTrackingTimelineOverviewGraph.ZoomDurationMilliseconds = 250;
+ WebInspector.ElementTrackingTimelineOverviewGraph.StyleClassName = "element-tracking";
+ 
+ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+     constructor: WebInspector.ElementTrackingTimelineOverviewGraph,
+     __proto__: WebInspector.TimelineOverviewGraph.prototype,
+@@ -70,21 +72,21 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+             var stack = this._timelineRecordStacks[stackIndex];
+             if (!stack)
+                 stack = this._timelineRecordStacks[stackIndex] = new WebInspector.TimelineRecordStack(records);
+             else {
+                 stack.records = records;
+             }
+             stack.refresh(this);
+             if (!stack.element.parentNode)
+                 this.element.appendChild(stack.element);
+ 
+-            if (records.some(function isSelected(record) { return this._selectedRecords.indexOf(record) !== -1; }, this))
++            if (records.some(function isSelected(record) { return this._selectedSnapshots.indexOf(record.snapshotHeader) !== -1; }, this))
+                 stack.selected = true;
+             else
+                 stack.selected = false;
+ 
+             if (records.length) {
+                 var header = records[0].snapshotHeader;
+                 console.assert(header instanceof WebInspector.ElementSnapshotHeader, header);
+                 header.fetchData().then(function(data) {
+                     stack.previewContentURL = data.contentURL;
+                 });
+@@ -122,64 +124,64 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+ 
+         function recordIsFilteredOut(record) {
+             var provisionalTreeElement = WebInspector.timelineSidebarPanel.treeElementForRepresentedObject(record.snapshotHeader);
+             return !provisionalTreeElement || provisionalTreeElement.hidden;
+         }
+         // Don't process the selection if none of its tree elements are visible with current filters.
+         // FIXME: we may want to revise or delete this if it's too awkward.
+         if (recordStack.records.every(recordIsFilteredOut))
+             return;
+ 
+-        var previouslySelectedRecord = null;
+-        var previouslySelectedRecordIndex = -1;
++        var previouslySelectedSnapshot = null;
++        var previouslySelectedSnapshotIndex = -1;
+         for (var record of recordStack.records) {
+-            previouslySelectedRecordIndex = this._selectedRecords.indexOf(record);
+-            if (previouslySelectedRecordIndex !== -1) {
+-                previouslySelectedRecord = record;
++            previouslySelectedSnapshotIndex = this._selectedSnapshots.indexOf(record.snapshotHeader);
++            if (previouslySelectedSnapshotIndex !== -1) {
++                previouslySelectedSnapshot = record.snapshot;
+                 break;
+             }
+         }
+ 
+-        var newlySelectedRecord = recordStack.records[0];
++        var newlySelectedSnapshot = recordStack.records[0].snapshotHeader;
+ 
+         // If already selected, deselect it.
+-        if (previouslySelectedRecord && WebInspector.modifierKeys.metaKey)
+-            this._selectedRecords.splice(previouslySelectedRecordIndex, 1);
++        if (previouslySelectedSnapshot && WebInspector.modifierKeys.metaKey)
++            this._selectedSnapshots.splice(previouslySelectedSnapshotIndex, 1);
+         // If not a cmd-click, only select one stack.
+         else if (!WebInspector.modifierKeys.metaKey)
+-            this._selectedRecords = [newlySelectedRecord];
++            this._selectedSnapshots = [newlySelectedSnapshot];
+         // If two stacks are already selected, replace the most recent selection.
+-        else if (this._selectedRecords.length == 2)
+-            this._selectedRecords.splice(1, 1, newlySelectedRecord);
++        else if (this._selectedSnapshots.length == 2)
++            this._selectedSnapshots.splice(1, 1, newlySelectedSnapshot);
+         // This is a cmd-click that adds a second selection.
+         else
+-            this._selectedRecords.push(newlySelectedRecord);
++            this._selectedSnapshots.push(newlySelectedSnapshot);
+ 
+         this.needsLayout();
+ 
+         // Decide which views to show, if any.
+-        if (!this._selectedRecords.length) {
++        if (!this._selectedSnapshots.length) {
+             var selectedTimeline = WebInspector.timelineSidebarPanel.selectedTimeline;
+             if (selectedTimeline)
+                 WebInspector.timelineSidebarPanel.showTimelineViewForTimeline(selectedTimeline);
+             else
+                 WebInspector.timelineSidebarPanel.showDefaultContentView();
+-        } else if (this._selectedRecords.length === 1) {
+-            var treeElement = WebInspector.timelineSidebarPanel.treeElementForRepresentedObject(this._selectedRecords[0].snapshotHeader);
++        } else if (this._selectedSnapshots.length === 1) {
++            var treeElement = WebInspector.timelineSidebarPanel.treeElementForRepresentedObject(this._selectedSnapshots[0]);
+             const omitFocus = true;
+             const selectedByUser = true;
+             const suppressOnSelect = false;
+             const suppressOnDeselect = false;
+             treeElement.revealAndSelect(omitFocus, selectedByUser, suppressOnSelect, suppressOnDeselect);
+         } else {
+-            console.assert(this._selectedRecords.length === 2);
+-            WebInspector.domTracingManager.requestSnapshotDiff(this._selectedRecords[0].snapshotHeader, this._selectedRecords[1].snapshotHeader)
++            console.assert(this._selectedSnapshots.length === 2);
++            WebInspector.domTracingManager.requestSnapshotDiff(this._selectedSnapshots[0], this._selectedSnapshots[1])
+                 .then(function(snapshotDiffObject) {
+                     WebInspector.timelineSidebarPanel.showSubviewForRepresentedObject(snapshotDiffObject);
+                 });
+         }
+     },
+ 
+     _recordStackCounterClicked: function(event)
+     {
+         var recordStack = event.target.parentElement.recordStack;
+         this._zoomToSplitRecordStack(recordStack);
+@@ -228,12 +230,30 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+             this.timelineOverview.secondsPerPixel = interpolatedValue(initialSecondsPerPixel, proposedSecondsPerPixel, progress);
+ 
+             // Synchronously update layout since we are in a requestAnimationFrame.
+             this.timelineOverview.updateLayout();
+ 
+             if (progress < 1)
+                 requestAnimationFrame(setTimelineViewState.bind(this));
+         }
+ 
+         requestAnimationFrame(setTimelineViewState.bind(this));
++    },
++
++    _supplementalRepresentedObjectsDidChange: function(event)
++    {
++        if (!(event.target instanceof WebInspector.TimelineRecordingContentView))
++            return;
++
++        this._selectedSnapshots = [];
++        for (var object of event.target.supplementalRepresentedObjects) {
++            if (object instanceof WebInspector.ElementSnapshotDiff) {
++                this._selectedSnapshots.push(object.preState.header);
++                this._selectedSnapshots.push(object.postState.header);
++                return;
++            } else if (object instanceof WebInspector.ElementSnapshot) {
++                this._selectedSnapshots.push(object.header);
++            }
++        }
++        this.needsLayout();
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
+index 633eb1c..bfa0127 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
+@@ -97,44 +97,45 @@ WebInspector.TimelineRecordingContentView.prototype = {
+     constructor: WebInspector.TimelineRecordingContentView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+     // Public
+ 
+     showOverviewTimelineView: function()
+     {
+         if (this.__experimentalShowSplitNavigationBars)
+             this.element.classList.add(WebInspector.TimelineRecordingContentView.ShowingDatagridSubviewStyleClassName);
+ 
+-        this._subviewContentBrowser.showContentView(this._overviewTimelineView);
++        this._showContentViewAsSubview(this._overviewTimelineView);
+     },
+ 
+     showContentViewForRepresentedObject: function(representedObject)
+     {
+         if (this.__experimentalShowSplitNavigationBars) {
+             var shouldHideNavigationBar = representedObject instanceof WebInspector.Timeline || representedObject instanceof WebInspector.TimelineRecording;
+             this.element.classList.toggle(WebInspector.TimelineRecordingContentView.ShowingDatagridSubviewStyleClassName, shouldHideNavigationBar);
+         }
+ 
+-        this._subviewContentBrowser.showContentViewForRepresentedObject(representedObject);
++        var contentView = this._subviewContentBrowser.contentViewForRepresentedObject(representedObject);
++        this._showContentViewAsSubview(contentView);
+     },
+ 
+     showTimelineViewForTimeline: function(timeline)
+     {
+         console.assert(timeline instanceof WebInspector.Timeline, timeline);
+         console.assert(this._timelineViewMap.has(timeline), timeline);
+         if (!this._timelineViewMap.has(timeline))
+             return;
+ 
+         if (this.__experimentalShowSplitNavigationBars)
+             this.element.classList.add(WebInspector.TimelineRecordingContentView.ShowingDatagridSubviewStyleClassName);
+ 
+-        this._subviewContentBrowser.showContentView(this._timelineViewMap.get(timeline));
++        this._showContentViewAsSubview(this._timelineViewMap.get(timeline));
+     },
+ 
+     get allowedNavigationSidebarPanels()
+     {
+         return [WebInspector.timelineSidebarPanel.identifier];
+     },
+ 
+     get supportsSplitContentBrowser()
+     {
+         // The layout of the overview and split content browser don't work well.
+@@ -157,21 +158,21 @@ WebInspector.TimelineRecordingContentView.prototype = {
+ 
+             pathComponents = pathComponents.concat(this._subviewContentBrowser.currentContentView.selectionPathComponents || []);
+         }
+         return pathComponents;
+     },
+ 
+     get supplementalRepresentedObjects()
+     {
+         if (!this._subviewContentBrowser.currentContentView)
+             return [];
+-        return this._subviewContentBrowser.currentContentView.supplementalRepresentedObjects;
++        return [this._subviewContentBrowser.currentContentView.representedObject];
+     },
+ 
+     get navigationItems()
+     {
+         return [this._clearTimelineNavigationItem];
+     },
+ 
+     get handleCopyEvent()
+     {
+         var currentContentView = this._subviewContentBrowser.currentContentView;
+@@ -365,20 +366,26 @@ WebInspector.TimelineRecordingContentView.prototype = {
+     },
+ 
+     // Private
+ 
+     _syntheticPathComponentForSnapshot: function(snapshot)
+     {
+         console.assert(snapshot instanceof WebInspector.ElementSnapshot || snapshot instanceof WebInspector.ElementSnapshotHeader, snapshot);
+         return new WebInspector.HierarchicalPathComponent(snapshot.displayName, WebInspector.ElementSnapshotContentView.SnapshotIconStyleClass, snapshot, false, false);
+     },
+ 
++    _showContentViewAsSubview: function(contentView)
++    {
++        this._subviewContentBrowser.showContentView(contentView);
++        this.dispatchEventToListeners(WebInspector.ContentView.Event.SupplementalRepresentedObjectsDidChange);
++    },
++
+     _currentContentViewDidChange: function(event)
+     {
+         var timelineView = this.lastShownTimelineView;
+         if (timelineView) {
+             WebInspector.timelineSidebarPanel.contentTreeOutline = timelineView.navigationSidebarTreeOutline;
+             WebInspector.timelineSidebarPanel.contentTreeOutlineLabel = timelineView.navigationSidebarTreeOutlineLabel;
+ 
+             timelineView.startTime = this._timelineOverview.selectionStartTime;
+             timelineView.endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
+             timelineView.currentTime = this._currentTime;
+-- 
+2.3.2
+

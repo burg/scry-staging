@@ -1,0 +1,197 @@
+From cbb78ca53b5d45cf771c12b7170bf21e78fb6220 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Fri, 13 Mar 2015 19:43:16 -0700
+Subject: [PATCH] Add a popover preview for element snapshot stacks.
+
+---
+ .../Views/ElementTrackingTimelineOverviewGraph.css | 19 +++++
+ .../Views/ElementTrackingTimelineOverviewGraph.js  | 90 +++++++++++++++++++++-
+ 2 files changed, 108 insertions(+), 1 deletion(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.css b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.css
+index 9941010..a4ac4a5 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.css
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.css
+@@ -24,10 +24,29 @@
+  */
+ 
+ .timeline-overview-graph.element-tracking > .timeline-record-bar {
+     margin-top: 8px;
+     height: 20px;
+ }
+ 
+ .timeline-overview-graph.element-tracking > .timeline-record-bar > .segment {
+     border-radius: 2px;
+ }
++
++.element-snapshot-popover img {
++    min-width: 0;
++    max-width: 500px;
++
++    -webkit-user-select: text;
++    -webkit-user-drag: auto;
++
++ /* A border is used instead of padding or margin so when there is overflow
++    there will be space on all sides. */
++    border: 5px solid transparent;
++
++    margin: auto 0;
++
++    background-image: url(../Images/Checkers.svg);
++    background-clip: content-box;
++    background-size: 14px;
++    background-color: #eee;
++}
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+index c8ec0f6..8e93ca9 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+@@ -23,35 +23,39 @@
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementTrackingTimelineOverviewGraph = function(timeline)
+ {
+     WebInspector.TimelineOverviewGraph.call(this, timeline);
+ 
+     this.element.classList.add(WebInspector.ElementTrackingTimelineOverviewGraph.StyleClassName);
+ 
+     this.element.addEventListener("click", this._timelineGraphClicked.bind(this));
++    this.element.addEventListener("mouseover", this._mouseOverTimelineGraph.bind(this));
++    this.element.addEventListener("mouseleave", this._mouseLeaveTimelineGraph.bind(this));
+ 
+     this.representedObject = timeline;
+     this.representedObject.addEventListener(WebInspector.Timeline.Event.RecordAdded, this._timelineRecordAdded, this);
+ 
+     this._timelineRecordStacks = [];
+ 
+     this._selectedSnapshots = [];
+ 
+     WebInspector.ContentView.addEventListener(WebInspector.ContentView.Event.SupplementalRepresentedObjectsDidChange, this._supplementalRepresentedObjectsDidChange, this);
+ 
+     this.reset();
+ };
+ 
+ WebInspector.ElementTrackingTimelineOverviewGraph.ZoomDurationMilliseconds = 250;
+-WebInspector.ElementTrackingTimelineOverviewGraph.StyleClassName = "element-tracking";
++
++WebInspector.ElementTrackingTimelineOverviewGraph.StyleClassName = "element-tracking-overview-graph";
++WebInspector.ElementTrackingTimelineOverviewGraph.SnapshotPopoverStyleClassName = "element-snapshot-popover";
+ 
+ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+     constructor: WebInspector.ElementTrackingTimelineOverviewGraph,
+     __proto__: WebInspector.TimelineOverviewGraph.prototype,
+ 
+     // Public
+ 
+     reset: function()
+     {
+         WebInspector.TimelineOverviewGraph.prototype.reset.call(this);
+@@ -232,20 +236,104 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+             // Synchronously update layout since we are in a requestAnimationFrame.
+             this.timelineOverview.updateLayout();
+ 
+             if (progress < 1)
+                 requestAnimationFrame(setTimelineViewState.bind(this));
+         }
+ 
+         requestAnimationFrame(setTimelineViewState.bind(this));
+     },
+ 
++    _mouseOverTimelineGraph: function(event)
++    {
++        // FIXME: should this dismiss the popover?
++        if (!event.target.classList.contains(WebInspector.TimelineRecordStack.StyleClassName))
++            return;
++
++        this._showPopoverForHoveredRecordStack(event.target.recordStack);
++    },
++
++    _mouseLeaveTimelineGraph: function(event)
++    {
++        this._mouseIsOverPopover = this._popover.element.contains(event.target);
++
++        if (!this._mouseIsOverPopover)
++            this._hidePopover();
++    },
++
++    _showPopoverForHoveredRecordStack: function(recordStack)
++    {
++        console.assert(recordStack.records.length);
++
++        this._fetchContentForPopover(recordStack.records[0].snapshotHeader)
++        .then(function(contentElement) {
++            var popover = this._popover;
++            if (!popover)
++                popover = this._popover = new WebInspector.Popover;
++
++            var targetFrame = WebInspector.Rect.rectFromClientRect(recordStack.element.getBoundingClientRect());
++
++            if (contentElement)
++                popover.content = contentElement;
++
++            this._trackPopoverEvents();
++            popover.present(targetFrame.pad(2), [WebInspector.RectEdge.MAX_Y]);
++        }.bind(this));
++    },
++
++    _hidePopover: function()
++    {
++        if (!this._popover)
++            return;
++
++        this._popover.dismiss();
++
++        if (this._popoverEventListeners && this._popoverEventListenersAreRegistered) {
++            this._popoverEventListenersAreRegistered = false;
++            this._popoverEventListeners.unregister();
++        }
++    },
++
++    _trackPopoverEvents: function()
++    {
++        if (!this._popoverEventListeners)
++            this._popoverEventListeners = new WebInspector.EventListenerSet(this, "Popover listeners");
++        if (!this._popoverEventListenersAreRegistered) {
++            this._popoverEventListenersAreRegistered = true;
++            this._popoverEventListeners.register(this._popover.element, "mouseover", this._popoverMouseover);
++            this._popoverEventListeners.register(this._popover.element, "mouseout", this._popoverMouseout);
++            this._popoverEventListeners.install();
++        }
++    },
++
++    _popoverMouseover: function(event)
++    {
++        this._mouseIsOverPopover = true;
++    },
++
++    _popoverMouseout: function(event)
++    {
++        this._mouseIsOverPopover = this._popover.element.contains(event.relatedTarget);
++    },
++
++    _fetchContentForPopover: function(snapshotHeader)
++    {
++        return snapshotHeader.fetchData().then(function(snapshot) {
++            var contentElement = document.createElement("div");
++            contentElement.className = WebInspector.ElementTrackingTimelineOverviewGraph.SnapshotPopoverStyleClassName;
++            var imageElement = document.createElement("img");
++            imageElement.src = snapshot.contentURL;
++            contentElement.appendChild(imageElement);
++            return contentElement;
++        });
++    },
++
+     _supplementalRepresentedObjectsDidChange: function(event)
+     {
+         if (!(event.target instanceof WebInspector.TimelineRecordingContentView))
+             return;
+ 
+         this._selectedSnapshots = [];
+         for (var object of event.target.supplementalRepresentedObjects) {
+             if (object instanceof WebInspector.ElementSnapshotDiff) {
+                 this._selectedSnapshots.push(object.preState.header);
+                 this._selectedSnapshots.push(object.postState.header);
+-- 
+2.3.2
+

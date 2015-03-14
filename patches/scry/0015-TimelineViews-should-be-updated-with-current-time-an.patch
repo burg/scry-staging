@@ -1,4 +1,4 @@
-From 38e5f14138cbb4ca1d3472f2407c5bc7a2b438d4 Mon Sep 17 00:00:00 2001
+From f779488b5ed55080890de7180493148272940235 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 4 Mar 2015 17:34:20 -0800
 Subject: [PATCH] TimelineViews should be updated with current time and filters
@@ -39,7 +39,7 @@ index 4a1f930..642f61c 100644
  
          // Apply the filters to the tree element and its descendants.
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
-index f0d7d0b..1685e17 100644
+index f0d7d0b..55cbd94 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
 @@ -158,24 +158,29 @@ WebInspector.TimelineRecordingContentView.prototype = {
@@ -54,7 +54,7 @@ index f0d7d0b..1685e17 100644
      },
  
 -    get currentTimelineView()
-+    get timelineViewForSelectedTimeline()
++    get lastShownTimelineView()
      {
 -        var contentView = this._contentViewContainer.currentContentView;
 -        return (contentView instanceof WebInspector.TimelineView) ? contentView : null;
@@ -62,7 +62,7 @@ index f0d7d0b..1685e17 100644
 +        // Since this timeline view's content outline could be showing in the timeline sidebar, we need
 +        // to keep its current time range, filters, etc in sync even if the data grid is not visible.
 +        if (!WebInspector.timelineSidebarPanel.selectedTimeline)
-+            return null;
++            return this._overviewTimelineView;
 +
 +        return this._timelineViewMap.get(WebInspector.timelineSidebarPanel.selectedTimeline);
      },
@@ -120,17 +120,17 @@ index f0d7d0b..1685e17 100644
      filterDidChange: function()
      {
 -        if (!this.currentTimelineView)
-+        if (!this.timelineViewForSelectedTimeline)
++        if (!this.lastShownTimelineView)
              return;
  
 -        this.currentTimelineView.filterDidChange();
-+        this.timelineViewForSelectedTimeline.filterDidChange();
++        this.lastShownTimelineView.filterDidChange();
      },
  
      matchTreeElementAgainstCustomFilters: function(treeElement)
      {
 -        if (this.currentTimelineView && !this.currentTimelineView.matchTreeElementAgainstCustomFilters(treeElement))
-+        if (this.timelineViewForSelectedTimeline && !this.timelineViewForSelectedTimeline.matchTreeElementAgainstCustomFilters(treeElement))
++        if (this.lastShownTimelineView && !this.lastShownTimelineView.matchTreeElementAgainstCustomFilters(treeElement))
              return false;
  
          var startTime = this._timelineOverview.selectionStartTime;
@@ -153,7 +153,7 @@ index f0d7d0b..1685e17 100644
      _currentContentViewDidChange: function(event)
      {
 -        var timelineView = this.currentTimelineView;
-+        var timelineView = this.timelineViewForSelectedTimeline;
++        var timelineView = this.lastShownTimelineView;
          if (timelineView) {
              WebInspector.timelineSidebarPanel.contentTreeOutline = timelineView.navigationSidebarTreeOutline;
              WebInspector.timelineSidebarPanel.contentTreeOutlineLabel = timelineView.navigationSidebarTreeOutlineLabel;
@@ -177,8 +177,8 @@ index f0d7d0b..1685e17 100644
          this._timelineOverview.currentTime = currentTime;
 -        if (this.currentTimelineView)
 -            this.currentTimelineView.currentTime = currentTime;
-+        if (this.timelineViewForSelectedTimeline)
-+            this.timelineViewForSelectedTimeline.currentTime = currentTime;
++        if (this.lastShownTimelineView)
++            this.lastShownTimelineView.currentTime = currentTime;
  
          WebInspector.timelineSidebarPanel.updateFilter();
  
@@ -186,8 +186,8 @@ index f0d7d0b..1685e17 100644
          this._timelineOverview.updateLayoutIfNeeded();
 -        if (this.currentTimelineView)
 -            this.currentTimelineView.updateLayoutIfNeeded();
-+        if (this.timelineViewForSelectedTimeline)
-+            this.timelineViewForSelectedTimeline.updateLayoutIfNeeded();
++        if (this.lastShownTimelineView)
++            this.lastShownTimelineView.updateLayoutIfNeeded();
      },
  
      _startUpdatingCurrentTime: function()
@@ -210,7 +210,7 @@ index f0d7d0b..1685e17 100644
  
          var timelineView = this._timelineViewMap.take(timeline);
 -        if (this.currentTimelineView === timelineView)
-+        if (this.timelineViewForSelectedTimeline === timelineView)
++        if (this.lastShownTimelineView === timelineView)
              this.showOverviewTimelineView();
  
          this._pathComponentMap.delete(timeline);
@@ -235,15 +235,15 @@ index f0d7d0b..1685e17 100644
 -        if (this.currentTimelineView) {
 -            this.currentTimelineView.startTime = this._timelineOverview.selectionStartTime;
 -            this.currentTimelineView.endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
-+        if (this.timelineViewForSelectedTimeline) {
-+            this.timelineViewForSelectedTimeline.startTime = this._timelineOverview.selectionStartTime;
-+            this.timelineViewForSelectedTimeline.endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
++        if (this.lastShownTimelineView) {
++            this.lastShownTimelineView.startTime = this._timelineOverview.selectionStartTime;
++            this.lastShownTimelineView.endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
          }
  
          // Delay until the next frame to stay in sync with the current timeline view's time-based layout changes.
          requestAnimationFrame(function() {
 -            var selectedTreeElement = this.currentTimelineView && this.currentTimelineView.navigationSidebarTreeOutline ? this.currentTimelineView.navigationSidebarTreeOutline.selectedTreeElement : null;
-+            var selectedTreeElement = this.timelineViewForSelectedTimeline && this.timelineViewForSelectedTimeline.navigationSidebarTreeOutline ? this.timelineViewForSelectedTimeline.navigationSidebarTreeOutline.selectedTreeElement : null;
++            var selectedTreeElement = this.lastShownTimelineView && this.lastShownTimelineView.navigationSidebarTreeOutline ? this.lastShownTimelineView.navigationSidebarTreeOutline.selectedTreeElement : null;
              var selectionWasHidden = selectedTreeElement && selectedTreeElement.hidden;
  
              WebInspector.timelineSidebarPanel.updateFilter();

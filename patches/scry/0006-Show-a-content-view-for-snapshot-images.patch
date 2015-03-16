@@ -1,4 +1,4 @@
-From c392fb7f52f807cb28d0841d639f52ec18b7658b Mon Sep 17 00:00:00 2001
+From 9cb9237e5d8d2ed47696b7722a88e8a9506a8891 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 21:44:02 -0800
 Subject: [PATCH] Show a content view for snapshot images.
@@ -145,10 +145,10 @@ index b78eb5a..5416730 100644
 -
 -WebInspector.TimelineManager.prototype.__proto__ = WebInspector.Object.prototype;
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 31dd079..d5a6922 100644
+index af2899e..2d564fe 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -384,20 +384,21 @@
+@@ -386,20 +386,21 @@
      <script src="Views/DebuggerSidebarPanel.js"></script>
      <script src="Views/DefaultDashboardView.js"></script>
      <script src="Views/DetailsSection.js"></script>
@@ -168,8 +168,8 @@ index 31dd079..d5a6922 100644
      <script src="Views/FilterBar.js"></script>
      <script src="Views/FindBanner.js"></script>
      <script src="Views/FlexibleSpaceNavigationItem.js"></script>
-     <script src="Views/FolderTreeElement.js"></script>
      <script src="Views/FontResourceContentView.js"></script>
+     <script src="Views/FormattedValue.js"></script>
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ContentView.js b/Source/WebInspectorUI/UserInterface/Views/ContentView.js
 index a95091b..24ab03d 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ContentView.js

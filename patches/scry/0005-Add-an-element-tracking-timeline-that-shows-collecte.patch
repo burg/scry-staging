@@ -1,11 +1,11 @@
-From f6f0f95adddbe8202f9f9f7f8408ffc3c30eadb0 Mon Sep 17 00:00:00 2001
+From 34b12aebb76d2b92b68f74969c80f2cd5238125b Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 09:45:51 -0800
 Subject: [PATCH] Add an element tracking timeline that shows collected
  snapshots.
 
 ---
- .../Localizations/en.lproj/localizedStrings.js     | Bin 58634 -> 58932 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 59180 -> 59478 bytes
  .../UserInterface/Controllers/DOMTracingManager.js |  19 +-
  .../UserInterface/Controllers/TimelineManager.js   |   3 +-
  Source/WebInspectorUI/UserInterface/Main.html      |   6 +
@@ -36,15 +36,15 @@ Subject: [PATCH] Add an element tracking timeline that shows collected
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js
 
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index 0d63479c9ff317a1ac25ddb8e07f1034653ed750..b48d4cc0b87da4d1431b2fbc23cd769bb3b815cd 100644
+index 57567de39086a8d8ace79887f9f0a80ea1ff598f..a6873ac85ecedb0a739d3368bd47f9dd7d9e3562 100644
 GIT binary patch
-delta 144
-zcmeA=#k}PV^9H5F$pPLx+zJdK3`Goy49N`HlP5X|Pu>?Uz=;qMlr!9{kmzS)Tgp(v
-zP{05p6&RcuGJqQL7}6P18B!RO7-E59wm_`J;15=Tp>A>`r~c-gxqT*+qvUud`&{Li
-Sd@M_AvcNTt&A%=R2m=6{(I)Ev
+delta 136
+zcmZ2;j``XJ<_*V^CJXrSafUDyF(fi1Gh|OrR1uyW=P!UH@^P-=<|9dGY$jXH=Q37c
+zaAwE=D$Qd^XGmp8VNha-Wl&(S1!5%ze}+<q5{3dWiKK3_qm2IMzWIG7lYi~ynVff>
+TW3t3Pt;rXzacq{kA|MO^<gh7R
 
 delta 36
-ucmV+<0Nekx%ma$b1F#}tvzTE_JhM`sj5L$T(~^@6+YFPg)CRN2(`*t%DG|~D
+ucmV+<0Nel8&;zW_1F*(ovpi$UJhOD5j5L$#)smAg-3*h^)&{fc)oc=MLlc_-
 
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
 index 49203aa..215ce07 100644
@@ -152,7 +152,7 @@ index 9701114..b78eb5a 100644
          // NOTE: Always stop immediately instead of waiting for a Timeline.recordingStopped event.
          // This way the UI feels as responsive to a stop as possible.
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 6785fd5..31dd079 100644
+index 3d20041..af2899e 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -66,20 +66,21 @@
@@ -200,7 +200,7 @@ index 6785fd5..31dd079 100644
      <script src="Models/IndexedDatabaseObjectStoreIndex.js"></script>
      <script src="Models/IssueMessage.js"></script>
      <script src="Models/KeyboardShortcut.js"></script>
-@@ -381,20 +384,23 @@
+@@ -383,20 +386,23 @@
      <script src="Views/DebuggerSidebarPanel.js"></script>
      <script src="Views/DefaultDashboardView.js"></script>
      <script src="Views/DetailsSection.js"></script>
@@ -219,11 +219,11 @@ index 6785fd5..31dd079 100644
      <script src="Views/FilterBar.js"></script>
      <script src="Views/FindBanner.js"></script>
      <script src="Views/FlexibleSpaceNavigationItem.js"></script>
-     <script src="Views/FolderTreeElement.js"></script>
      <script src="Views/FontResourceContentView.js"></script>
      <script src="Views/FormattedValue.js"></script>
      <script src="Views/FrameContentView.js"></script>
      <script src="Views/FrameDOMTreeContentView.js"></script>
+     <script src="Views/FrameTreeElement.js"></script>
 diff --git a/Source/WebInspectorUI/UserInterface/Views/LayoutTimelineView.css b/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js
 similarity index 69%
 copy from Source/WebInspectorUI/UserInterface/Views/LayoutTimelineView.css

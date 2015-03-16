@@ -1,11 +1,11 @@
-From c265f9af70255b7ee46229fdb0d8e4f74f18f6af Mon Sep 17 00:00:00 2001
+From c2470bf4bf373846f28be3f50a6481ed4f4b847d Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 5 Mar 2015 16:51:28 -0800
 Subject: [PATCH] When two snapshots are selected, create an
  ElementSnapshotDiff and show it as a subview.
 
 ---
- .../Localizations/en.lproj/localizedStrings.js     | Bin 60246 -> 60420 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 60792 -> 60966 bytes
  .../UserInterface/Controllers/DOMTracingManager.js |  32 +++
  .../WebInspectorUI/UserInterface/Images/Diff.svg   |  12 ++
  Source/WebInspectorUI/UserInterface/Main.html      |   3 +
@@ -27,14 +27,14 @@ Subject: [PATCH] When two snapshots are selected, create an
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffDetailsClusterContentView.js
 
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index 0b5c2a8937d127b2ef6d475a8d5010628efcd03e..26f0a63aab8db18dbe9874442f1f8fef160bec9e 100644
+index fd8ff7e97d5a7f5ddc4d7ea8564764c8774bfa25..6b80dcd2e8369420ca6dc9550a68bb764de5c561 100644
 GIT binary patch
-delta 153
-zcmcb1jk)Cp^M(&+>cbc^8B!U_859_t88R3W8S)s?f&5}1UxOhS$V+4>0P->z@)=6N
-sqN)rj48jT^Qj<Z6Ar`347KoJ?$TWwEA!YKzBl?pa&T?)3b0$g-06!@r4*&oF
+delta 150
+zcmexyi+R}{<_$vU>%$l_8B!U_859_t88R3W8S)s?f&5}1UxOhS$V+4>0P->z@)=6N
+pqN)rj48jT^Qj<Z6Ar`347KoJ?$TVkiBd7l4g!4R`<<3XR0RW6^A4mWI
 
 delta 14
-WcmZp<!F=r+^M(&+HqSeoCI<jMD+nC`
+WcmZ2>hxx}X<_$vUHy=2kCI<jKX9uzX
 
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
 index 3422942..be8152b 100644
@@ -133,7 +133,7 @@ index 0000000..de6453c
 +    <path d="M 8.5 10.5 L 12.5 10.5" stroke="rgb(208, 1, 27)" stroke-linecap="square"/>
 +</svg>
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 8707f2a..ebc35ee 100644
+index 433ce00..3e9e9b4 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -66,20 +66,21 @@
@@ -180,7 +180,7 @@ index 8707f2a..ebc35ee 100644
      <script src="Models/IndexedDatabase.js"></script>
      <script src="Models/IndexedDatabaseObjectStore.js"></script>
      <script src="Models/IndexedDatabaseObjectStoreIndex.js"></script>
-@@ -387,20 +389,21 @@
+@@ -389,20 +391,21 @@
      <script src="Views/DefaultDashboardView.js"></script>
      <script src="Views/DetailsSection.js"></script>
      <script src="Views/DetailsSectionDataGridRow.js"></script>
@@ -200,8 +200,8 @@ index 8707f2a..ebc35ee 100644
      <script src="Views/FilterBar.js"></script>
      <script src="Views/FindBanner.js"></script>
      <script src="Views/FlexibleSpaceNavigationItem.js"></script>
-     <script src="Views/FolderTreeElement.js"></script>
      <script src="Views/FontResourceContentView.js"></script>
+     <script src="Views/FormattedValue.js"></script>
 diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
 index 374b7f0..3481654 100644
 --- a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js

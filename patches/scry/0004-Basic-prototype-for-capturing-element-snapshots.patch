@@ -1,4 +1,4 @@
-From 0fd3237208f1b37d532bc603fd82d3292be0771a Mon Sep 17 00:00:00 2001
+From 619026e69c24c8148b457eef6bf4b761033fa2c7 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 23 Jan 2015 15:03:00 -0800
 Subject: [PATCH] Basic prototype for capturing element snapshots.
@@ -25,7 +25,7 @@ the old one if its bounding box is different (changed size or position).
  Source/WebCore/inspector/InspectorTimelineAgent.h  |   3 +-
  Source/WebCore/platform/graphics/ImageBuffer.cpp   |  32 ++++
  Source/WebCore/platform/graphics/ImageBuffer.h     |   2 +
- .../Localizations/en.lproj/localizedStrings.js     | Bin 58528 -> 58634 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 59074 -> 59180 bytes
  Source/WebInspectorUI/UserInterface/Base/Main.js   |   3 +
  .../UserInterface/Controllers/DOMTracingManager.js |  79 ++++++++
  Source/WebInspectorUI/UserInterface/Main.html      |   3 +
@@ -1081,7 +1081,7 @@ index b384372..0d1a34f 100644
  {
      return false;
 diff --git a/Source/WebCore/platform/graphics/ImageBuffer.h b/Source/WebCore/platform/graphics/ImageBuffer.h
-index 08ead67..5d2cac6 100644
+index aa48a5f..446cfa8 100644
 --- a/Source/WebCore/platform/graphics/ImageBuffer.h
 +++ b/Source/WebCore/platform/graphics/ImageBuffer.h
 @@ -92,20 +92,22 @@ public:
@@ -1108,22 +1108,22 @@ index 08ead67..5d2cac6 100644
      
      String toDataURL(const String& mimeType, const double* quality = 0, CoordinateSystem = LogicalCoordinateSystem) const;
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index f01dfaaface6ee6cb29512393483021088c8e8ce..0d63479c9ff317a1ac25ddb8e07f1034653ed750 100644
+index df86f8e154195832bb8f5fff9a23e7f842331593..57567de39086a8d8ace79887f9f0a80ea1ff598f 100644
 GIT binary patch
-delta 404
-zcmZ2*lDX>?Gw1(*WekZ7MGOiPHz;n@Ru$%CkWo-&C}xmVm>embjNolPDlBfs%%G+)
-z`M#$nn0EBhnQZQL9H9g#BgO&O?dW5%Io8{hiy3I(WbQCWW{{DLQTix+$8cXTe}0%L
-ziad-Dlb;waj3N)?!{sAnQRSh0m^@>oJc>Mw50gJ0X^tWf<2#1CP1cWRoBTRTX!Gf)
-zsbxr>&Ae!e!c*CN`r;!F)?|ik28GFf-qO4wz)($O0P`7KCqHmE-@N?RWKJYKoO*hQ
-L;HrG0&d2}&G?8E|
+delta 509
+zcmX?fmU+!NX3qcr$`}$EiWn3oZcyB)oi8H9AfuqlP|P5!pukW9lu2U9nLJNacXF<X
+zE+<@SGrwq|88d^L!el{jvB|mK!eI8t2%X8dy^kZ5fn+&g#!dbhVKMpdDW1)|zM5Rj
+zK%*wF4|ik++B3N}Tpxum7~?iM-=BjCsAO$~DT)#pAF4z`MgizPhE#?;h7<-}hFpex
+zAe{;|Qxa$g4q2#nB^iYRpq65WOrTdYfvh|RD+UFIG$6YIXiN&!AZ4II1l1uq`e&3p
+zilbqCBqiC=<|s;_{LO+fh2==$*L~R(g{QLl?d3-t?8yw-Kxev6{%}f?Hv|}Wi3~82
+d4T<KPPu`i#iKJ_-z8)eD*6ORUSTk@j007^reF*>n
 
-delta 463
-zcmeA=#k}AoGuOZW3}p<73`GnIlN(tTH)^R0b1KL%s4^5Q$TCch5Kb0?^As3LfC`fs
-zawb2t(4V|Olx;GPu-N1V5vR>jB8{fZ3Th0K?|Eu6DX2|;=%+jRfG5XfJFop}aP3MA
-zu?z|fwm_`J;L4D~kO?$S0VWI7VmbN1EuP8y!uck@ao5_s!22U7Gf;LiSC}I+&?%Fm
-z^pUxf9m0LV{CQzOn-S7bE=XDus2k{5hE#?;pl!MgxeWP0Iu)WAw<O%;2@$f$CPTR}
-z=}D3DNU~5KNRmlGX7a%R;mJ25RiO&dM1YFiCU1ymoBS$DX!EJ4sbxsvopI3=g{QLl
-a)Wt^}o5gPTaw3VZd7_KLQ(?Ad-~s^J`*j`w
+delta 480
+zcmZ2;j``48X0Ct#8Oj(E8HyMbCO5JwZq&*b5mAs~P-Q4qkY!L{C;>_(G2}3$PA(J^
+zog60O%n6s=%qLoC#-yM&ncrJ{a*nq!h`G^Eck(Uo;~X$WKshl4XQQ9xCSOx7W}xik
+zb>WW8KpQ64gzKa51!CML9|&Lvi>-+;MNtFeL)AzE%>lcOA&()2L6;$yAs<MmLQTaZ
+z3)Qa-)L#J9Q_PSF^k*iJmB(NO^m7`JUBQsbkODP{D0Rs0{t+dQ;%*opSxr{7If@!6
+qf3rYLVL2j<CwE;oMd7JzeslQ|$7YMWy_`tm=bq`J@Kl(s8MpuwwRE}w
 
 diff --git a/Source/WebInspectorUI/UserInterface/Base/Main.js b/Source/WebInspectorUI/UserInterface/Base/Main.js
 index 95b8f9c..bf5ca58 100644
@@ -1260,7 +1260,7 @@ index 0000000..49203aa
 +    }
 +};
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 3b44198..6785fd5 100644
+index 84cb06a..3d20041 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -182,20 +182,21 @@
@@ -1307,7 +1307,7 @@ index 3b44198..6785fd5 100644
      <script src="Models/IndexedDatabaseObjectStoreIndex.js"></script>
      <script src="Models/IssueMessage.js"></script>
      <script src="Models/KeyboardShortcut.js"></script>
-@@ -489,20 +491,21 @@
+@@ -490,20 +492,21 @@
      <script src="Controllers/AnalyzerManager.js"></script>
      <script src="Controllers/ApplicationCacheManager.js"></script>
      <script src="Controllers/BasicBlockAnnotator.js"></script>

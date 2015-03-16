@@ -1,4 +1,4 @@
-From 197b9d62cef3202ed5899c0f8be8f2fd9d49e0ca Mon Sep 17 00:00:00 2001
+From ef358f65081ca174271b5d3c2551237a7bc678c6 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Tue, 3 Mar 2015 11:22:41 -0800
 Subject: [PATCH] Show element snapshots in the tracking timeline.

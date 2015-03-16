@@ -1,4 +1,4 @@
-From 6d0c9fbe5ed036e59a415035af6861d4608a3a86 Mon Sep 17 00:00:00 2001
+From 2708011294eafe586d99fce1b54f4d46a53f58d3 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 6 Mar 2015 11:57:52 -0800
 Subject: [PATCH] Web Inspector: unify resizer implementations used by DataGrid
@@ -67,7 +67,7 @@ WebInspector.elementDragStart, as I would like to deprecate it in favor of Resiz
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/Resizer.js
 
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index c321579..3b44198 100644
+index 002e589..84cb06a 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -103,20 +103,21 @@
@@ -92,7 +92,7 @@ index c321579..3b44198 100644
      <link rel="stylesheet" href="Views/ScriptTimelineView.css">
      <link rel="stylesheet" href="Views/SearchBar.css">
      <link rel="stylesheet" href="Views/SearchIcons.css">
-@@ -434,20 +435,21 @@
+@@ -435,20 +436,21 @@
      <script src="Views/ProbeDetailsSidebarPanel.js"></script>
      <script src="Views/ProbeSetDataGrid.js"></script>
      <script src="Views/ProbeSetDataGridNode.js"></script>

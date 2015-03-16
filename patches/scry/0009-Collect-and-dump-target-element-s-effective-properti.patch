@@ -1,4 +1,4 @@
-From 5fce3459ef63c18942f315612a83ee1970dc790e Mon Sep 17 00:00:00 2001
+From 66fa7f0c4387a985d91ac060cf611ff17100856a Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 27 Feb 2015 11:09:08 -0800
 Subject: [PATCH] Collect and dump target element's effective properties and
@@ -179,7 +179,7 @@ index 8cb943b..625519f 100644
  
      auto consoleAgentPtr = std::make_unique<PageConsoleAgent>(m_injectedScriptManager.get(), m_domAgent);
 diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-index b432b53..890e821 100644
+index b432b53..f4c5eb8 100644
 --- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 @@ -25,41 +25,54 @@
@@ -421,7 +421,7 @@ index b432b53..890e821 100644
 +
 +    for (auto entry : winningInlineStyleMap) {
 +        ASSERT(is<StyledElement>(entry.value));
-+        InlineStyleRuleSet& inlineStyle = m_cssAgent->ruleSetForInlineStyle(downcast<StyledElement>(targetElement));
++        InlineStyleRuleSet& inlineStyle = m_cssAgent->ruleSetForInlineStyle(*entry.value);
 +        RefPtr<Inspector::Protocol::CSS::CSSProperty> propertyObject;
 +        RefPtr<Inspector::Protocol::DOMTracing::PropertyEntry> entryObject;
 +        inlineStyle.withInlineStyle([&] (StyleDeclaration& style) {

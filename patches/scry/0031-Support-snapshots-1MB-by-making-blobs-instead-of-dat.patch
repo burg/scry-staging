@@ -1,0 +1,306 @@
+From 6821e78cd9a956ddc461d247656edc8751898768 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Sat, 14 Mar 2015 15:29:30 -0700
+Subject: [PATCH] Support snapshots >1MB by making blobs instead of data urls
+ in frontend.
+
+---
+ .../inspector/protocol/DOMTracing.json             | 10 ++++++++-
+ .../WebCore/inspector/InspectorDOMTracingAgent.cpp | 16 ++++++++++++-
+ .../UserInterface/Models/ElementSnapshot.js        | 18 +++++----------
+ .../Views/ElementSnapshotOutputContentView.js      |  8 +++++--
+ .../Views/ElementTrackingTimelineOverviewGraph.js  |  8 +++++--
+ .../UserInterface/Views/TimelineRecordStack.js     | 26 ++++++++++------------
+ 6 files changed, 53 insertions(+), 33 deletions(-)
+
+diff --git a/Source/JavaScriptCore/inspector/protocol/DOMTracing.json b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
+index c69d050..bf2c09a 100644
+--- a/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
++++ b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
+@@ -26,25 +26,33 @@
+                 { "name": "snapshotId", "$ref": "SnapshotId" },
+                 { "name": "boundingBox", "$ref": "FloatRect", "description": "Bounding box for the element's fragments in root view (global, absolute) coordinates." },
+                 { "name": "elapsedTimestamp", "type": "number", "description": "Elapsed time since the start of page execution when the snapshot was created." }
+             ]
+         },
+         {
+             "id": "ElementSnapshotPayload",
+             "type": "object",
+             "properties": [
+                 { "name": "snapshotId", "$ref": "SnapshotId" },
+-                { "name": "imageData", "type": "string", "description": "Base64-encoded image data for the snapshot." },
++                { "name": "imageData", "$ref": "ImageData", "description": "Base64-encoded image data for the snapshot." },
+                 { "name": "styleData", "$ref": "EffectiveStyle", "description": "Effective style for element based on properties contributed from inline styles and rules." }
+             ]
+         },
+         {
++            "id": "ImageData",
++            "type": "object",
++            "properties": [
++                { "name": "mimeType", "type": "string", "description": "Mime type for the encoded image data." },
++                { "name": "encodedData", "type": "string", "description": "base64-encoded image data." }
++            ]
++        },
++        {
+             "id": "EffectiveStyle",
+             "type": "object",
+             "properties": [
+                 { "name": "targetElement", "$ref": "DOM.NodeId", "description": "The id for the element that was snapshotted."},
+                 { "name": "elements", "type": "array", "items": { "$ref": "ElementEntry" }, "description": "Elements that contributed styles from rules and inline styles, ordered from target element to root." },
+                 { "name": "properties", "type": "array", "items": { "$ref": "PropertyEntry"}, "description": "Effective properties for the target element." }
+             ],
+             "description": "Describes the effective style properties for the target element, with cross-references to the elements that contributed properties via inline styles and matched rules"
+         },
+         {
+diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+index f4c5eb8..00bb277 100644
+--- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
++++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+@@ -354,23 +354,37 @@ void DOMTracingAgent::getSnapshotPayload(ErrorString& error, int snapshotId, Ref
+         foundSnapshot = m_currentSnapshot.get();
+     else if (findResult != m_savedSnapshotMap.end())
+         foundSnapshot = findResult->value.get();
+     else {
+         error = ASCIILiteral("Unknown snapshot id.");
+         return;
+     }
+ 
+     ASSERT(foundSnapshot);
+ 
++    // FIXME: this is kind of hacky. It could be improved by adding an API
++    // to ImageBuffer to return the encoded image data as a Vector or SharedBuffer, rather
++    // than always prepending the data:url stuff which we strip out below.
++    String mimeType = ASCIILiteral("image/png");
++    String dataURL = foundSnapshot->imageData->toDataURL(mimeType);
++    auto offsetResult = dataURL.find(";base64,");
++    if (offsetResult == notFound)
++        return;
++
++    auto imageDataObject = Inspector::Protocol::DOMTracing::ImageData::create()
++        .setMimeType(mimeType)
++        .setEncodedData(dataURL.substringSharingImpl(offsetResult + 8)) // ;base64, is 8 characters
++        .release();
++
+     out_snapshotPayload = Inspector::Protocol::DOMTracing::ElementSnapshotPayload::create()
+         .setSnapshotId(lookupKey)
+-        .setImageData(foundSnapshot->imageData->toDataURL(ASCIILiteral("image/png")))
++        .setImageData(WTF::move(imageDataObject))
+         .setStyleData(foundSnapshot->effectiveStyle->encodedData)
+         .release();
+ }
+ 
+ // InspectorInstrumentation entry points.
+ 
+ void DOMTracingAgent::frameNavigated(Frame& frame)
+ {
+     // If the target node was in this frame, its document will soon be detached.
+     if (!m_targetElement || m_targetElement->document().frame() == &frame)
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+index d521232..dea24484 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+@@ -65,21 +65,21 @@ WebInspector.ElementSnapshotHeader.prototype = {
+     {
+         // Do nothing, since snapshots are not saved across reloads or reopens.
+     }
+ }
+ 
+ WebInspector.ElementSnapshot = function(header, payload)
+ {
+     console.assert(header instanceof WebInspector.ElementSnapshotHeader);
+ 
+     this._header = header;
+-    this._imageDataURL = payload.imageData;
++    this._imageData = decodeBase64ToBlob(payload.imageData.encodedData, payload.imageData.mimeTpe);
+     this._effectiveStyle = WebInspector.EffectiveStyleSnapshot.fromPayload(payload.styleData);
+ }
+ 
+ WebInspector.ElementSnapshot.prototype = {
+     constructor: WebInspector.ElementSnapshot,
+     __proto__: WebInspector.Object.prototype,
+ 
+     get displayName()
+     {
+         return this._header.displayName;
+@@ -93,30 +93,22 @@ WebInspector.ElementSnapshot.prototype = {
+     get ordinal()
+     {
+         return this._header.ordinal;
+     },
+ 
+     get header()
+     {
+         return this._header;
+     },
+ 
+-    get contentURL()
++    // This returns an object URL handle that should be revoked when no longer needed.
++    createObjectURLForImage: function()
+     {
+-        const maximumDataURLSize = 1024 * 1024; // 1 MiB
+-
+-        if (!this._imageDataURL)
+-            return null;
+-
+-        if (this._imageDataURL.length > maximumDataURLSize) {
+-            console.error("Element snapshot too large " + Number.bytesToString(this._imageDataURL.length) + "for data url.");
+-            return null;
+-        }
+-
+-        return this._imageDataURL;
++        console.assert(this._imageData instanceof Blob, this._imageData);
++        return URL.createObjectURL(this._imageData);
+     },
+ 
+     get effectiveStyle()
+     {
+         return this._effectiveStyle;
+     }
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.js
+index 44e8f6f..3fa4332 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.js
+@@ -23,22 +23,26 @@
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementSnapshotOutputContentView = function(snapshot)
+ {
+     console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+     WebInspector.ContentView.call(this, snapshot, WebInspector.ElementSnapshotOutputContentView.StyleClassName);
+ 
+     this.element.classList.add(WebInspector.ElementSnapshotOutputContentView.StyleClassName);
+ 
+-    this._imageElement = document.createElement("img");
+-    this._imageElement.src = snapshot.contentURL;
++    var imageElement = this._imageElement = document.createElement("img");
++    var imageObjectURL = imageElement.src = snapshot.createObjectURLForImage();
++    imageElement.addEventListener("load", function revokeURL() {
++        URL.revokeObjectURL(imageObjectURL);
++        imageElement.removeEventListener("load", revokeURL);
++    });
+     this.element.appendChild(this._imageElement);
+ };
+ 
+ WebInspector.ElementSnapshotOutputContentView.StyleClassName = "element-snapshot-output";
+ 
+ WebInspector.ElementSnapshotOutputContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotOutputContentView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+index 8e93ca9..5e3166b 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+@@ -85,21 +85,21 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+ 
+             if (records.some(function isSelected(record) { return this._selectedSnapshots.indexOf(record.snapshotHeader) !== -1; }, this))
+                 stack.selected = true;
+             else
+                 stack.selected = false;
+ 
+             if (records.length) {
+                 var header = records[0].snapshotHeader;
+                 console.assert(header instanceof WebInspector.ElementSnapshotHeader, header);
+                 header.fetchData().then(function(data) {
+-                    stack.previewContentURL = data.contentURL;
++                    stack.previewContentURL = data.createObjectURLForImage();
+                 });
+             }
+ 
+             ++stackIndex;
+         }
+ 
+         WebInspector.TimelineRecordStack.createStacksForVisibleRecords(this.representedObject.snapshotRecords, secondsPerPixel, this, createStack.bind(this));
+         // Neuter any remaining objects not used in this layout iteration.
+         for (; stackIndex < this._timelineRecordStacks.length; ++stackIndex)
+             this._timelineRecordStacks[stackIndex].records = null;
+@@ -314,21 +314,25 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+     {
+         this._mouseIsOverPopover = this._popover.element.contains(event.relatedTarget);
+     },
+ 
+     _fetchContentForPopover: function(snapshotHeader)
+     {
+         return snapshotHeader.fetchData().then(function(snapshot) {
+             var contentElement = document.createElement("div");
+             contentElement.className = WebInspector.ElementTrackingTimelineOverviewGraph.SnapshotPopoverStyleClassName;
+             var imageElement = document.createElement("img");
+-            imageElement.src = snapshot.contentURL;
++            var imageObjectURL = imageElement.src = snapshot.createObjectURLForImage();
++            imageElement.addEventListener("load", function revokeURL() {
++                URL.revokeObjectURL(imageObjectURL);
++                imageElement.removeEventListener("load", revokeURL);
++            });
+             contentElement.appendChild(imageElement);
+             return contentElement;
+         });
+     },
+ 
+     _supplementalRepresentedObjectsDidChange: function(event)
+     {
+         if (!(event.target instanceof WebInspector.TimelineRecordingContentView))
+             return;
+ 
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
+index 9434e39..9eb0283 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
+@@ -179,40 +179,38 @@ WebInspector.TimelineRecordStack.prototype = {
+     {
+         return this._isSelected;
+     },
+ 
+     set selected(value)
+     {
+         this._isSelected = !!value;
+         this._element.classList.toggle(WebInspector.TimelineRecordStack.SelectedStyleClassName, value);
+     },
+ 
+-    get previewContentURL()
+-    {
+-        return this._previewContentURL;
+-    },
+-
+-    set previewContentURL(value)
++    set previewContentURL(contentURL)
+     {
+         if (this._previewElement) {
+             this._previewElement.remove();
+             delete this._previewElement;
+         }
+ 
+-        this._previewContentURL = value;
+-
+-        if (this._previewContentURL) {
+-            this._previewElement = document.createElement("img");
+-            this._previewElement.classList.add(WebInspector.TimelineRecordStack.PreviewImageStyleClassName);
+-            this._previewElement.src = this._previewContentURL;
+-            this._element.appendChild(this._previewElement);
+-        }
++        if (!contentURL)
++            return;
++
++        var previewElement = this._previewElement = document.createElement("img");
++        this._previewElement.classList.add(WebInspector.TimelineRecordStack.PreviewImageStyleClassName);
++        this._previewElement.src = contentURL;
++        this._previewElement.addEventListener("load", function revokeURL() {
++            URL.revokeObjectURL(contentURL);
++            previewElement.removeEventListener("load", revokeURL);
++        });
++        this._element.appendChild(this._previewElement);
+     },
+ 
+     refresh: function(graphDataSource)
+     {
+         if (!this._records || !this._records.length)
+             return false;
+ 
+         var firstRecord = this._records[0];
+         var barStartTime = firstRecord.startTime;
+ 
+-- 
+2.3.2
+

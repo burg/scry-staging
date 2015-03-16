@@ -1,0 +1,264 @@
+From 073eaa38768e9be118f9b47aa252e61d1c2bd836 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Sat, 14 Mar 2015 21:29:26 -0700
+Subject: [PATCH] Move the timeline overview scroll bar out of the way of the
+ element tracking timeline.
+
+---
+ .../UserInterface/Views/TimelineOverview.css       | 27 +++++++-
+ .../UserInterface/Views/TimelineOverview.js        | 72 ++++++++++++++++++++++
+ 2 files changed, 96 insertions(+), 3 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.css b/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.css
+index 225455d..2f64148 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.css
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.css
+@@ -20,35 +20,56 @@
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ .timeline-overview > .scroll-container {
+     position: absolute;
+     left: 0;
+     right: 0;
+-    bottom: 0;
++    bottom: -14px;
+     height: 16px;
+     overflow-x: auto;
+     overflow-y: hidden;
+     opacity: 0;
++    z-index: 1000;
++}
++
++.timeline-overview > .scroll-container::-webkit-scrollbar {
++    -webkit-appearance: none;
++    height: 8px;
++}
++
++.timeline-overview > .scroll-container::-webkit-scrollbar-track {
++    border-radius: 8px;
+ }
+ 
+-.timeline-overview:hover > .scroll-container {
++.timeline-overview > .scroll-container::-webkit-scrollbar-thumb {
++    border-radius: 8px;
++    background-color: rgba(57,57,57, .6);
++}
++
++.timeline-overview.showing-scrollbar > .scroll-container {
+     opacity: 0.75;
+ }
+ 
+-.timeline-overview > .scroll-container:hover {
++.timeline-overview.showing-scrollbar > .scroll-container:hover {
+     opacity: 1;
+ }
+ 
++.timeline-overview.showing-scrollbar + .content-browser > .navigation-bar > *,
++.timeline-overview.showing-scrollbar + .content-browser .timeline-view > .timeline-ruler > .header > *,
++.timeline-overview.showing-scrollbar + .content-browser .timeline-view > .data-grid > .header > * {
++    opacity: 0.2;
++}
++
+ .timeline-overview > .timeline-ruler {
+     position: absolute;
+     top: 0;
+     left: 0;
+     bottom: 0;
+     right: 0;
+ }
+ 
+ .timeline-overview > .graphs-container {
+     position: absolute;
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.js b/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.js
+index 9011bbb..c1b21b3 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.js
+@@ -27,20 +27,22 @@ WebInspector.TimelineOverview = function(timelineRecording)
+ {
+     WebInspector.Object.call(this);
+ 
+     this._recording = timelineRecording;
+     this._recording.addEventListener(WebInspector.TimelineRecording.Event.TimelineAdded, this._timelineAdded, this);
+     this._recording.addEventListener(WebInspector.TimelineRecording.Event.TimelineRemoved, this._timelineRemoved, this);
+ 
+     this._element = document.createElement("div");
+     this._element.className = WebInspector.TimelineOverview.StyleClassName;
+     this._element.addEventListener("wheel", this._handleWheelEvent.bind(this));
++    this._element.addEventListener("mouseover", this._mouseOverTimelineOverview.bind(this));
++    this._element.addEventListener("mouseout", this._mouseOutTimelineOverview.bind(this));
+ 
+     this._graphsContainerElement = document.createElement("div");
+     this._graphsContainerElement.className = WebInspector.TimelineOverview.GraphsContainerStyleClassName;
+     this._element.appendChild(this._graphsContainerElement);
+ 
+     this._timelineOverviewGraphsMap = new Map;
+ 
+     this._timelineRuler = new WebInspector.TimelineRuler;
+     this._timelineRuler.allowsClippedLabels = true;
+     this._timelineRuler.allowsTimeRangeSelection = true;
+@@ -71,25 +73,28 @@ WebInspector.TimelineOverview = function(timelineRecording)
+     this._cachedScrollContainerWidth = NaN;
+ 
+     this.selectionStartTime = this._selectionStartTimeSetting.value;
+     this.selectionDuration = this._selectionDurationSetting.value;
+ 
+     for (var timeline of this._recording.timelines.values())
+         this._timelineAdded(timeline);
+ };
+ 
+ WebInspector.TimelineOverview.StyleClassName = "timeline-overview";
++WebInspector.TimelineOverview.ShowingScrollbarStyleClassName = "showing-scrollbar";
+ WebInspector.TimelineOverview.GraphsContainerStyleClassName = "graphs-container";
+ WebInspector.TimelineOverview.ScrollContainerStyleClassName = "scroll-container";
+ WebInspector.TimelineOverview.ScrollWidthSizerStyleClassName = "scroll-width-sizer";
+ WebInspector.TimelineOverview.MinimumSecondsPerPixel = 0.001;
+ WebInspector.TimelineOverview.ScrollDeltaDenominator = 500;
++WebInspector.TimelineOverview.ScrollContainerFadeDurationMilliseconds = 500;
++WebInspector.TimelineOverview.ScrollContainerOpacityWhenPresented = 0.75;
+ 
+ WebInspector.TimelineOverview.Event = {
+     TimeRangeSelectionChanged: "timeline-overview-time-range-selection-changed"
+ };
+ 
+ WebInspector.TimelineOverview.prototype = {
+     constructor: WebInspector.TimelineOverview,
+     __proto__: WebInspector.Object.prototype,
+ 
+     // Public
+@@ -171,20 +176,25 @@ WebInspector.TimelineOverview.prototype = {
+     set scrollStartTime(x)
+     {
+         if (this._scrollStartTime === x)
+             return;
+ 
+         this._scrollStartTime = x || 0;
+ 
+         this._needsLayout();
+     },
+ 
++    get isZoomed()
++    {
++        return this.visibleDuration < this.endTime - this.startTime;
++    },
++
+     get visibleDuration()
+     {
+         if (isNaN(this._cachedScrollContainerWidth)) {
+             this._cachedScrollContainerWidth = this._scrollContainerElement.offsetWidth;
+             console.assert(this._cachedScrollContainerWidth > 0);
+         }
+ 
+         return this._cachedScrollContainerWidth * this._secondsPerPixel;
+     },
+ 
+@@ -296,20 +306,22 @@ WebInspector.TimelineOverview.prototype = {
+ 
+         this._timelineRuler.updateLayout();
+ 
+         for (var timelineOverviewGraph of this._timelineOverviewGraphsMap.values()) {
+             timelineOverviewGraph.zeroTime = this._startTime;
+             timelineOverviewGraph.startTime = scrollStartTime;
+             timelineOverviewGraph.currentTime = this._currentTime;
+             timelineOverviewGraph.endTime = scrollStartTime + visibleDuration;
+             timelineOverviewGraph.updateLayout();
+         }
++
++        this.element.classList.toggle(WebInspector.TimelineOverview.ShowingScrollbarStyleClassName, this.isZoomed);
+     },
+ 
+     updateLayoutIfNeeded: function()
+     {
+         if (this._scheduledLayoutUpdateIdentifier) {
+             this.updateLayout();
+             return;
+         }
+ 
+         this._timelineRuler.updateLayoutIfNeeded();
+@@ -380,20 +392,80 @@ WebInspector.TimelineOverview.prototype = {
+ 
+         this.secondsPerPixel += event.deltaY * (this._secondsPerPixel / WebInspector.TimelineOverview.ScrollDeltaDenominator) * deviceDirection;
+ 
+         // Center the zoom around the mouse based on the remembered mouse position time.
+         this.scrollStartTime = mousePositionTime - (mouseOffset * this._secondsPerPixel);
+ 
+         event.preventDefault();
+         event.stopPropagation();
+     },
+ 
++    _mouseOverTimelineOverview: function(event)
++    {
++        if (this._hideScrollContainerTimeoutIdentifier) {
++            clearTimeout(this._hideScrollContainerTimeoutIdentifier)
++            delete this._hideScrollContainerTimeoutIdentifier;
++        }
++
++        if (!this._scrollContainerElement.contains(event.target)) {
++            this._element.classList.toggle(WebInspector.TimelineOverview.ShowingScrollbarStyleClassName, this.isZoomed);
++
++            // Reset this, since it's manually set in our JS animation.
++            if (this.isZoomed)
++                this._scrollContainerElement.style.opacity = WebInspector.TimelineOverview.ScrollContainerOpacityWhenPresented;
++
++            event.preventDefault();
++            event.stopPropagation();
++            return;
++        }
++    },
++
++    _mouseOutTimelineOverview: function(event)
++    {
++        if (!this.isZoomed || this._hideScrollContainerTimeoutIdentifier)
++            return;
++
++        this._hideScrollContainerTimeoutIdentifier = setTimeout(this._hideScrollContainer.bind(this), 1000);
++    },
++
++    _hideScrollContainer: function()
++    {
++        delete this._hideScrollContainerTimeoutIdentifier;
++
++        var animationStartTime = Date.now();
++        var epsilon = 1 / (200 * WebInspector.TimelineOverview.ScrollContainerFadeDurationMilliseconds);
++        var spline = new WebInspector.UnitBezier(0.25, 0.1, 0.25, 1);
++        var initialOpacity = WebInspector.TimelineOverview.ScrollContainerOpacityWhenPresented;
++        var finalOpacity = 0;
++
++        function interpolatedValue(from, to, progress)
++        {
++            return from + (to - from) * progress;
++        }
++
++        function updateScrollContainerOpacity()
++        {
++            var progress = spline.solve(Math.min((Date.now() - animationStartTime) / WebInspector.TimelineOverview.ScrollContainerFadeDurationMilliseconds, 1), epsilon);
++
++            this._scrollContainerElement.style.opacity = interpolatedValue(initialOpacity, finalOpacity, progress);
++
++            if (this._element.classList.contains(WebInspector.TimelineOverview.ShowingScrollbarStyleClassName))
++                return;
++
++            if (progress < 1)
++                requestAnimationFrame(updateScrollContainerOpacity.bind(this));
++        }
++
++        this.element.classList.remove(WebInspector.TimelineOverview.ShowingScrollbarStyleClassName);
++        requestAnimationFrame(updateScrollContainerOpacity.bind(this));
++    },
++
+     _timelineAdded: function(timelineOrEvent)
+     {
+         var timeline = timelineOrEvent;
+         if (!(timeline instanceof WebInspector.Timeline))
+             timeline = timelineOrEvent.data.timeline;
+ 
+         console.assert(timeline instanceof WebInspector.Timeline, timeline);
+         console.assert(!this._timelineOverviewGraphsMap.has(timeline), timeline);
+ 
+         var overviewGraph = new WebInspector.TimelineOverviewGraph(timeline);
+-- 
+2.3.2
+

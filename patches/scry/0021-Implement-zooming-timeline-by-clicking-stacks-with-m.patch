@@ -1,4 +1,4 @@
-From 1e011c9f5757bf5f63291cbedad1c84d3b728262 Mon Sep 17 00:00:00 2001
+From a587bc81a50c8c148ea9d4e8140471519d08f4ab Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sun, 8 Mar 2015 21:12:19 -0700
 Subject: [PATCH] Implement zooming timeline by clicking stacks with multiple

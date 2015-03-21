@@ -1,4 +1,4 @@
-From 3462ea11674d8cc1d4ef67d85845feb52ad0ea43 Mon Sep 17 00:00:00 2001
+From bfb5f5eb537648e770f0d1941d1872a720f8d23d Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 2 Mar 2015 14:05:51 -0800
 Subject: [PATCH] WIP: create TimelineRecordStack elements for snapshot
@@ -18,11 +18,10 @@ TODO: needs better algorithm for placement
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
 
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index f7067fd..433ce00 100644
+index afc0f40..f45be60 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -130,20 +130,21 @@
-     <link rel="stylesheet" href="Views/StyleRuleIcons.css">
+@@ -132,20 +132,21 @@
      <link rel="stylesheet" href="Views/SyntaxHighlightingDefaultTheme.css">
      <link rel="stylesheet" href="Views/TextContentView.css">
      <link rel="stylesheet" href="Views/TextEditor.css">
@@ -31,6 +30,7 @@ index f7067fd..433ce00 100644
      <link rel="stylesheet" href="Views/TimelineIcons.css">
      <link rel="stylesheet" href="Views/TimelineOverview.css">
      <link rel="stylesheet" href="Views/TimelineRecordBar.css">
+     <link rel="stylesheet" href="Views/TimelineRecordFrame.css">
      <link rel="stylesheet" href="Views/TimelineRecordingContentView.css">
 +    <link rel="stylesheet" href="Views/TimelineRecordStack.css">
      <link rel="stylesheet" href="Views/TimelineRuler.css">
@@ -43,8 +43,7 @@ index f7067fd..433ce00 100644
      <link rel="stylesheet" href="Controllers/CodeMirrorCompletionController.css">
      <link rel="stylesheet" href="Controllers/CodeMirrorDragToAdjustNumberController.css">
      <link rel="stylesheet" href="Controllers/CodeMirrorGradientEditingController.css">
-@@ -477,20 +478,21 @@
-     <script src="Views/SourceCodeTextEditor.js"></script>
+@@ -480,20 +481,21 @@
      <script src="Views/SourceCodeTimelineTimelineDataGridNode.js"></script>
      <script src="Views/SourceCodeTimelineTreeElement.js"></script>
      <script src="Views/SourceMapResourceTreeElement.js"></script>
@@ -53,6 +52,7 @@ index f7067fd..433ce00 100644
      <script src="Views/TextResourceContentView.js"></script>
      <script src="Views/TimelineOverview.js"></script>
      <script src="Views/TimelineRecordBar.js"></script>
+     <script src="Views/TimelineRecordFrame.js"></script>
      <script src="Views/TimelineRecordingContentView.js"></script>
 +    <script src="Views/TimelineRecordStack.js"></script>
      <script src="Views/TimelineRuler.js"></script>

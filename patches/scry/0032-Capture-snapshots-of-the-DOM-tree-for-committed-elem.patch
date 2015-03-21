@@ -1,4 +1,4 @@
-From a739c44c3d924593c93caf39253fb35d702295eb Mon Sep 17 00:00:00 2001
+From 51cf25ed192f1228568a7dabf615d9c36ae3f367 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 19 Mar 2015 14:08:01 -0700
 Subject: [PATCH] Capture snapshots of the DOM tree for committed element
@@ -401,10 +401,10 @@ index 07000b4e..b3a5145 100644
      uint64_t m_nextSnapshotId {1};
  
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 4cfdc00..a78ea5f9 100644
+index cd1dc5d..6cae89a 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -231,24 +231,26 @@
+@@ -233,24 +233,26 @@
      <script src="Models/CSSSelector.js"></script>
      <script src="Models/CSSStyleDeclaration.js"></script>
      <script src="Models/CSSStyleSheet.js"></script>

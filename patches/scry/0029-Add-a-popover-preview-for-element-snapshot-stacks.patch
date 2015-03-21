@@ -1,4 +1,4 @@
-From d99e1d0398e5015808baf3ee4e12346e0013c246 Mon Sep 17 00:00:00 2001
+From cef6955098ee7c81a74a14be75a734cbab64750a Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 13 Mar 2015 19:43:16 -0700
 Subject: [PATCH] Add a popover preview for element snapshot stacks.

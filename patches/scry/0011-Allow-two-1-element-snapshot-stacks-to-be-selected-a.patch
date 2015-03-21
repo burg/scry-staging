@@ -1,4 +1,4 @@
-From 22f477e6fe8b878200f8996f1464062517d02fba Mon Sep 17 00:00:00 2001
+From 50e14f7c06d84095cc604163d517a33291ed4bc0 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 2 Mar 2015 14:55:06 -0800
 Subject: [PATCH] Allow two 1-element snapshot stacks to be selected at a time.

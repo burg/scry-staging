@@ -1,4 +1,4 @@
-From b4ec44e51667221ab0d827fc9ca4239baefffeee Mon Sep 17 00:00:00 2001
+From d9ffec6415f950a8a14c50f7f8f15987180cc836 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 20 Mar 2015 10:09:03 -0700
 Subject: [PATCH] Add content views to show DOM tree snapshots and diff them.
@@ -17,10 +17,10 @@ Subject: [PATCH] Add content views to show DOM tree snapshots and diff them.
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffDOMTreeContentView.js
 
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index a78ea5f9..a398974 100644
+index 6cae89a..d07fa5b 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -398,22 +398,24 @@
+@@ -401,22 +401,24 @@
      <script src="Views/DetailsSection.js"></script>
      <script src="Views/DetailsSectionDataGridRow.js"></script>
      <script src="Views/DetailsSectionGroup.js"></script>

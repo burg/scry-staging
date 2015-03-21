@@ -1,4 +1,4 @@
-From 619026e69c24c8148b457eef6bf4b761033fa2c7 Mon Sep 17 00:00:00 2001
+From 3ecb85ebf7d128a0869becb5818d983693463f31 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 23 Jan 2015 15:03:00 -0800
 Subject: [PATCH] Basic prototype for capturing element snapshots.
@@ -25,7 +25,7 @@ the old one if its bounding box is different (changed size or position).
  Source/WebCore/inspector/InspectorTimelineAgent.h  |   3 +-
  Source/WebCore/platform/graphics/ImageBuffer.cpp   |  32 ++++
  Source/WebCore/platform/graphics/ImageBuffer.h     |   2 +
- .../Localizations/en.lproj/localizedStrings.js     | Bin 59074 -> 59180 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 59192 -> 59298 bytes
  Source/WebInspectorUI/UserInterface/Base/Main.js   |   3 +
  .../UserInterface/Controllers/DOMTracingManager.js |  79 ++++++++
  Source/WebInspectorUI/UserInterface/Main.html      |   3 +
@@ -907,10 +907,10 @@ index cc6e10f..c599f6c 100644
  
      // Cross-agents API
 diff --git a/Source/WebCore/inspector/InspectorTimelineAgent.cpp b/Source/WebCore/inspector/InspectorTimelineAgent.cpp
-index b4886de..81b6dc6 100644
+index ecc120a..387d93d 100644
 --- a/Source/WebCore/inspector/InspectorTimelineAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorTimelineAgent.cpp
-@@ -329,27 +329,34 @@ void InspectorTimelineAgent::willRecalculateStyle(Frame* frame)
+@@ -388,27 +388,34 @@ void InspectorTimelineAgent::willRecalculateStyle(Frame* frame)
  void InspectorTimelineAgent::didRecalculateStyle()
  {
      didCompleteCurrentRecord(TimelineRecordType::RecalculateStyles);
@@ -947,7 +947,7 @@ index b4886de..81b6dc6 100644
  
  void InspectorTimelineAgent::didScroll()
  {
-@@ -686,26 +693,16 @@ void InspectorTimelineAgent::pushCurrentRecord(RefPtr<InspectorObject>&& data, T
+@@ -748,26 +755,16 @@ void InspectorTimelineAgent::pushCurrentRecord(RefPtr<InspectorObject>&& data, T
  {
      pushCurrentRecord(createRecordEntry(WTF::move(data), type, captureCallStack, frame));
  }
@@ -975,10 +975,10 @@ index b4886de..81b6dc6 100644
  
  } // namespace WebCore
 diff --git a/Source/WebCore/inspector/InspectorTimelineAgent.h b/Source/WebCore/inspector/InspectorTimelineAgent.h
-index 45af6359..da70463 100644
+index a0e7c7b..3e2c30a 100644
 --- a/Source/WebCore/inspector/InspectorTimelineAgent.h
 +++ b/Source/WebCore/inspector/InspectorTimelineAgent.h
-@@ -147,21 +147,21 @@ public:
+@@ -149,21 +149,21 @@ public:
      void willEvaluateScript(const String&, int, Frame&);
      void didEvaluateScript(Frame&);
      void didInvalidateLayout(Frame&);
@@ -1001,7 +1001,7 @@ index 45af6359..da70463 100644
      void didMarkLoadEvent(Frame&);
      void didRequestAnimationFrame(int callbackId, Frame*);
      void didCancelAnimationFrame(int callbackId, Frame*);
-@@ -216,21 +216,20 @@ private:
+@@ -218,21 +218,20 @@ private:
      TimelineRecordEntry createRecordEntry(RefPtr<Inspector::InspectorObject>&& data, TimelineRecordType, bool captureCallStack, Frame*);
  
      void setFrameIdentifier(Inspector::InspectorObject* record, Frame*);
@@ -1108,22 +1108,23 @@ index aa48a5f..446cfa8 100644
      
      String toDataURL(const String& mimeType, const double* quality = 0, CoordinateSystem = LogicalCoordinateSystem) const;
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index df86f8e154195832bb8f5fff9a23e7f842331593..57567de39086a8d8ace79887f9f0a80ea1ff598f 100644
+index b1467d0357d7739ad3e92b5e0ab8d3174e5211a6..463e8e97b0c4b4cb64cf53d9ac0056dd3ecfc65b 100644
 GIT binary patch
-delta 509
-zcmX?fmU+!NX3qcr$`}$EiWn3oZcyB)oi8H9AfuqlP|P5!pukW9lu2U9nLJNacXF<X
-zE+<@SGrwq|88d^L!el{jvB|mK!eI8t2%X8dy^kZ5fn+&g#!dbhVKMpdDW1)|zM5Rj
-zK%*wF4|ik++B3N}Tpxum7~?iM-=BjCsAO$~DT)#pAF4z`MgizPhE#?;h7<-}hFpex
-zAe{;|Qxa$g4q2#nB^iYRpq65WOrTdYfvh|RD+UFIG$6YIXiN&!AZ4II1l1uq`e&3p
-zilbqCBqiC=<|s;_{LO+fh2==$*L~R(g{QLl?d3-t?8yw-Kxev6{%}f?Hv|}Wi3~82
-d4T<KPPu`i#iKJ_-z8)eD*6ORUSTk@j007^reF*>n
+delta 523
+zcmdmSj(O2}X3qcr$`}$EiWn3oZcyB)oi8H9AfuqlP|P5!pukW9lu2U9nLJNacXF<X
+zE+<@SGrwq|88d^L!el{jvB|mK!eI8t2%X8dy^kZ5fn+&g#!dbhVKKQnQEKwuM61cG
+zeQhS+50=`z+P9mN8EEX}_2G`pKszVbhU=s71!LSM=lgRo0hO$cFhx-U<3p85$S45a
+z%8<&C$B@FH%aF^E52RC}W=aC>z#$9Ot|X&S0Mt^<kO}m5CXkiKV8x)okOpK|0F6n3
+z8l(&~h@d(oNB@kHM{zWakEA3!+8jj*l)qUp=6N|%STbHQMd7JzPQLPpgFTrc8|X~e
+n$$5#Aydl7NOk{wGY)CZUY=3t$Cz39~=PHx`KSLE!XJh~Xj}3x+
 
-delta 480
-zcmZ2;j``48X0Ct#8Oj(E8HyMbCO5JwZq&*b5mAs~P-Q4qkY!L{C;>_(G2}3$PA(J^
+delta 492
+zcmZ2<o_WVPX0Ct#8Oj(E8HyMbCO5JwZq&*b5mAs~P-Q4qkY!L{C;>_(G2}3$PA(J^
 zog60O%n6s=%qLoC#-yM&ncrJ{a*nq!h`G^Eck(Uo;~X$WKshl4XQQ9xCSOx7W}xik
 zb>WW8KpQ64gzKa51!CML9|&Lvi>-+;MNtFeL)AzE%>lcOA&()2L6;$yAs<MmLQTaZ
 z3)Qa-)L#J9Q_PSF^k*iJmB(NO^m7`JUBQsbkODP{D0Rs0{t+dQ;%*opSxr{7If@!6
-qf3rYLVL2j<CwE;oMd7JzeslQ|$7YMWy_`tm=bq`J@Kl(s8MpuwwRE}w
+zf3rZ$^KwKOPr71?%u$)lW~njx!&Q#SW>+UouDZjs+2E=O$L4i+dpQxIyjoumnWM^V
+H&A<f!$^>}B
 
 diff --git a/Source/WebInspectorUI/UserInterface/Base/Main.js b/Source/WebInspectorUI/UserInterface/Base/Main.js
 index 95b8f9c..bf5ca58 100644
@@ -1260,10 +1261,10 @@ index 0000000..49203aa
 +    }
 +};
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 84cb06a..3d20041 100644
+index d72adbd..1a88c69 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -182,20 +182,21 @@
+@@ -184,20 +184,21 @@
      <script src="Base/LoadLocalizedStrings.js"></script>
      <script src="Base/MIMETypeUtilities.js"></script>
      <script src="Base/URLUtilities.js"></script>
@@ -1285,7 +1286,7 @@ index 84cb06a..3d20041 100644
      <script src="Protocol/MessageDispatcher.js"></script>
      <script src="Protocol/NetworkObserver.js"></script>
      <script src="Protocol/PageObserver.js"></script>
-@@ -232,20 +233,21 @@
+@@ -234,20 +235,21 @@
      <script src="Models/CookieStorageObject.js"></script>
      <script src="Models/DOMNode.js"></script>
      <script src="Models/DOMNodeStyles.js"></script>
@@ -1307,7 +1308,7 @@ index 84cb06a..3d20041 100644
      <script src="Models/IndexedDatabaseObjectStoreIndex.js"></script>
      <script src="Models/IssueMessage.js"></script>
      <script src="Models/KeyboardShortcut.js"></script>
-@@ -490,20 +492,21 @@
+@@ -493,20 +495,21 @@
      <script src="Controllers/AnalyzerManager.js"></script>
      <script src="Controllers/ApplicationCacheManager.js"></script>
      <script src="Controllers/BasicBlockAnnotator.js"></script>

@@ -1,18 +1,18 @@
-From 34b12aebb76d2b92b68f74969c80f2cd5238125b Mon Sep 17 00:00:00 2001
+From 7153ea9396a77107011566db35eadcd7515e9ca8 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 09:45:51 -0800
 Subject: [PATCH] Add an element tracking timeline that shows collected
  snapshots.
 
 ---
- .../Localizations/en.lproj/localizedStrings.js     | Bin 59180 -> 59478 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 59298 -> 59596 bytes
  .../UserInterface/Controllers/DOMTracingManager.js |  19 +-
  .../UserInterface/Controllers/TimelineManager.js   |   3 +-
  Source/WebInspectorUI/UserInterface/Main.html      |   6 +
  .../ElementTrackingTimeline.js}                    |  34 +-
  .../Models/ElementTrackingTimelineRecord.js        | 107 +++++++
  .../UserInterface/Models/Geometry.js               |   5 +
- .../UserInterface/Models/Timeline.js               |   6 +
+ .../UserInterface/Models/Timeline.js               |   7 +
  .../UserInterface/Models/TimelineRecord.js         |   3 +-
  .../UserInterface/Views/ContentView.js             |   3 +
  .../Views/ElementTrackingTimelineDataGridNode.js   |  82 +++++
@@ -23,11 +23,13 @@ Subject: [PATCH] Add an element tracking timeline that shows collected
  .../UserInterface/Views/NetworkTimelineView.css    |   8 -
  .../UserInterface/Views/ScriptTimelineView.css     |   8 -
  .../UserInterface/Views/TimelineDataGrid.css       |  12 +
+ .../UserInterface/Views/TimelineIcons.css          |   8 +
  .../UserInterface/Views/TimelineOverviewGraph.js   |   5 +-
  .../UserInterface/Views/TimelineRecordBar.css      |   5 +
- .../Views/TimelineRecordTreeElement.js             |  12 +
+ .../Views/TimelineRecordTreeElement.js             |  11 +
+ .../UserInterface/Views/TimelineSidebarPanel.js    |   1 +
  .../UserInterface/Views/TimelineView.js            |   2 -
- 22 files changed, 734 insertions(+), 58 deletions(-)
+ 24 files changed, 743 insertions(+), 58 deletions(-)
  copy Source/WebInspectorUI/UserInterface/{Views/LayoutTimelineView.css => Models/ElementTrackingTimeline.js} (69%)
  create mode 100644 Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimelineRecord.js
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineDataGridNode.js
@@ -36,15 +38,15 @@ Subject: [PATCH] Add an element tracking timeline that shows collected
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js
 
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index 57567de39086a8d8ace79887f9f0a80ea1ff598f..a6873ac85ecedb0a739d3368bd47f9dd7d9e3562 100644
+index 463e8e97b0c4b4cb64cf53d9ac0056dd3ecfc65b..8475886360eccb2de28ed01b0f4fc9ddf78bd411 100644
 GIT binary patch
-delta 136
-zcmZ2;j``XJ<_*V^CJXrSafUDyF(fi1Gh|OrR1uyW=P!UH@^P-=<|9dGY$jXH=Q37c
-zaAwE=D$Qd^XGmp8VNha-Wl&(S1!5%ze}+<q5{3dWiKK3_qm2IMzWIG7lYi~ynVff>
-TW3t3Pt;rXzacq{kA|MO^<gh7R
+delta 140
+zcmZ2<p83p0<_*V^CJXrSafUDyF(fi1Gh|OrR1uyW=P!UH@^P-=<|9dGY$jXH=Q37c
+zaAwE=D$Qd^XGmp8VNha-Wl&(S1!5%ze}+<q5{3dWiKK3_qm2IMzWFSsla;QDOinwi
+XHTlC;j>%?MCrz%p!?W4oYLO5Cb^R+q
 
-delta 36
-ucmV+<0Nel8&;zW_1F*(ovpi$UJhOD5j5L$#)smAg-3*h^)&{fc)oc=MLlc_-
+delta 24
+gcmX?ek$KU1<_*V^Hrphhve{g+fXQ_8o~r`F0G#a$ssI20
 
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
 index 49203aa..215ce07 100644
@@ -121,10 +123,10 @@ index 49203aa..215ce07 100644
      },
  
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js b/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
-index 9701114..b78eb5a 100644
+index 113db82..d9cdaf7 100644
 --- a/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
 +++ b/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
-@@ -85,24 +85,25 @@ WebInspector.TimelineManager.prototype = {
+@@ -86,24 +86,25 @@ WebInspector.TimelineManager.prototype = {
      {
          console.assert(!this._isCapturing, "TimelineManager is already capturing.");
  
@@ -152,7 +154,7 @@ index 9701114..b78eb5a 100644
          // NOTE: Always stop immediately instead of waiting for a Timeline.recordingStopped event.
          // This way the UI feels as responsive to a stop as possible.
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 3d20041..af2899e 100644
+index 1a88c69..cf96199 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -66,20 +66,21 @@
@@ -177,7 +179,7 @@ index 3d20041..af2899e 100644
      <link rel="stylesheet" href="Views/GoToLineDialog.css">
      <link rel="stylesheet" href="Views/GradientSlider.css">
      <link rel="stylesheet" href="Views/HierarchicalPathComponent.css">
-@@ -234,20 +235,22 @@
+@@ -236,20 +237,22 @@
      <script src="Models/DOMNode.js"></script>
      <script src="Models/DOMNodeStyles.js"></script>
      <script src="Models/DOMSearchMatchObject.js"></script>
@@ -200,7 +202,7 @@ index 3d20041..af2899e 100644
      <script src="Models/IndexedDatabaseObjectStoreIndex.js"></script>
      <script src="Models/IssueMessage.js"></script>
      <script src="Models/KeyboardShortcut.js"></script>
-@@ -383,20 +386,23 @@
+@@ -386,20 +389,23 @@
      <script src="Views/DebuggerSidebarPanel.js"></script>
      <script src="Views/DefaultDashboardView.js"></script>
      <script src="Views/DetailsSection.js"></script>
@@ -392,65 +394,64 @@ index 0000000..1cd557c
 +    }
 +};
 diff --git a/Source/WebInspectorUI/UserInterface/Models/Geometry.js b/Source/WebInspectorUI/UserInterface/Models/Geometry.js
-index ea5c081..f45c4a5 100644
+index 0bfe276..a854ced 100644
 --- a/Source/WebInspectorUI/UserInterface/Models/Geometry.js
 +++ b/Source/WebInspectorUI/UserInterface/Models/Geometry.js
-@@ -91,20 +91,25 @@ WebInspector.Rect = function(x, y, width, height)
- {
-     this.origin = new WebInspector.Point(x || 0, y || 0);
-     this.size = new WebInspector.Size(width || 0, height || 0);
- };
+@@ -99,20 +99,25 @@ WebInspector.Rect = class Rect
+         this.size = new WebInspector.Size(width || 0, height || 0);
+     }
  
- WebInspector.Rect.rectFromClientRect = function(clientRect)
- {
-     return new WebInspector.Rect(clientRect.left, clientRect.top, clientRect.width, clientRect.height);
- };
+     // Static
  
-+WebInspector.Rect.fromObject = function(object)
-+{
-+    return new WebInspector.Rect(object.x, object.y, object.width, object.height);
-+};
+     static rectFromClientRect(clientRect)
+     {
+         return new WebInspector.Rect(clientRect.left, clientRect.top, clientRect.width, clientRect.height);
+     }
+ 
++    static fromObject(object)
++    {
++        return new WebInspector.Rect(object.x, object.y, object.width, object.height);
++    }
 +
- WebInspector.Rect.unionOfRects = function(rects)
- {
-     var union = rects[0];
-     for (var i = 1; i < rects.length; ++i)
-         union = union.unionWithRect(rects[i]);
-     return union;
- };
+     static unionOfRects(rects)
+     {
+         var union = rects[0];
+         for (var i = 1; i < rects.length; ++i)
+             union = union.unionWithRect(rects[i]);
+         return union;
+     }
  
- WebInspector.Rect.prototype = {
-     constructor: WebInspector.Rect,
+     // Public
+ 
 diff --git a/Source/WebInspectorUI/UserInterface/Models/Timeline.js b/Source/WebInspectorUI/UserInterface/Models/Timeline.js
-index e435e99..112f38d 100644
+index 649ba79..cf3f4ee 100644
 --- a/Source/WebInspectorUI/UserInterface/Models/Timeline.js
 +++ b/Source/WebInspectorUI/UserInterface/Models/Timeline.js
-@@ -22,20 +22,22 @@
-  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
-  * THE POSSIBILITY OF SUCH DAMAGE.
-  */
+@@ -33,20 +33,23 @@ WebInspector.Timeline = class Timeline extends WebInspector.Object
  
- WebInspector.Timeline = function(type)
- {
-     if (this.constructor === WebInspector.Timeline) {
-         // When instantiated directly, potentially return an instance of a concrete subclass.
+         this.reset(true);
+     }
+ 
+     // Static
+ 
+     static create(type)
+     {
          if (type === WebInspector.TimelineRecord.Type.Network)
              return new WebInspector.NetworkTimeline(type);
 +        if (type === WebInspector.TimelineRecord.Type.ElementTracking)
 +            return new WebInspector.ElementTrackingTimeline(type);
++    }
+ 
+         return new WebInspector.Timeline(type);
      }
  
-     WebInspector.Object.call(this);
+     // Public
  
-     this._type = type;
- 
-     this.reset(true);
- };
- 
- WebInspector.Timeline.Event = {
-@@ -73,32 +75,36 @@ WebInspector.Timeline.prototype = {
-     },
- 
+     get startTime()
+     {
+         return this._startTime;
+     }
+@@ -69,34 +72,38 @@ WebInspector.Timeline = class Timeline extends WebInspector.Object
      get displayName()
      {
          if (this._type === WebInspector.TimelineRecord.Type.Network)
@@ -459,11 +460,13 @@ index e435e99..112f38d 100644
              return WebInspector.UIString("Layout & Rendering");
          if (this._type === WebInspector.TimelineRecord.Type.Script)
              return WebInspector.UIString("JavaScript & Events");
+         if (this._type === WebInspector.TimelineRecord.Type.RunLoop)
+             return WebInspector.UIString("Frames");
 +        if (this._type === WebInspector.TimelineRecord.Type.ElementTracking)
 +            return WebInspector.UIString("Element Tracking");
  
          console.error("Timeline has unknown type:", this._type, this);
-     },
+     }
  
      get iconClassName()
      {
@@ -471,26 +474,27 @@ index e435e99..112f38d 100644
              return WebInspector.TimelineSidebarPanel.NetworkIconStyleClass;
          if (this._type === WebInspector.TimelineRecord.Type.Layout)
              return WebInspector.TimelineSidebarPanel.ColorsIconStyleClass;
+         if (this._type === WebInspector.TimelineRecord.Type.RunLoop)
+             return WebInspector.TimelineSidebarPanel.RunLoopIconStyleClass;
          if (this._type === WebInspector.TimelineRecord.Type.Script)
              return WebInspector.TimelineSidebarPanel.ScriptIconStyleClass;
 +        if (this._type === WebInspector.TimelineRecord.Type.ElementTracking)
-+            return WebInspector.TimelineSidebarPanel.ScriptIconStyleClass;
++            return WebInspector.TimelineSidebarPanel.ElementTrackingIconStyleClass;
  
          console.error("Timeline has unknown type:", this._type, this);
-     },
+     }
  
-     reset: function(suppressEvents)
+     reset(suppressEvents)
      {
          this._records = [];
          this._startTime = NaN;
          this._endTime = NaN;
  
 diff --git a/Source/WebInspectorUI/UserInterface/Models/TimelineRecord.js b/Source/WebInspectorUI/UserInterface/Models/TimelineRecord.js
-index 09582bc..dd6b957 100644
+index 56671f1..a24be1b 100644
 --- a/Source/WebInspectorUI/UserInterface/Models/TimelineRecord.js
 +++ b/Source/WebInspectorUI/UserInterface/Models/TimelineRecord.js
-@@ -39,21 +39,22 @@ WebInspector.TimelineRecord = function(type, startTime, endTime, callFrames, sou
-     this._sourceCodeLocation = sourceCodeLocation || null;
+@@ -131,18 +131,19 @@ WebInspector.TimelineRecord = class TimelineRecord extends WebInspector.Object
  };
  
  WebInspector.TimelineRecord.Event = {
@@ -500,8 +504,9 @@ index 09582bc..dd6b957 100644
  WebInspector.TimelineRecord.Type = {
      Network: "timeline-record-type-network",
      Layout: "timeline-record-type-layout",
--    Script: "timeline-record-type-script"
-+    Script: "timeline-record-type-script",
+     Script: "timeline-record-type-script",
+-    RunLoop: "timeline-record-type-runloop"
++    RunLoop: "timeline-record-type-runloop",
 +    ElementTracking: "timeline-record-type-element-tracking",
  };
  
@@ -510,11 +515,8 @@ index 09582bc..dd6b957 100644
  WebInspector.TimelineRecord.SourceCodeLocationLineCookieKey = "timeline-record-source-code-location-line";
  WebInspector.TimelineRecord.SourceCodeLocationColumnCookieKey = "timeline-record-source-code-location-column";
  WebInspector.TimelineRecord.TypeCookieKey = "timeline-record-type";
- 
- WebInspector.TimelineRecord.prototype = {
-     constructor: WebInspector.TimelineRecord,
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ContentView.js b/Source/WebInspectorUI/UserInterface/Views/ContentView.js
-index cb32ae7..a95091b 100644
+index 82bb89f..27c344e 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ContentView.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/ContentView.js
 @@ -45,20 +45,23 @@ WebInspector.ContentView = function(representedObject)
@@ -523,7 +525,7 @@ index cb32ae7..a95091b 100644
              if (timelineType === WebInspector.TimelineRecord.Type.Network)
                  return new WebInspector.NetworkTimelineView(representedObject);
  
-             if (timelineType === WebInspector.TimelineRecord.Type.Layout)
+             if (timelineType === WebInspector.TimelineRecord.Type.Layout || timelineType === WebInspector.TimelineRecord.Type.RunLoop)
                  return new WebInspector.LayoutTimelineView(representedObject);
  
              if (timelineType === WebInspector.TimelineRecord.Type.Script)
@@ -1257,20 +1259,53 @@ index 72b42c7..b374d52 100644
      left: 0;
      right: 0;
      height: 32px;
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css b/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css
+index 5b70027..669081d 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css
+@@ -64,20 +64,28 @@ body.mac-platform.legacy .colors-icon.large .icon {
+ }
+ 
+ .runloop-icon .icon {
+     content: -webkit-image-set(url(../Images/Frames.png) 1x, url(../Images/Frames@2x.png) 2x);
+ }
+ 
+ .runloop-icon.large .icon {
+     content: -webkit-image-set(url(../Images/FramesLarge.png) 1x, url(../Images/FramesLarge@2x.png) 2x);
+ }
+ 
++.element-tracking-icon .icon {
++    content: -webkit-image-set(url(../Images/Script.png) 1x, url(../Images/Script@2x.png) 2x);
++}
++
++.element-tracking-icon.large .icon {
++    content: -webkit-image-set(url(../Images/ScriptLarge.png) 1x, url(../Images/ScriptLarge@2x.png) 2x);
++}
++
+ .stopwatch-icon .icon {
+     content: -webkit-image-set(url(../Images/Stopwatch.png) 1x, url(../Images/Stopwatch@2x.png) 2x);
+ }
+ 
+ .profile-icon .icon {
+     content: -webkit-image-set(url(../Images/Profile.png) 1x, url(../Images/Profile@2x.png) 2x);
+ }
+ 
+ .style-record .icon {
+     content: url(../Images/TimelineRecordStyle.svg);
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/TimelineOverviewGraph.js
-index 4ab1f87..136964f 100644
+index 719d9df..135a653 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineOverviewGraph.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineOverviewGraph.js
-@@ -33,21 +33,24 @@ WebInspector.TimelineOverviewGraph = function(timeline)
-         var timelineType = timeline.type;
-         if (timelineType === WebInspector.TimelineRecord.Type.Network)
-             return new WebInspector.NetworkTimelineOverviewGraph(timeline);
+@@ -36,21 +36,24 @@ WebInspector.TimelineOverviewGraph = function(timeline)
  
          if (timelineType === WebInspector.TimelineRecord.Type.Layout)
              return new WebInspector.LayoutTimelineOverviewGraph(timeline);
  
          if (timelineType === WebInspector.TimelineRecord.Type.Script)
              return new WebInspector.ScriptTimelineOverviewGraph(timeline);
+ 
+         if (timelineType === WebInspector.TimelineRecord.Type.RunLoop)
+             return new WebInspector.RunLoopTimelineOverviewGraph(timeline);
  
 -        throw Error("Can't make a graph for an unknown timeline.");
 +        if (timelineType === WebInspector.TimelineRecord.Type.ElementTracking)
@@ -1282,11 +1317,11 @@ index 4ab1f87..136964f 100644
      // Concrete object instantiation.
      console.assert(this.constructor !== WebInspector.TimelineOverviewGraph && this instanceof WebInspector.TimelineOverviewGraph);
  
-     WebInspector.Object.call(this);
+     // FIXME: Convert this to a WebInspector.Object subclass, and call super().
+     // WebInspector.Object.call(this);
  
      this.element = document.createElement("div");
      this.element.classList.add(WebInspector.TimelineOverviewGraph.StyleClassName);
- 
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordBar.css b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordBar.css
 index 2acd591..bd59264 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordBar.css
@@ -1308,18 +1343,18 @@ index 2acd591..bd59264 100644
 +    border-color: rgb(215, 141, 47);
 +}
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
-index 8421ba4..07bd4ee 100644
+index 07d6fe9..0ab77fc 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
-@@ -92,20 +92,32 @@ WebInspector.TimelineRecordTreeElement = function(timelineRecord, subtitleNameSt
-         case WebInspector.ScriptTimelineRecord.EventType.AnimationFrameRequested:
-         case WebInspector.ScriptTimelineRecord.EventType.AnimationFrameCanceled:
-             iconStyleClass = WebInspector.TimelineRecordTreeElement.AnimationRecordIconStyleClass;
-             break;
-         default:
+@@ -97,20 +97,31 @@ WebInspector.TimelineRecordTreeElement = function(timelineRecord, subtitleNameSt
              console.error("Unknown ScriptTimelineRecord eventType: " + timelineRecord.eventType, timelineRecord);
          }
  
+         break;
+ 
+     case WebInspector.TimelineRecord.Type.RunLoop:
+         title = WebInspector.UIString("Runloop Executed");
+         iconStyleClass = WebInspector.TimelineRecordTreeElement.RunLoopRecordIconStyleClass;
          break;
  
 +    case WebInspector.TimelineRecord.Type.ElementTracking:
@@ -1331,7 +1366,6 @@ index 8421ba4..07bd4ee 100644
 +        default:
 +            console.error("Unknown ElementTrackingTimelineRecord eventType: " + timelineRecord.eventType, timelineRecord);
 +        }
-+
 +        break;
 +
      default:
@@ -1344,6 +1378,32 @@ index 8421ba4..07bd4ee 100644
  
      if (this._sourceCodeLocation)
          this.tooltipHandledSeparately = true;
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
+index 5b8c73d..1f020c9 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
+@@ -133,20 +133,21 @@ WebInspector.TimelineSidebarPanel.TitleBarStyleClass = "title-bar";
+ WebInspector.TimelineSidebarPanel.TimelinesTitleBarStyleClass = "timelines";
+ WebInspector.TimelineSidebarPanel.TimelineEventsTitleBarStyleClass = "timeline-events";
+ WebInspector.TimelineSidebarPanel.TimelinesContentContainerStyleClass = "timelines-content";
+ WebInspector.TimelineSidebarPanel.CloseButtonStyleClass = "close-button";
+ WebInspector.TimelineSidebarPanel.LargeIconStyleClass = "large";
+ WebInspector.TimelineSidebarPanel.StopwatchIconStyleClass = "stopwatch-icon";
+ WebInspector.TimelineSidebarPanel.NetworkIconStyleClass = "network-icon";
+ WebInspector.TimelineSidebarPanel.ColorsIconStyleClass = "colors-icon";
+ WebInspector.TimelineSidebarPanel.ScriptIconStyleClass = "script-icon";
+ WebInspector.TimelineSidebarPanel.RunLoopIconStyleClass = "runloop-icon";
++WebInspector.TimelineSidebarPanel.ElementTrackingIconStyleClass = "element-tracking-icon";
+ WebInspector.TimelineSidebarPanel.TimelineRecordingContentViewShowingStyleClass = "timeline-recording-content-view-showing";
+ 
+ WebInspector.TimelineSidebarPanel.ShowingTimelineRecordingContentViewCookieKey = "timeline-sidebar-panel-showing-timeline-recording-content-view";
+ WebInspector.TimelineSidebarPanel.SelectedTimelineViewIdentifierCookieKey = "timeline-sidebar-panel-selected-timeline-view-identifier";
+ WebInspector.TimelineSidebarPanel.OverviewTimelineIdentifierCookieValue = "overview";
+ 
+ WebInspector.TimelineSidebarPanel.prototype = {
+     constructor: WebInspector.TimelineSidebarPanel,
+     __proto__: WebInspector.NavigationSidebarPanel.prototype,
+ 
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineView.js b/Source/WebInspectorUI/UserInterface/Views/TimelineView.js
 index e7dbcae..3ca86a9 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineView.js

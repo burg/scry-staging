@@ -1,4 +1,4 @@
-From a456fd22d98ce6174f65e807ea99410470a5b954 Mon Sep 17 00:00:00 2001
+From 27452e77df4f124321778c08f31ade8bcb7d22fd Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 13 Mar 2015 12:05:10 -0700
 Subject: [PATCH] Sync snapshot selections to tree element selections.

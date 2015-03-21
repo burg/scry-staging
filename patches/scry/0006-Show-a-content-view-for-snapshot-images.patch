@@ -1,4 +1,4 @@
-From 9cb9237e5d8d2ed47696b7722a88e8a9506a8891 Mon Sep 17 00:00:00 2001
+From c49fe19e3b8e52361639a5c9f61c0103b8f34110 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 21:44:02 -0800
 Subject: [PATCH] Show a content view for snapshot images.
@@ -91,10 +91,10 @@ index 215ce07..a2c48ba 100644
      }
  };
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js b/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
-index b78eb5a..5416730 100644
+index d9cdaf7..0fe754a 100644
 --- a/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
 +++ b/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
-@@ -41,33 +41,36 @@ WebInspector.TimelineManager = function()
+@@ -42,33 +42,36 @@ WebInspector.TimelineManager = function()
  
      function delayedWork()
      {
@@ -131,7 +131,7 @@ index b78eb5a..5416730 100644
          return this._activeRecording;
      },
  
-@@ -548,12 +551,10 @@ WebInspector.TimelineManager.prototype = {
+@@ -570,12 +573,10 @@ WebInspector.TimelineManager.prototype = {
          // loading the cached resources when the inspector opens, and they do not have timing information.
          if (!WebInspector.frameResourceManager.mainFrame)
              return;
@@ -145,10 +145,10 @@ index b78eb5a..5416730 100644
 -
 -WebInspector.TimelineManager.prototype.__proto__ = WebInspector.Object.prototype;
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index af2899e..2d564fe 100644
+index cf96199..c97b469 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -386,20 +386,21 @@
+@@ -389,20 +389,21 @@
      <script src="Views/DebuggerSidebarPanel.js"></script>
      <script src="Views/DefaultDashboardView.js"></script>
      <script src="Views/DetailsSection.js"></script>
@@ -171,7 +171,7 @@ index af2899e..2d564fe 100644
      <script src="Views/FontResourceContentView.js"></script>
      <script src="Views/FormattedValue.js"></script>
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ContentView.js b/Source/WebInspectorUI/UserInterface/Views/ContentView.js
-index a95091b..24ab03d 100644
+index 27c344e..740bddc 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ContentView.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/ContentView.js
 @@ -80,20 +80,23 @@ WebInspector.ContentView = function(representedObject)
@@ -198,7 +198,7 @@ index a95091b..24ab03d 100644
  
      // Concrete object instantiation.
      console.assert(this.constructor !== WebInspector.ContentView && this instanceof WebInspector.ContentView);
-@@ -136,20 +139,22 @@ WebInspector.ContentView.isViewable = function(representedObject)
+@@ -138,20 +141,22 @@ WebInspector.ContentView.isViewable = function(representedObject)
      if (representedObject instanceof WebInspector.IndexedDatabaseObjectStoreIndex)
          return true;
      if (representedObject instanceof WebInspector.ApplicationCacheFrame)

@@ -1,4 +1,4 @@
-From 5733fce35978af621ddab6467df7ea53715c4ae8 Mon Sep 17 00:00:00 2001
+From 9b06568ce0b9ab58e3c309d8841fae6dc20695da Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 12 Mar 2015 10:12:53 -0700
 Subject: [PATCH] Bring diff views up to date and using real content views.

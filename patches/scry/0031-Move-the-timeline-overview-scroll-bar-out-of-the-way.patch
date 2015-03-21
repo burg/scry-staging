@@ -1,4 +1,4 @@
-From fa1ede0be6039324019a0b1c88bb2f5deeca68ee Mon Sep 17 00:00:00 2001
+From bd34115953abdb6197724a70d2cbe2a4ffb5c06f Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sat, 14 Mar 2015 21:29:26 -0700
 Subject: [PATCH] Move the timeline overview scroll bar out of the way of the
@@ -74,12 +74,12 @@ index 225455d..2f64148 100644
  .timeline-overview > .graphs-container {
      position: absolute;
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.js b/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.js
-index 9011bbb..78e5dfa 100644
+index 582be8f..c1764f1 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.js
-@@ -27,20 +27,22 @@ WebInspector.TimelineOverview = function(timelineRecording)
- {
-     WebInspector.Object.call(this);
+@@ -28,20 +28,22 @@ WebInspector.TimelineOverview = function(timelineRecording)
+     // FIXME: Convert this to a WebInspector.Object subclass, and call super().
+     // WebInspector.Object.call(this);
  
      this._recording = timelineRecording;
      this._recording.addEventListener(WebInspector.TimelineRecording.Event.TimelineAdded, this._timelineAdded, this);
@@ -100,7 +100,7 @@ index 9011bbb..78e5dfa 100644
      this._timelineRuler = new WebInspector.TimelineRuler;
      this._timelineRuler.allowsClippedLabels = true;
      this._timelineRuler.allowsTimeRangeSelection = true;
-@@ -71,25 +73,28 @@ WebInspector.TimelineOverview = function(timelineRecording)
+@@ -72,25 +74,28 @@ WebInspector.TimelineOverview = function(timelineRecording)
      this._cachedScrollContainerWidth = NaN;
  
      this.selectionStartTime = this._selectionStartTimeSetting.value;
@@ -129,7 +129,7 @@ index 9011bbb..78e5dfa 100644
      __proto__: WebInspector.Object.prototype,
  
      // Public
-@@ -171,20 +176,25 @@ WebInspector.TimelineOverview.prototype = {
+@@ -172,20 +177,25 @@ WebInspector.TimelineOverview.prototype = {
      set scrollStartTime(x)
      {
          if (this._scrollStartTime === x)
@@ -155,7 +155,7 @@ index 9011bbb..78e5dfa 100644
          return this._cachedScrollContainerWidth * this._secondsPerPixel;
      },
  
-@@ -249,20 +259,25 @@ WebInspector.TimelineOverview.prototype = {
+@@ -250,20 +260,25 @@ WebInspector.TimelineOverview.prototype = {
  
      revealMarker: function(marker)
      {
@@ -181,7 +181,7 @@ index 9011bbb..78e5dfa 100644
          }
  
          // Calculate the required width based on the duration and seconds per pixel.
-@@ -296,20 +311,22 @@ WebInspector.TimelineOverview.prototype = {
+@@ -297,20 +312,22 @@ WebInspector.TimelineOverview.prototype = {
  
          this._timelineRuler.updateLayout();
  
@@ -204,7 +204,7 @@ index 9011bbb..78e5dfa 100644
          }
  
          this._timelineRuler.updateLayoutIfNeeded();
-@@ -380,20 +397,93 @@ WebInspector.TimelineOverview.prototype = {
+@@ -381,20 +398,93 @@ WebInspector.TimelineOverview.prototype = {
  
          this.secondsPerPixel += event.deltaY * (this._secondsPerPixel / WebInspector.TimelineOverview.ScrollDeltaDenominator) * deviceDirection;
  

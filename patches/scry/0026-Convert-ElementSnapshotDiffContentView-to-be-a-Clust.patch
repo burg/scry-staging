@@ -1,4 +1,4 @@
-From c6ca4f095515b366e0a4edb39acb5e9818476a54 Mon Sep 17 00:00:00 2001
+From cbda7ca1ebef6a0699f75894a0a897f8381015d1 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 11 Mar 2015 15:46:37 -0700
 Subject: [PATCH] Convert ElementSnapshotDiffContentView to be a
@@ -17,10 +17,10 @@ Subject: [PATCH] Convert ElementSnapshotDiffContentView to be a
  copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotDiffContentView.js => ElementSnapshotDiffStyleContentView.js} (76%)
 
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 2f61333..4cfdc00 100644
+index f0edd8e..cd1dc5d 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -396,20 +396,22 @@
+@@ -399,20 +399,22 @@
      <script src="Views/DetailsSection.js"></script>
      <script src="Views/DetailsSectionDataGridRow.js"></script>
      <script src="Views/DetailsSectionGroup.js"></script>
@@ -44,7 +44,7 @@ index 2f61333..4cfdc00 100644
      <script src="Views/FindBanner.js"></script>
      <script src="Views/FlexibleSpaceNavigationItem.js"></script>
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ContentView.js b/Source/WebInspectorUI/UserInterface/Views/ContentView.js
-index 5f1c1b6..ac422df 100644
+index 38f2384..5a98d3e 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ContentView.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/ContentView.js
 @@ -96,21 +96,21 @@ WebInspector.ContentView = function(representedObject)
@@ -61,7 +61,8 @@ index 5f1c1b6..ac422df 100644
 -    console.assert(WebInspector.ContentView.isViewable(representedObject));
 +    console.assert(WebInspector.ContentView.isViewable(representedObject), representedObject);
  
-     WebInspector.Object.call(this);
+     // FIXME: Convert this to a WebInspector.Object subclass, and call super().
+     // WebInspector.Object.call(this);
  
      this._representedObject = representedObject;
  
@@ -69,7 +70,6 @@ index 5f1c1b6..ac422df 100644
      this._element.classList.add(WebInspector.ContentView.StyleClassName);
  
      this._parentContainer = null;
- };
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
 index 4d1d342..6bcc32a 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
@@ -489,10 +489,10 @@ index 7fcdfc6..7e2ab20 100644
      resizerDragStarted: function(resizer)
      {
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css b/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css
-index 7e3904a..b1f4f6f 100644
+index afefdc6..2bc3042 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css
-@@ -103,14 +103,10 @@ body.mac-platform.legacy .colors-icon.large .icon {
+@@ -123,14 +123,10 @@ body.mac-platform.legacy .colors-icon.large .icon {
      content: -webkit-image-set(url(../Images/DocumentImage.png) 1x, url(../Images/DocumentImage@2x.png) 2x);
  }
  

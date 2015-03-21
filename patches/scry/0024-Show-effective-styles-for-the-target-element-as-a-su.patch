@@ -1,4 +1,4 @@
-From 2de339b20ceff66564c2100a4bad01906120c2fa Mon Sep 17 00:00:00 2001
+From f988852468b19d24fd2896bc2ff2204e0b8e9965 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Tue, 10 Mar 2015 08:54:26 -0700
 Subject: [PATCH] Show effective styles for the target element as a subview of
@@ -8,7 +8,7 @@ Subject: [PATCH] Show effective styles for the target element as a subview of
  .../inspector/protocol/DOMTracing.json             |   4 +-
  Source/WebInspectorUI/UserInterface/Main.html      |   3 +
  .../WebInspectorUI/UserInterface/Models/CSSRule.js |  26 +-
- .../UserInterface/Models/CSSStyleDeclaration.js    |  23 +-
+ .../UserInterface/Models/CSSStyleDeclaration.js    |  25 +-
  .../UserInterface/Models/EffectivePropertyData.js  |  86 ++++++
  .../UserInterface/Models/EffectiveStyleSnapshot.js | 304 +++++++++++++++++++++
  .../UserInterface/Models/ElementSnapshot.js        |  11 +-
@@ -16,7 +16,7 @@ Subject: [PATCH] Show effective styles for the target element as a subview of
  .../Views/ElementSnapshotContentView.js            |  36 ++-
  ...iew.css => ElementSnapshotStyleContentView.css} |   3 +-
  ...View.css => ElementSnapshotStyleContentView.js} |  33 ++-
- 11 files changed, 495 insertions(+), 38 deletions(-)
+ 11 files changed, 496 insertions(+), 39 deletions(-)
  create mode 100644 Source/WebInspectorUI/UserInterface/Models/EffectivePropertyData.js
  create mode 100644 Source/WebInspectorUI/UserInterface/Models/EffectiveStyleSnapshot.js
  copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotContentView.css => ElementSnapshotStyleContentView.css} (95%)
@@ -58,7 +58,7 @@ index c68f475..c69d050 100644
                  { "name": "nodeId", "$ref": "DOM.NodeId", "description": "Id for the ancestor element that contributed inherited styles."},
                  { "name": "inlineStyle", "$ref": "CSS.CSSStyle", "optional": true, "description": "The ancestor element's inline style, if any, in the style inheritance chain." },
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 55a0a61..2f61333 100644
+index f5f7a59..f0edd8e 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -69,20 +69,21 @@
@@ -83,7 +83,7 @@ index 55a0a61..2f61333 100644
      <link rel="stylesheet" href="Views/FormattedValue.css">
      <link rel="stylesheet" href="Views/GoToLineDialog.css">
      <link rel="stylesheet" href="Views/GradientSlider.css">
-@@ -238,20 +239,21 @@
+@@ -240,20 +241,21 @@
      <script src="Models/CookieStorageObject.js"></script>
      <script src="Models/DOMNode.js"></script>
      <script src="Models/DOMNodeStyles.js"></script>
@@ -105,7 +105,7 @@ index 55a0a61..2f61333 100644
      <script src="Models/Geometry.js"></script>
      <script src="Models/Gradient.js"></script>
      <script src="Models/IndexedDatabase.js"></script>
-@@ -395,20 +397,21 @@
+@@ -398,20 +400,21 @@
      <script src="Views/DetailsSectionDataGridRow.js"></script>
      <script src="Views/DetailsSectionGroup.js"></script>
      <script src="Views/DetailsSectionPropertiesRow.js"></script>
@@ -128,12 +128,10 @@ index 55a0a61..2f61333 100644
      <script src="Views/FontResourceContentView.js"></script>
      <script src="Views/FormattedValue.js"></script>
 diff --git a/Source/WebInspectorUI/UserInterface/Models/CSSRule.js b/Source/WebInspectorUI/UserInterface/Models/CSSRule.js
-index 0d87410..5851fa9 100644
+index 6f3873b..f5b39b2 100644
 --- a/Source/WebInspectorUI/UserInterface/Models/CSSRule.js
 +++ b/Source/WebInspectorUI/UserInterface/Models/CSSRule.js
-@@ -16,26 +16,26 @@
-  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
-  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+@@ -18,26 +18,26 @@
   * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
   * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
   * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
@@ -142,33 +140,35 @@ index 0d87410..5851fa9 100644
   * THE POSSIBILITY OF SUCH DAMAGE.
   */
  
--WebInspector.CSSRule = function(nodeStyles, ownerStyleSheet, id, type, sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList)
-+WebInspector.CSSRule = function(updateDelegate, ownerStyleSheet, id, type, sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList)
+ WebInspector.CSSRule = class CSSRule extends WebInspector.Object
  {
-     WebInspector.Object.call(this);
+-    constructor(nodeStyles, ownerStyleSheet, id, type, sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList)
++    constructor(updateDelegate, ownerStyleSheet, id, type, sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList)
+     {
+         super();
  
--    console.assert(nodeStyles);
--    this._nodeStyles = nodeStyles;
-+    // A WebInspector.DOMNodeStyles instance if this corresponds to a live, editable style.
-+    this._updateDelegate = updateDelegate || null;
+-        console.assert(nodeStyles);
+-        this._nodeStyles = nodeStyles;
++        // A WebInspector.DOMNodeStyles instance if this corresponds to a live, editable style.
++        this._updateDelegate = updateDelegate || null;
  
-     this._ownerStyleSheet = ownerStyleSheet || null;
-     this._id = id || null;
-     this._type = type || null;
+         this._ownerStyleSheet = ownerStyleSheet || null;
+         this._id = id || null;
+         this._type = type || null;
  
-     this.update(sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList, true);
- };
+         this.update(sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList, true);
+     }
  
- WebInspector.Object.addConstructorFunctions(WebInspector.CSSRule);
+     // Public
  
-@@ -60,21 +60,30 @@ WebInspector.CSSRule.prototype = {
+@@ -46,21 +46,30 @@ WebInspector.CSSRule = class CSSRule extends WebInspector.Object
          return this._id;
-     },
+     }
  
      get ownerStyleSheet()
      {
          return this._ownerStyleSheet;
-     },
+     }
  
      get editable()
      {
@@ -183,9 +183,9 @@ index 0d87410..5851fa9 100644
 +            return true;
 +
 +        return false;
-     },
+     }
  
-     update: function(sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList, dontFireEvents)
+     update(sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, style, mediaList, dontFireEvents)
      {
          sourceCodeLocation = sourceCodeLocation || null;
          selectorText = selectorText || "";
@@ -193,7 +193,7 @@ index 0d87410..5851fa9 100644
          matchedSelectorIndices = matchedSelectorIndices || [];
          style = style || null;
          mediaList = mediaList || [];
-@@ -124,21 +133,21 @@ WebInspector.CSSRule.prototype = {
+@@ -110,21 +119,21 @@ WebInspector.CSSRule = class CSSRule extends WebInspector.Object
  
      set selectorText(selectorText)
      {
@@ -206,27 +206,27 @@ index 0d87410..5851fa9 100644
  
 -        this._nodeStyles.changeRuleSelector(this, selectorText);
 +        this._updateDelegate.changeRuleSelector(this, selectorText);
-     },
+     }
  
      get selectors()
      {
          return this._selectors;
-     },
+     }
  
      get matchedSelectorIndices()
      {
          return this._matchedSelectorIndices;
-@@ -188,20 +197,13 @@ WebInspector.CSSRule.prototype = {
+@@ -174,27 +183,20 @@ WebInspector.CSSRule = class CSSRule extends WebInspector.Object
          return this._mediaList;
-     },
+     }
  
-     isEqualTo: function(rule)
+     isEqualTo(rule)
      {
          if (!rule)
              return false;
  
          return Object.shallowEqual(this._id, rule.id);
-     },
+     }
 -
 -    // Protected
 -
@@ -236,14 +236,19 @@ index 0d87410..5851fa9 100644
 -    }
  };
  
- WebInspector.CSSRule.prototype.__proto__ = WebInspector.Object.prototype;
+ WebInspector.CSSRule.Event = {
+     Changed: "css-rule-changed"
+ };
+ 
+ WebInspector.CSSRule.Type = {
+     Author: "css-rule-type-author",
+     User: "css-rule-type-user",
+     UserAgent: "css-rule-type-user-agent",
 diff --git a/Source/WebInspectorUI/UserInterface/Models/CSSStyleDeclaration.js b/Source/WebInspectorUI/UserInterface/Models/CSSStyleDeclaration.js
-index ec059e1..1bbf751 100644
+index fb0c63e..24d437c 100644
 --- a/Source/WebInspectorUI/UserInterface/Models/CSSStyleDeclaration.js
 +++ b/Source/WebInspectorUI/UserInterface/Models/CSSStyleDeclaration.js
-@@ -16,29 +16,30 @@
-  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
-  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+@@ -18,29 +18,30 @@
   * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
   * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
   * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
@@ -252,58 +257,36 @@ index ec059e1..1bbf751 100644
   * THE POSSIBILITY OF SUCH DAMAGE.
   */
  
--WebInspector.CSSStyleDeclaration = function(nodeStyles, ownerStyleSheet, id, type, node, inherited, text, properties, styleSheetTextRange)
-+WebInspector.CSSStyleDeclaration = function(updateDelegate, ownerStyleSheet, id, type, node, inherited, text, properties, styleSheetTextRange)
+ WebInspector.CSSStyleDeclaration = class CSSStyleDeclaration extends WebInspector.Object
  {
-     WebInspector.Object.call(this);
- 
--    console.assert(nodeStyles);
--    this._nodeStyles = nodeStyles;
-+    // A WebInspector.DOMNodeStyles instance if this corresponds to a live, editable style.
-+    this._updateDelegate = updateDelegate || null;
- 
-     this._ownerRule = null;
- 
-+    // Used to indirectly update the style declaration. Consider merging with updateDelegate somehow.
-     this._ownerStyleSheet = ownerStyleSheet || null;
-     this._id = id || null;
-     this._type = type || null;
-     this._node = node || null;
-     this._inherited = inherited || false;
- 
-     this._pendingProperties = [];
-     this._propertyNameMap = {};
- 
-     this.update(text, properties, styleSheetTextRange, true);
-@@ -47,21 +48,22 @@ WebInspector.CSSStyleDeclaration = function(nodeStyles, ownerStyleSheet, id, typ
- WebInspector.Object.addConstructorFunctions(WebInspector.CSSStyleDeclaration);
- 
- WebInspector.CSSStyleDeclaration.Event = {
-     PropertiesChanged: "css-style-declaration-properties-changed"
- };
- 
- WebInspector.CSSStyleDeclaration.Type = {
-     Rule: "css-style-declaration-type-rule",
-     Inline: "css-style-declaration-type-inline",
-     Attribute: "css-style-declaration-type-attribute",
--    Computed: "css-style-declaration-type-computed"
-+    Computed: "css-style-declaration-type-computed",
-+    Effective: "css-style-declaration-type-effective"
- };
- 
- WebInspector.CSSStyleDeclaration.prototype = {
-     constructor: WebInspector.CSSStyleDeclaration,
-     __proto__: WebInspector.Object.prototype,
- 
-     // Public
- 
-     get id()
+-    constructor(nodeStyles, ownerStyleSheet, id, type, node, inherited, text, properties, styleSheetTextRange)
++    constructor(updateDelegate, ownerStyleSheet, id, type, node, inherited, text, properties, styleSheetTextRange)
      {
-@@ -86,20 +88,23 @@ WebInspector.CSSStyleDeclaration.prototype = {
+         super();
+ 
+-        console.assert(nodeStyles);
+-        this._nodeStyles = nodeStyles;
++        // A WebInspector.DOMNodeStyles instance if this corresponds to a live, editable style.
++        this._updateDelegate = updateDelegate || null;
+ 
+         this._ownerRule = null;
+ 
++        // Used to indirectly update the style declaration. Consider merging with updateDelegate somehow.
+         this._ownerStyleSheet = ownerStyleSheet || null;
+         this._id = id || null;
+         this._type = type || null;
+         this._node = node || null;
+         this._inherited = inherited || false;
+ 
+         this._pendingProperties = [];
+         this._propertyNameMap = {};
+ 
+         this.update(text, properties, styleSheetTextRange, true);
+@@ -71,20 +72,23 @@ WebInspector.CSSStyleDeclaration = class CSSStyleDeclaration extends WebInspecto
      get node()
      {
          return this._node;
-     },
+     }
  
      get editable()
      {
@@ -320,14 +303,14 @@ index ec059e1..1bbf751 100644
              return !this._node.isInShadowTree();
  
          return false;
-     },
+     }
  
-     update: function(text, properties, styleSheetTextRange, dontFireEvents)
-@@ -191,21 +196,22 @@ WebInspector.CSSStyleDeclaration.prototype = {
+     update(text, properties, styleSheetTextRange, dontFireEvents)
+@@ -176,22 +180,23 @@ WebInspector.CSSStyleDeclaration = class CSSStyleDeclaration extends WebInspecto
      get text()
      {
          return this._text;
-     },
+     }
  
      set text(text)
      {
@@ -335,19 +318,21 @@ index ec059e1..1bbf751 100644
              return;
  
 -        this._nodeStyles.changeStyleText(this, text);
+-    }
 +        console.assert(this._updateDelegate, "Tried to edit style text of non-editable declaratin.");
 +        this._updateDelegate.changeStyleText(this, text);
-     },
++    },
  
      get properties()
      {
          return this._properties;
-     },
+     }
  
      get visibleProperties()
      {
          if (this._visibleProperties)
-@@ -267,18 +273,11 @@ WebInspector.CSSStyleDeclaration.prototype = {
+             return this._visibleProperties;
+@@ -252,29 +257,23 @@ WebInspector.CSSStyleDeclaration = class CSSStyleDeclaration extends WebInspecto
          if (bestMatchProperty)
              return bestMatchProperty;
  
@@ -357,7 +342,7 @@ index ec059e1..1bbf751 100644
          this._pendingProperties.push(newProperty);
  
          return newProperty;
-     },
+     }
 -
 -    // Protected
 -
@@ -365,6 +350,19 @@ index ec059e1..1bbf751 100644
 -    {
 -        return this._nodeStyles;
 -    }
+ };
+ 
+ WebInspector.CSSStyleDeclaration.Event = {
+     PropertiesChanged: "css-style-declaration-properties-changed"
+ };
+ 
+ WebInspector.CSSStyleDeclaration.Type = {
+     Rule: "css-style-declaration-type-rule",
+     Inline: "css-style-declaration-type-inline",
+     Attribute: "css-style-declaration-type-attribute",
+-    Computed: "css-style-declaration-type-computed"
++    Computed: "css-style-declaration-type-computed",
++    Effective: "css-style-declaration-type-effective"
  };
 diff --git a/Source/WebInspectorUI/UserInterface/Models/EffectivePropertyData.js b/Source/WebInspectorUI/UserInterface/Models/EffectivePropertyData.js
 new file mode 100644

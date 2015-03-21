@@ -1,4 +1,4 @@
-From 071dea8998fde3de5c1472c748ac6a702c8182eb Mon Sep 17 00:00:00 2001
+From 9209b81c68069d32e73972265b0633a18f15e5b4 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 4 Mar 2015 15:46:47 -0800
 Subject: [PATCH] Show the ElementSnapshotContentView inside the
@@ -7,7 +7,7 @@ Subject: [PATCH] Show the ElementSnapshotContentView inside the
  - Construct path components that include the selected timeline and components for the container's content view.
  - Add icons and tasteful titles/subtitles for Element Snapshot path components and "Output Changed" record tree elements.
 ---
- .../Localizations/en.lproj/localizedStrings.js     | Bin 60694 -> 60792 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 60812 -> 60910 bytes
  .../UserInterface/Models/ElementSnapshot.js        |   5 ++-
  .../Models/ElementTrackingTimeline.js              |   5 +++
  .../Views/ElementSnapshotContentView.js            |   9 +++++
@@ -20,13 +20,13 @@ Subject: [PATCH] Show the ElementSnapshotContentView inside the
  10 files changed, 85 insertions(+), 24 deletions(-)
 
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index d128c9b69c94c47114075a1841e9c78f3cc82cec..fd8ff7e97d5a7f5ddc4d7ea8564764c8774bfa25 100644
+index ad730659143fe78092b2e241113a55459a05a8dd..72da1851573b9ca6b20e634f8c74e32cdda4d085 100644
 GIT binary patch
 delta 48
-ucmbPsi}}Yb<_(+9apy54G88ZrGh{I2Pv(~v<qc*)7O|Bw-n`*lnj8R|vJaX7
+ucmeCV&HU~*^9GIc+<6R%3<V6u3>gghlli4Zd4m~{MQo*vH>;gblLG*NR1S6k
 
 delta 14
-Wcmexyi+S2D<_(+9Z5BD7A_o9IIR}vd
+WcmaENo4MyU^9GIco4d}Z$N>O5ZU<}t
 
 diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
 index eac2127..e7a2d09 100644
@@ -175,7 +175,7 @@ index 2522249..98d8355 100644
              return;
          }
 diff --git a/Source/WebInspectorUI/UserInterface/Views/LayoutTimelineView.js b/Source/WebInspectorUI/UserInterface/Views/LayoutTimelineView.js
-index 05b46d5..25274cb 100644
+index 13776eb..7170c0f 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/LayoutTimelineView.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/LayoutTimelineView.js
 @@ -221,26 +221,23 @@ WebInspector.LayoutTimelineView.prototype = {
@@ -207,10 +207,10 @@ index 05b46d5..25274cb 100644
          }
  
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css b/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css
-index 05b0ee2..b1f4f6f 100644
+index 669081d..2bc3042 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css
-@@ -92,17 +92,21 @@ body.mac-platform.legacy .colors-icon.large .icon {
+@@ -112,17 +112,21 @@ body.mac-platform.legacy .colors-icon.large .icon {
  }
  
  .probe-record .icon {
@@ -233,15 +233,15 @@ index 05b0ee2..b1f4f6f 100644
      content: url(../Images/TimelineRecordAnimation.svg);
  }
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
-index b652575..38d8937 100644
+index 9f989f2..16559c1 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
-@@ -95,21 +95,22 @@ WebInspector.TimelineRecordTreeElement = function(timelineRecord, subtitleNameSt
-             break;
-         default:
-             console.error("Unknown ScriptTimelineRecord eventType: " + timelineRecord.eventType, timelineRecord);
-         }
+@@ -100,21 +100,22 @@ WebInspector.TimelineRecordTreeElement = function(timelineRecord, subtitleNameSt
+         break;
  
+     case WebInspector.TimelineRecord.Type.RunLoop:
+         title = WebInspector.UIString("Runloop Executed");
+         iconStyleClass = WebInspector.TimelineRecordTreeElement.RunLoopRecordIconStyleClass;
          break;
  
      case WebInspector.TimelineRecord.Type.ElementTracking:
@@ -260,12 +260,12 @@ index b652575..38d8937 100644
  
      default:
          console.error("Unknown TimelineRecord type: " + timelineRecord.type, timelineRecord);
-@@ -124,20 +125,21 @@ WebInspector.TimelineRecordTreeElement = function(timelineRecord, subtitleNameSt
- };
+@@ -130,20 +131,21 @@ WebInspector.TimelineRecordTreeElement = function(timelineRecord, subtitleNameSt
  
  WebInspector.TimelineRecordTreeElement.StyleRecordIconStyleClass = "style-record";
  WebInspector.TimelineRecordTreeElement.LayoutRecordIconStyleClass = "layout-record";
  WebInspector.TimelineRecordTreeElement.PaintRecordIconStyleClass = "paint-record";
+ WebInspector.TimelineRecordTreeElement.RunLoopRecordIconStyleClass = "runloop-record";
  WebInspector.TimelineRecordTreeElement.EvaluatedRecordIconStyleClass = "evaluated-record";
  WebInspector.TimelineRecordTreeElement.EventRecordIconStyleClass = "event-record";
  WebInspector.TimelineRecordTreeElement.TimerRecordIconStyleClass = "timer-record";
@@ -383,7 +383,7 @@ index 1419755..f0d7d0b 100644
      {
          if (!this.currentTimelineView)
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
-index de6bd63..1fb712b 100644
+index 2136749..213ec28 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
 @@ -32,21 +32,21 @@ WebInspector.TimelineSidebarPanel = function()
@@ -409,7 +409,7 @@ index de6bd63..1fb712b 100644
      this._recordingsTreeOutline.onselect = this._recordingsTreeElementSelected.bind(this);
      this._timelinesContentContainerElement.appendChild(this._recordingsTreeOutline.element);
  
-@@ -163,20 +163,26 @@ WebInspector.TimelineSidebarPanel.prototype = {
+@@ -165,20 +165,26 @@ WebInspector.TimelineSidebarPanel.prototype = {
      {
          if (this._displayedContentView)
              this.showTimelineOverview();
@@ -436,7 +436,7 @@ index de6bd63..1fb712b 100644
              var foundTreeElement = this._timelineTreeElementMap.get(representedObject);
              if (foundTreeElement)
                  return foundTreeElement;
-@@ -256,31 +262,56 @@ WebInspector.TimelineSidebarPanel.prototype = {
+@@ -258,31 +264,56 @@ WebInspector.TimelineSidebarPanel.prototype = {
  
      showTimelineOverview: function()
      {
@@ -495,7 +495,7 @@ index de6bd63..1fb712b 100644
      },
  
      hasCustomFilters: function()
-@@ -361,21 +392,24 @@ WebInspector.TimelineSidebarPanel.prototype = {
+@@ -363,21 +394,24 @@ WebInspector.TimelineSidebarPanel.prototype = {
  
          this.updateFilter();
      },

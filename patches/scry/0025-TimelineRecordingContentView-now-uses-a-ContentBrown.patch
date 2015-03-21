@@ -1,4 +1,4 @@
-From 10a0c0d2e6f30b9a62904e1480ca8d127a58508e Mon Sep 17 00:00:00 2001
+From d85a0e5e6ae3463b0ec77730d2c14e4ad35271be Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 11 Mar 2015 14:03:02 -0700
 Subject: [PATCH] TimelineRecordingContentView now uses a ContentBrownser.
@@ -69,10 +69,10 @@ index e532e42..defb810 100644
      },
  
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ContentBrowser.js b/Source/WebInspectorUI/UserInterface/Views/ContentBrowser.js
-index 3cc3d4d..04ddfb9 100644
+index ea6044f..90924cd 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ContentBrowser.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/ContentBrowser.js
-@@ -364,21 +364,26 @@ WebInspector.ContentBrowser.prototype = {
+@@ -366,21 +366,26 @@ WebInspector.ContentBrowser.prototype = {
              var pathComponent = new WebInspector.GeneralTreeElementPathComponent(treeElement);
              pathComponents.unshift(pathComponent);
              treeElement = treeElement.parent;
@@ -146,15 +146,15 @@ index 23c55f9..cbb22cc 100644
  
      get selectionPathComponents()
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
-index ee86f8e..4faef23 100644
+index 757a27d..c5c6b2b 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
-@@ -95,21 +95,21 @@ WebInspector.TimelineRecordTreeElement = function(timelineRecord, subtitleNameSt
-             break;
-         default:
-             console.error("Unknown ScriptTimelineRecord eventType: " + timelineRecord.eventType, timelineRecord);
-         }
+@@ -100,21 +100,21 @@ WebInspector.TimelineRecordTreeElement = function(timelineRecord, subtitleNameSt
+         break;
  
+     case WebInspector.TimelineRecord.Type.RunLoop:
+         title = WebInspector.UIString("Runloop Executed");
+         iconStyleClass = WebInspector.TimelineRecordTreeElement.RunLoopRecordIconStyleClass;
          break;
  
      case WebInspector.TimelineRecord.Type.ElementTracking:

@@ -1,4 +1,4 @@
-From b52f59bd7539720aefaf17b6e7a1445339ddbd27 Mon Sep 17 00:00:00 2001
+From b7adf41947ccc0f5ab543bee8cc5138a18804012 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Mar 2015 10:57:03 -0700
 Subject: [PATCH] Rename ElementSnapshot to ElementSnapshotHeader, and
@@ -660,15 +660,15 @@ index 64a3259..a7f8a7f 100644
  
      _elementTrackingTimelineRecordAdded: function(event)
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
-index 38d8937..ee86f8e 100644
+index 16559c1..757a27d 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
-@@ -95,21 +95,21 @@ WebInspector.TimelineRecordTreeElement = function(timelineRecord, subtitleNameSt
-             break;
-         default:
-             console.error("Unknown ScriptTimelineRecord eventType: " + timelineRecord.eventType, timelineRecord);
-         }
+@@ -100,21 +100,21 @@ WebInspector.TimelineRecordTreeElement = function(timelineRecord, subtitleNameSt
+         break;
  
+     case WebInspector.TimelineRecord.Type.RunLoop:
+         title = WebInspector.UIString("Runloop Executed");
+         iconStyleClass = WebInspector.TimelineRecordTreeElement.RunLoopRecordIconStyleClass;
          break;
  
      case WebInspector.TimelineRecord.Type.ElementTracking:
@@ -687,10 +687,10 @@ index 38d8937..ee86f8e 100644
  
      default:
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
-index 75f38c8..2b34ccc 100644
+index cd80982..36dc41f 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
-@@ -286,23 +286,25 @@ WebInspector.TimelineSidebarPanel.prototype = {
+@@ -288,23 +288,25 @@ WebInspector.TimelineSidebarPanel.prototype = {
          console.assert(record instanceof WebInspector.TimelineRecord, record);
          console.assert(this._displayedRecording);
  

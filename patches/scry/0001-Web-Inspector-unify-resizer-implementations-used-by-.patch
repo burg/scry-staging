@@ -1,4 +1,4 @@
-From 2708011294eafe586d99fce1b54f4d46a53f58d3 Mon Sep 17 00:00:00 2001
+From 337c3161289e4d412f435b05266f9c45a3cb3d3d Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 6 Mar 2015 11:57:52 -0800
 Subject: [PATCH] Web Inspector: unify resizer implementations used by DataGrid
@@ -67,7 +67,7 @@ WebInspector.elementDragStart, as I would like to deprecate it in favor of Resiz
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/Resizer.js
 
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 002e589..84cb06a 100644
+index b0dc22a..d72adbd 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -103,20 +103,21 @@
@@ -86,13 +86,13 @@ index 002e589..84cb06a 100644
      <link rel="stylesheet" href="Views/ResourceSidebarPanel.css">
      <link rel="stylesheet" href="Views/ResourceTreeElement.css">
      <link rel="stylesheet" href="Views/RulesStyleDetailsPanel.css">
+     <link rel="stylesheet" href="Views/RunLoopTimelineOverviewGraph.css">
      <link rel="stylesheet" href="Views/ScopeBar.css">
      <link rel="stylesheet" href="Views/ScriptContentView.css">
      <link rel="stylesheet" href="Views/ScriptTimelineOverviewGraph.css">
      <link rel="stylesheet" href="Views/ScriptTimelineView.css">
      <link rel="stylesheet" href="Views/SearchBar.css">
-     <link rel="stylesheet" href="Views/SearchIcons.css">
-@@ -435,20 +436,21 @@
+@@ -437,20 +438,21 @@
      <script src="Views/ProbeDetailsSidebarPanel.js"></script>
      <script src="Views/ProbeSetDataGrid.js"></script>
      <script src="Views/ProbeSetDataGridNode.js"></script>
@@ -110,10 +110,10 @@ index 002e589..84cb06a 100644
      <script src="Views/ResourceTimelineDataGridNode.js"></script>
      <script src="Views/ResourceTimelineDataGridNodePathComponent.js"></script>
      <script src="Views/RulesStyleDetailsPanel.js"></script>
+     <script src="Views/RunLoopTimelineOverviewGraph.js"></script>
      <script src="Views/ScopeBar.js"></script>
      <script src="Views/ScopeBarItem.js"></script>
      <script src="Views/ScopeChainDetailsSidebarPanel.js"></script>
-     <script src="Views/ScopeVariableTreeElement.js"></script>
 diff --git a/Source/WebInspectorUI/UserInterface/Views/DataGrid.css b/Source/WebInspectorUI/UserInterface/Views/DataGrid.css
 index 416484c..79ab83c 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/DataGrid.css
@@ -695,10 +695,10 @@ index dccb566..05e0d75 100644
  .sidebar.collapsed {
      display: none;
 diff --git a/Source/WebInspectorUI/UserInterface/Views/Sidebar.js b/Source/WebInspectorUI/UserInterface/Views/Sidebar.js
-index e07be64..f77cae2 100644
+index f675776..6a919fa 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/Sidebar.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/Sidebar.js
-@@ -31,38 +31,36 @@ WebInspector.Sidebar = function(element, side, sidebarPanels, role, label) {
+@@ -32,39 +32,37 @@ WebInspector.Sidebar = function(element, side, sidebarPanels, role, label) {
  
      this._element = element || document.createElement("div");
      this._element.classList.add(WebInspector.Sidebar.StyleClassName);
@@ -725,7 +725,8 @@ index e07be64..f77cae2 100644
      }
  };
  
- WebInspector.Object.addConstructorFunctions(WebInspector.Sidebar);
+ // FIXME: Move to a WebInspector.Object subclass and we can remove this.
+ WebInspector.Object.deprecatedAddConstructorFunctions(WebInspector.Sidebar);
  
  WebInspector.Sidebar.StyleClassName = "sidebar";
  WebInspector.Sidebar.CollapsedStyleClassName = "collapsed";
@@ -740,7 +741,7 @@ index e07be64..f77cae2 100644
      SidebarPanelSelected: "sidebar-sidebar-panel-selected",
      CollapsedStateDidChange: "sidebar-sidebar-collapsed-state-did-change",
      WidthDidChange: "sidebar-width-did-change",
-@@ -243,72 +241,41 @@ WebInspector.Sidebar.prototype = {
+@@ -245,72 +243,41 @@ WebInspector.Sidebar.prototype = {
                  if (this._sidebarPanels[i].identifier === sidebarPanelOrIdentifierOrIndex) {
                      sidebarPanel = this._sidebarPanels[i];
                      break;

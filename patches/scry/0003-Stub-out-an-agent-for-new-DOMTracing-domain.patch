@@ -1,4 +1,4 @@
-From 540777f12a0a293c1588159ac62f832d477fd459 Mon Sep 17 00:00:00 2001
+From 093a9ad07af502e625915d651d6a976c92aaf44a Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 15 Jan 2015 13:51:04 -0800
 Subject: [PATCH] Stub out an agent for new DOMTracing domain.
@@ -77,10 +77,10 @@ index 0000000..9559dc0
 +    ]
 +}
 diff --git a/Source/WebCore/CMakeLists.txt b/Source/WebCore/CMakeLists.txt
-index d8c6020..a7c2ce4 100644
+index 4bfdd27..8915df9 100644
 --- a/Source/WebCore/CMakeLists.txt
 +++ b/Source/WebCore/CMakeLists.txt
-@@ -1763,20 +1763,21 @@ set(WebCore_SOURCES
+@@ -1779,20 +1779,21 @@ set(WebCore_SOURCES
      inspector/CommandLineAPIModule.cpp
      inspector/DOMEditor.cpp
      inspector/DOMPatchSupport.cpp
@@ -103,10 +103,10 @@ index d8c6020..a7c2ce4 100644
      inspector/InspectorLayerTreeAgent.cpp
      inspector/InspectorNodeFinder.cpp
 diff --git a/Source/WebCore/WebCore.xcodeproj/project.pbxproj b/Source/WebCore/WebCore.xcodeproj/project.pbxproj
-index 5c2e365..0e50a50 100644
+index b413bda..08fda8c 100644
 --- a/Source/WebCore/WebCore.xcodeproj/project.pbxproj
 +++ b/Source/WebCore/WebCore.xcodeproj/project.pbxproj
-@@ -5584,20 +5584,22 @@
+@@ -5596,20 +5596,22 @@
  		C348612315FDE21E007A1CC9 /* InputTypeNames.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C348612115FDE21E007A1CC9 /* InputTypeNames.cpp */; };
  		C348612415FDE21E007A1CC9 /* InputTypeNames.h in Headers */ = {isa = PBXBuildFile; fileRef = C348612215FDE21E007A1CC9 /* InputTypeNames.h */; };
  		C375D7FD16639519006184AB /* TypeAhead.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C375D7FB16639519006184AB /* TypeAhead.cpp */; };
@@ -129,7 +129,7 @@ index 5c2e365..0e50a50 100644
  		C4E657FE1A97FBED00479C15 /* InspectorStyleRuleSet.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F71A97FBED00479C15 /* InspectorStyleRuleSet.h */; };
  		C4E657FF1A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C4E657F81A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp */; };
  		C4E658001A97FBED00479C15 /* InspectorStylesheetRuleSet.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F91A97FBED00479C15 /* InspectorStylesheetRuleSet.h */; };
-@@ -13089,20 +13091,22 @@
+@@ -13112,20 +13114,22 @@
  		C348612215FDE21E007A1CC9 /* InputTypeNames.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InputTypeNames.h; sourceTree = "<group>"; };
  		C375D7FB16639519006184AB /* TypeAhead.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TypeAhead.cpp; sourceTree = "<group>"; };
  		C375D7FC16639519006184AB /* TypeAhead.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TypeAhead.h; sourceTree = "<group>"; };
@@ -152,7 +152,7 @@ index 5c2e365..0e50a50 100644
  		C4E657F71A97FBED00479C15 /* InspectorStyleRuleSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStyleRuleSet.h; sourceTree = "<group>"; };
  		C4E657F81A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = InspectorStylesheetRuleSet.cpp; sourceTree = "<group>"; };
  		C4E657F91A97FBED00479C15 /* InspectorStylesheetRuleSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStylesheetRuleSet.h; sourceTree = "<group>"; };
-@@ -15360,20 +15364,22 @@
+@@ -15388,20 +15392,22 @@
  				7AB0B1BF1211A62200A76940 /* InspectorDatabaseAgent.h */,
  				F3F5CF1212ED81B30084C569 /* InspectorDatabaseInstrumentation.h */,
  				41F062130F5F192600A07EAC /* InspectorDatabaseResource.cpp */,
@@ -175,7 +175,7 @@ index 5c2e365..0e50a50 100644
  				7A54857D14E02D51006AE05A /* InspectorHistory.cpp */,
  				7A54857E14E02D51006AE05A /* InspectorHistory.h */,
  				7ACD88D114C08BD60084EDD2 /* InspectorIndexedDBAgent.cpp */,
-@@ -24805,20 +24811,21 @@
+@@ -24840,20 +24846,21 @@
  				A871DB250A150BD600B12A68 /* HTMLTableSectionElement.h in Headers */,
  				D66817FB166FE6D700FA07B4 /* HTMLTemplateElement.h in Headers */,
  				A81369D6097374F600D74463 /* HTMLTextAreaElement.h in Headers */,
@@ -197,7 +197,7 @@ index 5c2e365..0e50a50 100644
  				862F12A018C1DD02005C54AF /* HysteresisActivity.h in Headers */,
  				B275356E0B053814002CE64F /* Icon.h in Headers */,
  				97E4029013A696ED00913D67 /* IconController.h in Headers */,
-@@ -29495,20 +29502,21 @@
+@@ -29539,20 +29546,21 @@
  				3571883EEF618793751E4089 /* RenderMathMLMenclose.cpp in Sources */,
  				439046DF12DA25E800AF80A2 /* RenderMathMLOperator.cpp in Sources */,
  				439046DF12DA25E800BF80A3 /* RenderMathMLRadicalOperator.cpp in Sources */,

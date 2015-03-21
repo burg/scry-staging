@@ -1,4 +1,4 @@
-From 76e75428b0bc8fb22df23c06aab716466a5eb4ba Mon Sep 17 00:00:00 2001
+From a5c97f3a84e7ac8602d62ed1e74e3ecd8416c250 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 20 Mar 2015 14:08:28 -0700
 Subject: [PATCH] Refactor DOMNode, DOMTreeElement, DOMTreeOutline to support
@@ -11,39 +11,39 @@ Subject: [PATCH] Refactor DOMNode, DOMTreeElement, DOMTreeOutline to support
  3 files changed, 59 insertions(+), 24 deletions(-)
 
 diff --git a/Source/WebInspectorUI/UserInterface/Models/DOMNode.js b/Source/WebInspectorUI/UserInterface/Models/DOMNode.js
-index 25a3ef6..fb89039 100644
+index 3057f9a..2ac7119 100644
 --- a/Source/WebInspectorUI/UserInterface/Models/DOMNode.js
 +++ b/Source/WebInspectorUI/UserInterface/Models/DOMNode.js
-@@ -217,20 +217,30 @@ WebInspector.DOMNode.prototype = {
-     hasShadowRoots: function()
+@@ -211,20 +211,30 @@ WebInspector.DOMNode = class DOMNode extends WebInspector.Object
+     hasShadowRoots()
      {
          return !!this._shadowRoots.length;
-     },
+     }
  
-     isInShadowTree: function()
+     isInShadowTree()
      {
          return this._isInShadowTree;
-     },
+     }
  
-+    isEditable: function()
++    isEditable()
 +    {
 +        return !this.isInShadowTree();
-+    },
++    }
 +
-+    isTrackable: function()
++    isTrackable()
 +    {
 +        return !this.isInShadowTree() && this.nodeType() === Node.ELEMENT_NODE;
-+    },
++    }
 +
-     nodeType: function()
+     nodeType()
      {
          return this._nodeType;
-     },
+     }
  
-     nodeName: function()
+     nodeName()
      {
          return this._nodeName;
-     },
+     }
  
 diff --git a/Source/WebInspectorUI/UserInterface/Views/DOMTreeElement.js b/Source/WebInspectorUI/UserInterface/Views/DOMTreeElement.js
 index c099001..9af0481 100644
@@ -276,7 +276,7 @@ index c099001..9af0481 100644
  
              return this._addNewAttribute();
 diff --git a/Source/WebInspectorUI/UserInterface/Views/DOMTreeOutline.js b/Source/WebInspectorUI/UserInterface/Views/DOMTreeOutline.js
-index 51a32a2..d6beca6 100644
+index 885f784..a261e02 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/DOMTreeOutline.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/DOMTreeOutline.js
 @@ -21,40 +21,40 @@
@@ -322,10 +322,10 @@ index 51a32a2..d6beca6 100644
      this.element.addEventListener("contextmenu", this._contextMenuEventFired.bind(this), true);
  
      this._hideElementKeyboardShortcut = new WebInspector.KeyboardShortcut(null, "H", this._hideElement.bind(this), this.element);
-@@ -64,20 +64,33 @@ WebInspector.DOMTreeOutline = function(omitRootDOMNode, selectEnabled, showInEle
- };
+@@ -65,20 +65,33 @@ WebInspector.DOMTreeOutline = function(omitRootDOMNode, selectEnabled, showInEle
  
- WebInspector.Object.addConstructorFunctions(WebInspector.DOMTreeOutline);
+ // FIXME: Move to a WebInspector.Object subclass and we can remove this.
+ WebInspector.Object.deprecatedAddConstructorFunctions(WebInspector.DOMTreeOutline);
  
  WebInspector.DOMTreeOutline.StyleClassName = "dom-tree-outline";
  
@@ -356,7 +356,7 @@ index 51a32a2..d6beca6 100644
  
      close: function()
      {
-@@ -101,20 +114,30 @@ WebInspector.DOMTreeOutline.prototype = {
+@@ -102,20 +115,30 @@ WebInspector.DOMTreeOutline.prototype = {
      addEventListener: function(eventType, listener, thisObject)
      {
          this._eventSupport.addEventListener(eventType, listener, thisObject);
@@ -387,7 +387,7 @@ index 51a32a2..d6beca6 100644
          if (this._rootDOMNode === x)
              return;
  
-@@ -306,54 +329,57 @@ WebInspector.DOMTreeOutline.prototype = {
+@@ -307,54 +330,57 @@ WebInspector.DOMTreeOutline.prototype = {
  
          if (element) {
              element.hovered = true;
@@ -448,7 +448,7 @@ index 51a32a2..d6beca6 100644
              return false;
  
          var treeElement = this._treeElementFromEvent(event);
-@@ -489,21 +515,21 @@ WebInspector.DOMTreeOutline.prototype = {
+@@ -490,21 +516,21 @@ WebInspector.DOMTreeOutline.prototype = {
      },
  
      _updateModifiedNodes: function()

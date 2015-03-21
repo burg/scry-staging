@@ -1,11 +1,11 @@
-From c2470bf4bf373846f28be3f50a6481ed4f4b847d Mon Sep 17 00:00:00 2001
+From 865427e626641c9d8dfa304cfdc53f359cd38b35 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 5 Mar 2015 16:51:28 -0800
 Subject: [PATCH] When two snapshots are selected, create an
  ElementSnapshotDiff and show it as a subview.
 
 ---
- .../Localizations/en.lproj/localizedStrings.js     | Bin 60792 -> 60966 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 60910 -> 61084 bytes
  .../UserInterface/Controllers/DOMTracingManager.js |  32 +++
  .../WebInspectorUI/UserInterface/Images/Diff.svg   |  12 ++
  Source/WebInspectorUI/UserInterface/Main.html      |   3 +
@@ -27,14 +27,14 @@ Subject: [PATCH] When two snapshots are selected, create an
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffDetailsClusterContentView.js
 
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index fd8ff7e97d5a7f5ddc4d7ea8564764c8774bfa25..6b80dcd2e8369420ca6dc9550a68bb764de5c561 100644
+index 72da1851573b9ca6b20e634f8c74e32cdda4d085..8ab9ab08c48dfbb5865b6ed6dfb5dda5901a3f3f 100644
 GIT binary patch
-delta 150
-zcmexyi+R}{<_$vU>%$l_8B!U_859_t88R3W8S)s?f&5}1UxOhS$V+4>0P->z@)=6N
-pqN)rj48jT^Qj<Z6Ar`347KoJ?$TVkiBd7l4g!4R`<<3XR0RW6^A4mWI
+delta 146
+zcmaENn|aP%<_#U^>%$l_8B!U_859_t88R3W8S)s?f&5}1UxOhS$V+4>0P->z@)=6N
+kqN)rj48jT^Qj<Z6Ar`347KoJ?$TVkiBd7l6j`L}907z~gQ~&?~
 
 delta 14
-WcmZ2>hxx}X<_$vUHy=2kCI<jKX9uzX
+WcmbPpm-*do<_#U^H=A8ZlLG)enFoyk
 
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
 index 3422942..be8152b 100644
@@ -133,7 +133,7 @@ index 0000000..de6453c
 +    <path d="M 8.5 10.5 L 12.5 10.5" stroke="rgb(208, 1, 27)" stroke-linecap="square"/>
 +</svg>
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 433ce00..3e9e9b4 100644
+index f45be60..496d401 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -66,20 +66,21 @@
@@ -158,7 +158,7 @@ index 433ce00..3e9e9b4 100644
      <link rel="stylesheet" href="Views/FormattedValue.css">
      <link rel="stylesheet" href="Views/GoToLineDialog.css">
      <link rel="stylesheet" href="Views/GradientSlider.css">
-@@ -236,20 +237,21 @@
+@@ -238,20 +239,21 @@
      <script src="Models/DOMNode.js"></script>
      <script src="Models/DOMNodeStyles.js"></script>
      <script src="Models/DOMSearchMatchObject.js"></script>
@@ -180,7 +180,7 @@ index 433ce00..3e9e9b4 100644
      <script src="Models/IndexedDatabase.js"></script>
      <script src="Models/IndexedDatabaseObjectStore.js"></script>
      <script src="Models/IndexedDatabaseObjectStoreIndex.js"></script>
-@@ -389,20 +391,21 @@
+@@ -392,20 +394,21 @@
      <script src="Views/DefaultDashboardView.js"></script>
      <script src="Views/DetailsSection.js"></script>
      <script src="Views/DetailsSectionDataGridRow.js"></script>
@@ -275,7 +275,7 @@ index 0000000..897e37e
 +    __proto__: WebInspector.Object.prototype,
 +}
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ContentView.js b/Source/WebInspectorUI/UserInterface/Views/ContentView.js
-index 24ab03d..5f1c1b6 100644
+index 740bddc..38f2384 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ContentView.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/ContentView.js
 @@ -83,20 +83,23 @@ WebInspector.ContentView = function(representedObject)
@@ -302,7 +302,7 @@ index 24ab03d..5f1c1b6 100644
  
      // Concrete object instantiation.
      console.assert(this.constructor !== WebInspector.ContentView && this instanceof WebInspector.ContentView);
-@@ -141,20 +144,22 @@ WebInspector.ContentView.isViewable = function(representedObject)
+@@ -143,20 +146,22 @@ WebInspector.ContentView.isViewable = function(representedObject)
      if (representedObject instanceof WebInspector.ApplicationCacheFrame)
          return true;
      if (representedObject instanceof WebInspector.DOMTree)
@@ -804,10 +804,10 @@ index 47866f4..925ff6f 100644
      }
  };
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css b/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css
-index b1f4f6f..7e3904a 100644
+index 2bc3042..afefdc6 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineIcons.css
-@@ -103,10 +103,14 @@ body.mac-platform.legacy .colors-icon.large .icon {
+@@ -123,10 +123,14 @@ body.mac-platform.legacy .colors-icon.large .icon {
      content: -webkit-image-set(url(../Images/DocumentImage.png) 1x, url(../Images/DocumentImage@2x.png) 2x);
  }
  
@@ -823,10 +823,10 @@ index b1f4f6f..7e3904a 100644
 +    content: url(../Images/Diff.svg);
 +}
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
-index 1fb712b..75f38c8 100644
+index 213ec28..cd80982 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
-@@ -298,20 +298,28 @@ WebInspector.TimelineSidebarPanel.prototype = {
+@@ -300,20 +300,28 @@ WebInspector.TimelineSidebarPanel.prototype = {
              WebInspector.contentBrowser.showContentView(this._displayedContentView);
          } else {
              this.showTimelineViewForTimeline(timeline, false);

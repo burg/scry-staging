@@ -1,11 +1,11 @@
-From 2288ce3f10091f5f7727b239a903e48d60a5f450 Mon Sep 17 00:00:00 2001
+From 3cca27d68505c2ffcb6e23f91623802a3f2b151a Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sun, 8 Mar 2015 14:59:06 -0700
 Subject: [PATCH] Convert the snapshot content view to be a cluster content
  view.
 
 ---
- .../Localizations/en.lproj/localizedStrings.js     | Bin 60966 -> 61072 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 61084 -> 61190 bytes
  .../WebInspectorUI/UserInterface/Images/Camera.svg |   6 +
  Source/WebInspectorUI/UserInterface/Main.html      |   3 +
  ...ntentView.js => ElementSnapshotContentView.css} |  34 +-----
@@ -19,14 +19,14 @@ Subject: [PATCH] Convert the snapshot content view to be a cluster content
  copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotContentView.js => ElementSnapshotOutputContentView.js} (62%)
 
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index 6b80dcd2e8369420ca6dc9550a68bb764de5c561..893aa5dc92aae4c649d6c88f2b1a7427bccd7174 100644
+index 8ab9ab08c48dfbb5865b6ed6dfb5dda5901a3f3f..56ba10266fde1f6cfa61d26ed8a1bf946e31740a 100644
 GIT binary patch
-delta 89
-zcmZ2>hk3$X<_$vUHy=1ZPja%*`E|Bo44DkY45bW-3^@!64E{h?2}1#xRAPt)ir50N
-S5(5rZlNlX!H^;p^!2$r^#2A_Y
+delta 96
+zcmbPpm$~g8^M;P|o6RoFlbqafew}R?LncEpLn%WdLk@!igFlc}!cYJvl^9}yBDO%R
+Z#DGK9WJU+w$$GE&CcR?Y{Nm*n767s59Gn0E
 
-delta 27
-lcmV+$0ObFW-2<lF1F#a$ld$NnlVHybvmVcq8MDag$OO!@4ygbD
+delta 23
+fcmZp>$2{jQ^M;P|lht0X+uU(}p5$h`S0`8inBNSe
 
 diff --git a/Source/WebInspectorUI/UserInterface/Images/Camera.svg b/Source/WebInspectorUI/UserInterface/Images/Camera.svg
 new file mode 100644
@@ -41,7 +41,7 @@ index 0000000..92b81de
 +    <path d="M 8 10.5 C 9.10456955 10.5 10 9.60456955 10 8.5 C 10 7.39543045 9.10456955 6.5 8 6.5 C 6.89543045 6.5 6 7.39543045 6 8.5 C 6 9.60456955 6.89543045 10.5 8 10.5 Z" fill="none" stroke="black"/>
 +</svg>
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 3e9e9b4..55a0a61 100644
+index 496d401..f5f7a59 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
 @@ -66,21 +66,23 @@
@@ -68,7 +68,7 @@ index 3e9e9b4..55a0a61 100644
      <link rel="stylesheet" href="Views/FormattedValue.css">
      <link rel="stylesheet" href="Views/GoToLineDialog.css">
      <link rel="stylesheet" href="Views/GradientSlider.css">
-@@ -392,20 +394,21 @@
+@@ -395,20 +397,21 @@
      <script src="Views/DetailsSection.js"></script>
      <script src="Views/DetailsSectionDataGridRow.js"></script>
      <script src="Views/DetailsSectionGroup.js"></script>

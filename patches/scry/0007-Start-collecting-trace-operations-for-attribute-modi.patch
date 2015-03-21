@@ -1,4 +1,4 @@
-From 490e49c64c30006c976ccbe3a638e5d83cd5c4f9 Mon Sep 17 00:00:00 2001
+From 0c97e52379622892d0f79cc0af0c723c1395697b Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 12 Feb 2015 18:55:51 -0800
 Subject: [PATCH] Start collecting trace operations for attribute modify/remove
@@ -12,7 +12,7 @@ Subject: [PATCH] Start collecting trace operations for attribute modify/remove
  .../WebCore/inspector/InspectorDOMTracingAgent.cpp |  72 ++++++++++++++
  .../WebCore/inspector/InspectorDOMTracingAgent.h   |   8 ++
  .../WebCore/inspector/InspectorInstrumentation.cpp |   4 +
- .../Localizations/en.lproj/localizedStrings.js     | Bin 59478 -> 59958 bytes
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 59596 -> 60076 bytes
  .../UserInterface/Controllers/DOMTracingManager.js |  36 +++++++
  .../UserInterface/Controllers/TimelineManager.js   |  64 ++++++------
  Source/WebInspectorUI/UserInterface/Main.html      |   1 +
@@ -22,9 +22,9 @@ Subject: [PATCH] Start collecting trace operations for attribute modify/remove
  .../UserInterface/Protocol/DOMTracingObserver.js   |   5 +
  .../Views/ElementTrackingTimelineDataGridNode.js   |  12 ++-
  .../Views/ElementTrackingTimelineView.js           |  18 ++--
- .../Views/TimelineRecordTreeElement.js             |  12 +--
+ .../Views/TimelineRecordTreeElement.js             |  13 +--
  .../UserInterface/Views/TimelineSidebarPanel.js    |   5 +
- 19 files changed, 425 insertions(+), 106 deletions(-)
+ 19 files changed, 426 insertions(+), 106 deletions(-)
  create mode 100644 Source/WebCore/inspector/ElementTraceOperations.cpp
  create mode 100644 Source/WebCore/inspector/ElementTraceOperations.h
  copy Source/WebInspectorUI/UserInterface/Models/{ElementTrackingTimelineRecord.js => TraceOperationTimelineRecord.js} (51%)
@@ -89,10 +89,10 @@ index acfcb83..62a4df8 100644
      ]
  }
 diff --git a/Source/WebCore/WebCore.xcodeproj/project.pbxproj b/Source/WebCore/WebCore.xcodeproj/project.pbxproj
-index 0e50a50..fe6fd08 100644
+index 08fda8c..3570a19 100644
 --- a/Source/WebCore/WebCore.xcodeproj/project.pbxproj
 +++ b/Source/WebCore/WebCore.xcodeproj/project.pbxproj
-@@ -5586,20 +5586,22 @@
+@@ -5598,20 +5598,22 @@
  		C375D7FD16639519006184AB /* TypeAhead.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C375D7FB16639519006184AB /* TypeAhead.cpp */; };
  		C375D7FE16639519006184AB /* TypeAhead.h in Headers */ = {isa = PBXBuildFile; fileRef = C375D7FC16639519006184AB /* TypeAhead.h */; settings = {ATTRIBUTES = (Private, ); }; };
  		C37CDEBD149EF2030042090D /* ColorChooserClient.h in Headers */ = {isa = PBXBuildFile; fileRef = C37CDEBC149EF2030042090D /* ColorChooserClient.h */; settings = {ATTRIBUTES = (Private, ); }; };
@@ -115,7 +115,7 @@ index 0e50a50..fe6fd08 100644
  		C4E657FE1A97FBED00479C15 /* InspectorStyleRuleSet.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F71A97FBED00479C15 /* InspectorStyleRuleSet.h */; };
  		C4E657FF1A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C4E657F81A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp */; };
  		C4E658001A97FBED00479C15 /* InspectorStylesheetRuleSet.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F91A97FBED00479C15 /* InspectorStylesheetRuleSet.h */; };
-@@ -13091,20 +13093,22 @@
+@@ -13114,20 +13116,22 @@
  		C348612215FDE21E007A1CC9 /* InputTypeNames.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InputTypeNames.h; sourceTree = "<group>"; };
  		C375D7FB16639519006184AB /* TypeAhead.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TypeAhead.cpp; sourceTree = "<group>"; };
  		C375D7FC16639519006184AB /* TypeAhead.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TypeAhead.h; sourceTree = "<group>"; };
@@ -138,7 +138,7 @@ index 0e50a50..fe6fd08 100644
  		C4E657F51A97FBED00479C15 /* InspectorStyleRule.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStyleRule.h; sourceTree = "<group>"; };
  		C4E657F61A97FBED00479C15 /* InspectorStyleProperty.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStyleProperty.h; sourceTree = "<group>"; };
  		C4E657F71A97FBED00479C15 /* InspectorStyleRuleSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStyleRuleSet.h; sourceTree = "<group>"; };
-@@ -15343,20 +15347,22 @@
+@@ -15371,20 +15375,22 @@
  				A584FE311864D5AF00843B10 /* CommandLineAPIHost.cpp */,
  				A584FE321864D5AF00843B10 /* CommandLineAPIHost.h */,
  				A584FE331864D5AF00843B10 /* CommandLineAPIHost.idl */,
@@ -161,8 +161,8 @@ index 0e50a50..fe6fd08 100644
  				82AB1741124B99EC00C5069D /* InspectorCSSAgent.cpp */,
  				82AB1742124B99EC00C5069D /* InspectorCSSAgent.h */,
  				C4E657F11A97F7A700479C15 /* InspectorCSSId.h */,
-@@ -24231,20 +24237,21 @@
- 				93D3C1590F97A9D70053C013 /* DOMHTMLCanvasElement.h in Headers */,
+@@ -24265,20 +24271,21 @@
+ 				31DCD29D1AB4FBDE0072E817 /* AnimationTrigger.h in Headers */,
  				93F9B6580BA0F35E00854064 /* DOMHTMLCanvasElementInternal.h in Headers */,
  				85DF2F8E0AA3C88100AD64C5 /* DOMHTMLCollection.h in Headers */,
  				85E711A20AC5D5350053270F /* DOMHTMLCollectionInternal.h in Headers */,
@@ -183,7 +183,7 @@ index 0e50a50..fe6fd08 100644
  				85E711A70AC5D5350053270F /* DOMHTMLElementInternal.h in Headers */,
  				8540756A0AD6CBF900620C57 /* DOMHTMLEmbedElement.h in Headers */,
  				855247D00AD850B80012093B /* DOMHTMLEmbedElementInternal.h in Headers */,
-@@ -28946,20 +28953,21 @@
+@@ -28990,20 +28997,21 @@
  				A83B78FF0CCAFF15000B0825 /* JSSVGFontFaceSrcElement.cpp in Sources */,
  				A83B78FD0CCAFF15000B0825 /* JSSVGFontFaceUriElement.cpp in Sources */,
  				B2FA3D980AB75A6F000E5AC4 /* JSSVGForeignObjectElement.cpp in Sources */,
@@ -648,15 +648,15 @@ index aaecb49..23b0e07 100644
  }
  
 diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
-index a6873ac85ecedb0a739d3368bd47f9dd7d9e3562..6f73f32fd0801b51c008c28c95a09d8a2e4ad4f1 100644
+index 8475886360eccb2de28ed01b0f4fc9ddf78bd411..be3e0c993f1ee3fc1f45276dcfa6b6c572e7547d 100644
 GIT binary patch
-delta 159
-zcmcb1fqB~%<_&Y?Cfmsg2r4l6GUPL)Fk~{M0dXor%4B~zd0rIJ$&NCHAhnZ~ZVFBI
-zxy3a(MotLGw%R;PZjUXeCqo`XF;HXC<bxN5C&&2<Ac=guXgGO8fWYLqIJU`sF+!X3
-hV$#?qtK1X-n*vk{WLtm~OiC7-oTb9G`9o4#D*#F`H8ubM
+delta 153
+zcmX?ek$KHk<_&Y?Cfmsg2r4l6GUPL)Fk~{M0dXor%4B~zd0rIJ$&NCHAhnY>+>)6b
+zBPTR@#!aiuv*h;J@_RDmF%$ze6)}{6wFdgja>B(XC+;$wydgkfa$FqS<h~f8&3Q3t
+hY?C+LlA0XnFEDx5O$(6Zq-3GVSt?wcKP2601pv`HGL`@U
 
 delta 40
-ycmV+@0N4Mv)C1Pg1F)PPvy>mYJ(ECU29x|<60_W0W(JesWD=8Vs|vHwWM+koJ`(%@
+ycmV+@0N4Ml)dS4Y1F)PPvy>mYJ(ECU29x|<60_W0W(JesWD=8Vs|vHwWZZ>{a}!_y
 
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
 index a2c48ba..e207d62 100644
@@ -720,10 +720,10 @@ index a2c48ba..e207d62 100644
      {
          if (this._targetNode)
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js b/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
-index 5416730..aedcf93 100644
+index 0fe754a..95653f7 100644
 --- a/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
 +++ b/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
-@@ -54,20 +54,51 @@ WebInspector.TimelineManager.Event = {
+@@ -55,20 +55,51 @@ WebInspector.TimelineManager.Event = {
      RecordingCreated: "timeline-manager-recording-created",
      RecordingLoaded: "timeline-manager-recording-loaded",
      CapturingStarted: "timeline-manager-capturing-started",
@@ -775,30 +775,30 @@ index 5416730..aedcf93 100644
      get activeRecording()
      {
          console.assert(this._activeRecording || !this._isCapturing);
-@@ -170,21 +201,21 @@ WebInspector.TimelineManager.prototype = {
+@@ -216,21 +247,21 @@ WebInspector.TimelineManager.prototype = {
+                 stack.pop();
+         }
+ 
+         return records;
+     },
+ 
+     _processRecord: function(recordPayload, parentRecordPayload)
      {
-         // Called from WebInspector.TimelineObserver.
+         var startTime = this.activeRecording.computeElapsedTime(recordPayload.startTime);
+         var endTime = this.activeRecording.computeElapsedTime(recordPayload.endTime);
+-        var callFrames = this._callFramesFromPayload(recordPayload.stackTrace);
++        var callFrames = WebInspector.TimelineManager.callFramesFromPayload(recordPayload.stackTrace);
  
-         if (!this._isCapturing)
-             return;
- 
-         function processRecord(recordPayload, parentRecordPayload)
-         {
-             var startTime = this.activeRecording.computeElapsedTime(recordPayload.startTime);
-             var endTime = this.activeRecording.computeElapsedTime(recordPayload.endTime);
--            var callFrames = this._callFramesFromPayload(recordPayload.stackTrace);
-+            var callFrames = WebInspector.TimelineManager.callFramesFromPayload(recordPayload.stackTrace);
- 
-             var significantCallFrame = null;
-             if (callFrames) {
-                 for (var i = 0; i < callFrames.length; ++i) {
-                     if (callFrames[i].nativeCode)
-                         continue;
-                     significantCallFrame = callFrames[i];
-                     break;
-                 }
+         var significantCallFrame = null;
+         if (callFrames) {
+             for (var i = 0; i < callFrames.length; ++i) {
+                 if (callFrames[i].nativeCode)
+                     continue;
+                 significantCallFrame = callFrames[i];
+                 break;
              }
-@@ -429,51 +460,20 @@ WebInspector.TimelineManager.prototype = {
+         }
+@@ -451,51 +482,20 @@ WebInspector.TimelineManager.prototype = {
  
          var oldRecording = this._activeRecording;
          if (oldRecording)
@@ -851,10 +851,10 @@ index 5416730..aedcf93 100644
  
      _startAutoCapturing: function(event)
 diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
-index 2d564fe..f7067fd 100644
+index c97b469..afc0f40 100644
 --- a/Source/WebInspectorUI/UserInterface/Main.html
 +++ b/Source/WebInspectorUI/UserInterface/Main.html
-@@ -287,20 +287,21 @@
+@@ -290,20 +290,21 @@
      <script src="Models/SourceCodeRevision.js"></script>
      <script src="Models/SourceCodeSearchMatchObject.js"></script>
      <script src="Models/SourceCodeTextRange.js"></script>
@@ -1225,17 +1225,17 @@ index 173784e..adcdb26 100644
          WebInspector.timelineSidebarPanel.updateFilter();
      },
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
-index 07bd4ee..b652575 100644
+index 0ab77fc..9f989f2 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
-@@ -93,29 +93,29 @@ WebInspector.TimelineRecordTreeElement = function(timelineRecord, subtitleNameSt
-         case WebInspector.ScriptTimelineRecord.EventType.AnimationFrameCanceled:
-             iconStyleClass = WebInspector.TimelineRecordTreeElement.AnimationRecordIconStyleClass;
-             break;
-         default:
-             console.error("Unknown ScriptTimelineRecord eventType: " + timelineRecord.eventType, timelineRecord);
+@@ -98,27 +98,28 @@ WebInspector.TimelineRecordTreeElement = function(timelineRecord, subtitleNameSt
          }
  
+         break;
+ 
+     case WebInspector.TimelineRecord.Type.RunLoop:
+         title = WebInspector.UIString("Runloop Executed");
+         iconStyleClass = WebInspector.TimelineRecordTreeElement.RunLoopRecordIconStyleClass;
          break;
  
      case WebInspector.TimelineRecord.Type.ElementTracking:
@@ -1248,12 +1248,12 @@ index 07bd4ee..b652575 100644
 -            break;
 -        default:
 -            console.error("Unknown ElementTrackingTimelineRecord eventType: " + timelineRecord.eventType, timelineRecord);
-         }
- 
++        }
++
 +        if (timelineRecord instanceof WebInspector.TraceOperationTimelineRecord) {
 +            title = WebInspector.TraceOperationTimelineRecord.displayNameForEventType(timelineRecord.eventType);
 +            iconStyleClass = WebInspector.TimelineRecordTreeElement.EvaluatedRecordIconStyleClass;
-+        }
+         }
          break;
  
      default:
@@ -1263,12 +1263,11 @@ index 07bd4ee..b652575 100644
      WebInspector.GeneralTreeElement.call(this, [iconStyleClass], title, subtitle, representedObject || timelineRecord, false);
  
      this.small = true;
- 
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
-index b664cf7..de6bd63 100644
+index 1f020c9..2136749 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
-@@ -420,20 +420,25 @@ WebInspector.TimelineSidebarPanel.prototype = {
+@@ -422,20 +422,25 @@ WebInspector.TimelineSidebarPanel.prototype = {
              }
  
              previousTreeElement = treeElement;

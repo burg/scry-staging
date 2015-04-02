@@ -1,0 +1,114 @@
+From f8fcbe6469e97ee9dd7832a3cd80eb69de8626e7 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Wed, 1 Apr 2015 10:04:56 -0700
+Subject: [PATCH] Exclude properties with implicit initial values from
+ effective style.
+
+Improve diagnostic logging in effective style calculation code.
+---
+ .../WebCore/inspector/InspectorDOMTracingAgent.cpp | 37 +++++++++++++++-------
+ 1 file changed, 26 insertions(+), 11 deletions(-)
+
+diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+index c3b11df..b15429b 100644
+--- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
++++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+@@ -198,69 +198,84 @@ static RefPtr<Inspector::Protocol::CSS::CSSProperty> buildObjectForProperty(Styl
+     return WTF::move(result);
+ }
+ 
+ RefPtr<Inspector::Protocol::DOMTracing::EffectiveStyle> DOMTracingAgent::createEffectiveStyle(Element& targetElement, StyleSnapshotData& snapshotData)
+ {
+     std::bitset<numCSSProperties> propertyIsClaimed;
+     HashMap<CSSPropertyID, WebCore::StyleRule*> winningRuleMap;
+     HashMap<CSSPropertyID, Element*> winningInlineStyleMap;
+ 
+     StyleResolver& styleResolver = targetElement.document().ensureStyleResolver();
+-
++    LOG(WebReplay, "\nCalculating effective style for element %p\n", &targetElement);
++    
+     for (Element* element = &targetElement; element; element = element->parentElement()) {
+         // First try to claim properties in the inline style, as it has highest specificity.
+         const StyleProperties* properties = nullptr;
+         if (is<StyledElement>(element))
+             properties = downcast<StyledElement>(element)->inlineStyle();
+ 
+         unsigned size = properties ? properties->propertyCount() : 0;
+ 
++        if (element == &targetElement)
++            LOG(WebReplay, "\tFinding non-inherited properties that match element %p\n", element);
++        else
++            LOG(WebReplay, "\tFinding inherited properties from ancestor element %p\n", element);
++        
+         if (size)
+-            LOG(WebReplay, "Checking inline style for element: %p\n", element);
++            LOG(WebReplay, "\t\tChecking inline style for element: %p\n", element);
+ 
+         bool claimedPropertyFromInlineStyle = false;
+         for (unsigned i = 0; i < size; ++i) {
+             auto property = properties->propertyAt(i);
+             if (!propertyIsClaimed[property.id()]) {
+                 propertyIsClaimed.set(property.id());
+                 claimedPropertyFromInlineStyle = true;
+                 auto addResult = winningInlineStyleMap.set(property.id(), element);
+                 ASSERT_UNUSED(addResult, addResult.isNewEntry);
+-                LOG(WebReplay, "Claimed property  %s: %s\n", getPropertyName(property.id()), property.value()->cssText().utf8().data());
++                LOG(WebReplay, "\t\t\tClaimed property  %s: %s\n", getPropertyName(property.id()), property.value()->cssText().utf8().data());
+             }
+         }
+ 
+         if (claimedPropertyFromInlineStyle)
+             snapshotData.addElement(*element);
+ 
+         // Then try to claim properties from each rule that matches this element.
+         // Rules are already sorted by descending specificity, so higher specificity
+         // rules and earlier rules will claim properties first.
+         auto matchedRules = styleResolver.styleRulesForElement(element, StyleResolver::AuthorCSSRules);
+         for (RefPtr<WebCore::StyleRule> rule : matchedRules) {
+-            LOG(WebReplay, "Checking rule with selector: %s\n", rule->selectorList().selectorsText().utf8().data());
++            LOG(WebReplay, "\t\tChecking rule with selector: %s\n", rule->selectorList().selectorsText().utf8().data());
+ 
+             bool onlyConsiderInheritedProperties = (element != &targetElement);
+             const StyleProperties& properties = rule->properties();
+             bool claimedPropertyFromRule = false;
+             unsigned size = properties.propertyCount();
+             for (unsigned i = 0; i < size; ++i) {
+                 auto property = properties.propertyAt(i);
+-                if (onlyConsiderInheritedProperties && !CSSProperty::isInheritedProperty(property.id()))
++                if (onlyConsiderInheritedProperties && !CSSProperty::isInheritedProperty(property.id())) {
++                    LOG(WebReplay, "\t\t\tIgnoring non-inheritable property %s\n", getPropertyName(property.id()));
++                    continue;
++                }
++                if (property.value()->isImplicitInitialValue()) {
++                    LOG(WebReplay, "\t\t\tIgnoring implicit initial value for property %s\n", getPropertyName(property.id()));
++                    continue;
++                }
++                if (propertyIsClaimed[property.id()]) {
++                    LOG(WebReplay, "\t\t\tIgnoring losing property %s\n", getPropertyName(property.id()));
+                     continue;
+-                if (!propertyIsClaimed[property.id()]) {
+-                    propertyIsClaimed.set(property.id());
+-                    claimedPropertyFromRule = true;
+-                    auto addResult = winningRuleMap.set(property.id(), rule.get());
+-                    ASSERT_UNUSED(addResult, addResult.isNewEntry);
+-                    LOG(WebReplay, "Claimed property  %s: %s\n", getPropertyName(property.id()), property.value()->cssText().utf8().data());
+                 }
++
++                propertyIsClaimed.set(property.id());
++                claimedPropertyFromRule = true;
++                auto addResult = winningRuleMap.set(property.id(), rule.get());
++                ASSERT_UNUSED(addResult, addResult.isNewEntry);
++                LOG(WebReplay, "\t\t\tClaimed property  %s: %s\n", getPropertyName(property.id()), property.value()->cssText().utf8().data());
+             }
+             if (!claimedPropertyFromRule)
+                 continue;
+ 
+             snapshotData.addRuleForElement(*rule, *element);
+         }
+         // TODO: add matched pseudo style rules. See CSSAgent. It could be folded into above.
+     }
+ 
+     auto propertiesArray = Inspector::Protocol::Array<Inspector::Protocol::DOMTracing::PropertyEntry>::create();
+-- 
+2.3.2
+

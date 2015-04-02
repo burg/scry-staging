@@ -1,0 +1,265 @@
+From 23c7780cb958ba9d49d0c513a8d9018de87662ec Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Tue, 31 Mar 2015 15:31:24 -0700
+Subject: [PATCH] Compute and show effective styles for all subtree elements.
+
+Hook up subtree element selection to showing its style snapshot.
+---
+ .../WebCore/inspector/InspectorDOMTracingAgent.cpp |  8 ++++++--
+ .../Views/ElementSnapshotCombinedContentView.css   |  2 ++
+ .../Views/ElementSnapshotCombinedContentView.js    |  6 ++++++
+ .../Views/ElementSnapshotDOMTreeContentView.js     | 24 ++++++++++++++++++++++
+ .../Views/ElementSnapshotStyleContentView.js       | 15 +++++++++++---
+ 5 files changed, 50 insertions(+), 5 deletions(-)
+
+diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+index 0e86038..c3b11df 100644
+--- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
++++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+@@ -300,22 +300,26 @@ RefPtr<Inspector::Protocol::DOMTracing::EffectiveStyle> DOMTracingAgent::createE
+ 
+     return Inspector::Protocol::DOMTracing::EffectiveStyle::create()
+         .setTarget(m_domAgent->pushNodePathToFrontend(&targetElement))
+         .setProperties(WTF::move(propertiesArray))
+         .release();
+ }
+ 
+ std::unique_ptr<StyleSnapshot> DOMTracingAgent::createStyleSnapshot(Element& targetElement, StyleSnapshotData& snapshotData)
+ {
+     auto effectiveStylesArray = Inspector::Protocol::Array<Inspector::Protocol::DOMTracing::EffectiveStyle>::create();
+-    // FIXME: capture effective styles for all element descendants of targetElement.
+-    effectiveStylesArray->addItem(createEffectiveStyle(targetElement, snapshotData));
++    for (Node* node = &targetElement; node; node = NodeTraversal::next(*node, &targetElement)) {
++        if (!is<Element>(node))
++            continue;
++
++        effectiveStylesArray->addItem(createEffectiveStyle(downcast<Element>(*node), snapshotData));
++    }
+ 
+     // For now, serialize the data directly to inspector objects since we don't do any analysis on
+     // the backend. In the future, we may want to use a different intermediate format for that.
+     auto elementsArray = Inspector::Protocol::Array<Inspector::Protocol::DOMTracing::ElementEntry>::create();
+     for (Element* element : snapshotData.elementOrder) {
+         auto matchedRulesArray = Inspector::Protocol::Array<Inspector::Protocol::DOMTracing::ElementRuleMatch>::create();
+ 
+         if (const Vector<RefPtr<WebCore::StyleRule>>* rulesToKeep = snapshotData.rulesToKeepForElement.get(element)) {
+             for (RefPtr<WebCore::StyleRule> rule : *rulesToKeep) {
+                 RefPtr<Inspector::Protocol::DOMTracing::ElementRuleMatch> matchObject = Inspector::Protocol::DOMTracing::ElementRuleMatch::create()
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.css b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.css
+index f4a8156..2b3f885 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.css
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.css
+@@ -22,15 +22,17 @@
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ .content-view.combined-snapshot-view > .content-view {
+     position: absolute;
+     left: 0;
+     right: 0;
+     top: 0;
+     bottom: 0;
++
++    overflow-y: scroll;
+ }
+ 
+ .content-view.combined-snapshot-view .resizer {
+     border-left: 1px solid rgb(179, 179, 179);
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.js
+index fb600f3..035c2ab 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.js
+@@ -32,20 +32,21 @@ WebInspector.ElementSnapshotCombinedContentView = function(snapshot)
+     var resizerDelegate = this;
+     this._leftResizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
+     this.element.appendChild(this._leftResizer.element);
+     this._rightResizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
+     this.element.appendChild(this._rightResizer.element);
+ 
+     this._outputContentView = new WebInspector.ElementSnapshotOutputContentView(snapshot);
+     this.element.appendChild(this._outputContentView.element);
+ 
+     this._domTreeContentView = new WebInspector.ElementSnapshotDOMTreeContentView(snapshot);
++    this._domTreeContentView.addEventListener(WebInspector.ElementSnapshotDOMTreeContentView.Event.SelectedNodeChanged, this._selectedNodeChanged, this);
+     this.element.appendChild(this._domTreeContentView.element);
+ 
+     this._styleContentView = new WebInspector.ElementSnapshotStyleContentView(snapshot);
+     this.element.appendChild(this._styleContentView.element);
+ 
+     this._repositionResizers(0.3, 0.7);
+ };
+ 
+ WebInspector.ElementSnapshotCombinedContentView.StyleClassName = "combined-snapshot-view";
+ WebInspector.ElementSnapshotCombinedContentView.IconStyleClassName = "combined-snapshot-view-icon";
+@@ -88,20 +89,25 @@ WebInspector.ElementSnapshotCombinedContentView.prototype = {
+     updateLayout: function()
+     {
+         WebInspector.ContentView.prototype.updateLayout.call(this);
+         this._outputContentView.updateLayout();
+         this._domTreeContentView.updateLayout();
+         this._styleContentView.updateLayout();
+     },
+ 
+     // Private
+ 
++    _selectedNodeChanged: function(event)
++    {
++        this._styleContentView.showStyleForNode(this._domTreeContentView.selectedNode);
++    },
++
+     _repositionResizers: function(leftResizerPercent, rightResizerPercent)
+     {
+         if (leftResizerPercent === this._leftResizerPercent && rightResizerPercent === this._rightResizerPercent)
+             return;
+ 
+         this._leftResizerPercent = leftResizerPercent || 0.3;
+         this._rightResizerPercent = rightResizerPercent || 0.7;
+         this._leftResizer.element.style.left = "%.5f".format(this._leftResizerPercent * 100) + '%';
+         this._rightResizer.element.style.left = "%.5f".format(this._rightResizerPercent * 100) + '%';
+ 
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDOMTreeContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDOMTreeContentView.js
+index 150bd33..960adb8 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDOMTreeContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDOMTreeContentView.js
+@@ -43,24 +43,42 @@ WebInspector.ElementSnapshotDOMTreeContentView = function(snapshot)
+     }
+ 
+     function hideNodeHighlight() {
+         console.log("hiding highlight");
+     }
+ 
+     this._domTreeOutline.delegate = { showHighlightForNode, hideNodeHighlight };
+     this.element.appendChild(this._domTreeOutline.element);
+ 
+     this._domTreeOutline.rootDOMNode = snapshot.treeSnapshot.rootNode;
++    // Expand the tree a bit so it's not so empty.
++    this._domTreeOutline.children[0].expandRecursively(-1);
++
++    // Select the root tree element after giving a chance for the parent content view to add listeners.
++    function delayedWork() {
++        var options = [
++            true, // omitFocus
++            false, // selectedByUser
++            false, // suppressOnSelect
++            false, // suppressOnDeselect
++        ];
++        this._domTreeOutline.children[0].revealAndSelect(...options);
++    }
++    setTimeout(delayedWork.bind(this), 0);
+ };
+ 
+ WebInspector.ElementSnapshotDOMTreeContentView.StyleClassName = "element-snapshot-dom-tree";
+ 
++WebInspector.ElementSnapshotDOMTreeContentView.Event = {
++    SelectedNodeChanged: Symbol("selected-node-changed"),
++}
++
+ WebInspector.ElementSnapshotDOMTreeContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotDOMTreeContentView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+     // Public
+ 
+     updateLayout: function()
+     {
+         WebInspector.ContentView.prototype.updateLayout.call(this);
+ 
+@@ -77,20 +95,25 @@ WebInspector.ElementSnapshotDOMTreeContentView.prototype = {
+     hidden: function()
+     {
+         this._domTreeOutline.setVisible(false);
+     },
+ 
+     closed: function()
+     {
+         this._domTreeOutline.close();
+     },
+ 
++    get selectedNode()
++    {
++        return this._domTreeOutline.selectedDOMNode();
++    },
++
+     get selectionPathComponents()
+     {
+         var treeElement = this._domTreeOutline.selectedTreeElement;
+         var pathComponents = [];
+ 
+         while (treeElement && !treeElement.root) {
+             // The close tag is contained within the element it closes. So skip it since we don't want to
+             // show the same node twice in the hierarchy.
+             if (treeElement.isCloseTag()) {
+                 treeElement = treeElement.parent;
+@@ -112,12 +135,13 @@ WebInspector.ElementSnapshotDOMTreeContentView.prototype = {
+     {
+         console.assert(event.data.pathComponent instanceof WebInspector.DOMTreeElementPathComponent);
+         console.assert(event.data.pathComponent.domTreeElement instanceof WebInspector.DOMTreeElement);
+ 
+         this._domTreeOutline.selectDOMNode(event.data.pathComponent.domTreeElement.representedObject, true);
+     },
+ 
+     _selectedNodeDidChange: function(event)
+     {
+         this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
++        this.dispatchEventToListeners(WebInspector.ElementSnapshotDOMTreeContentView.Event.SelectedNodeChanged);
+     },
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
+index b5997ca..cd70ad7 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
+@@ -23,37 +23,46 @@
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementSnapshotStyleContentView = function(snapshot)
+ {
+     console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+     WebInspector.ContentView.call(this, snapshot);
+ 
+     this.element.classList.add(WebInspector.ElementSnapshotStyleContentView.StyleClassName);
+ 
+-    var effectiveStyle = snapshot.treeSnapshot.rootNode.effectiveStyle;
+-    this._propertiesTextEditor = new WebInspector.CSSStyleDeclarationTextEditor(this, effectiveStyle.declaration);
++    this._propertiesTextEditor = new WebInspector.CSSStyleDeclarationTextEditor(this, null);
+     this._propertiesTextEditor.showsImplicitProperties = false;
+     this._propertiesTextEditor.sortProperties = true;
+ 
+     this.element.appendChild(this._propertiesTextEditor.element);
+ };
+ 
+ WebInspector.ElementSnapshotStyleContentView.StyleClassName = "element-snapshot-style";
+ 
+ WebInspector.ElementSnapshotStyleContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotStyleContentView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+-
+     shown: function()
+     {
+         WebInspector.ContentView.prototype.shown.call(this);
+ 
+         this._propertiesTextEditor.updateLayout();
+     },
+ 
+     updateLayout: function()
+     {
+         this._propertiesTextEditor.updateLayout();
++    },
++
++    showStyleForNode: function(nodeSnapshot)
++    {
++        var canShowStyle = nodeSnapshot && nodeSnapshot.effectiveStyle;
++        if (canShowStyle)
++            this._propertiesTextEditor.style = nodeSnapshot.effectiveStyle.declaration;
++        else
++            this._propertiesTextEditor.style = null;
++
++        this.updateLayout();
+     }
+ };
+-- 
+2.3.2
+

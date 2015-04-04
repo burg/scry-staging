@@ -1,0 +1,40 @@
+From ffa5793349d3f928ac272a2905e3854e38c7fbbe Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Fri, 3 Apr 2015 12:08:18 -0700
+Subject: [PATCH] FIXUP bug in popover hiding in element tracking graph
+
+---
+ .../UserInterface/Views/ElementTrackingTimelineOverviewGraph.js        | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+index 5e3166b..7706f30 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+@@ -247,20 +247,23 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+     {
+         // FIXME: should this dismiss the popover?
+         if (!event.target.classList.contains(WebInspector.TimelineRecordStack.StyleClassName))
+             return;
+ 
+         this._showPopoverForHoveredRecordStack(event.target.recordStack);
+     },
+ 
+     _mouseLeaveTimelineGraph: function(event)
+     {
++        if (!this._popover)
++            return;
++
+         this._mouseIsOverPopover = this._popover.element.contains(event.target);
+ 
+         if (!this._mouseIsOverPopover)
+             this._hidePopover();
+     },
+ 
+     _showPopoverForHoveredRecordStack: function(recordStack)
+     {
+         console.assert(recordStack.records.length);
+ 
+-- 
+2.3.2
+

@@ -1,4 +1,4 @@
-From 7d450366eb06abd5ac1b930f683a51246b3cf471 Mon Sep 17 00:00:00 2001
+From 81034d4fbf2c32d4c3bd16cdc366074050315d85 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 2 Apr 2015 14:39:49 -0700
 Subject: [PATCH] Include properties animated through CSS animations and
@@ -8,12 +8,12 @@ Add substantial comments to createEffectiveStyle() so it's clear what
 stuff in the cascade simulator has been implemented or not implemented.
 ---
  .../inspector/protocol/DOMTracing.json             |  12 +-
- .../WebCore/inspector/InspectorDOMTracingAgent.cpp | 224 ++++++++++++++++-----
+ .../WebCore/inspector/InspectorDOMTracingAgent.cpp | 233 ++++++++++++++++-----
  .../Localizations/en.lproj/localizedStrings.js     | Bin 61568 -> 61698 bytes
- .../UserInterface/Models/DOMTreeSnapshot.js        |  57 ++++--
+ .../UserInterface/Models/DOMTreeSnapshot.js        |  57 +++--
  .../UserInterface/Models/EffectiveStyleSnapshot.js |  60 +++---
  .../Views/ElementSnapshotStyleContentView.js       |  18 +-
- 6 files changed, 272 insertions(+), 99 deletions(-)
+ 6 files changed, 279 insertions(+), 101 deletions(-)
 
 diff --git a/Source/JavaScriptCore/inspector/protocol/DOMTracing.json b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
 index 9661971..07a9e6f 100644
@@ -61,7 +61,7 @@ index 9661971..07a9e6f 100644
              "properties": [
                  { "name": "nodeId", "$ref": "DOM.NodeId", "description": "Identifier for the element that this object describes."},
 diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-index 2f66601..3202f3d 100644
+index 2f66601..bfbb040 100644
 --- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 @@ -20,20 +20,21 @@
@@ -112,7 +112,7 @@ index 2f66601..3202f3d 100644
      , m_domAgent(domAgent)
      , m_cssAgent(cssAgent)
  {
-@@ -164,162 +168,280 @@ std::unique_ptr<ElementSnapshot> DOMTracingAgent::createSnapshot(Element& elemen
+@@ -164,162 +168,285 @@ std::unique_ptr<ElementSnapshot> DOMTracingAgent::createSnapshot(Element& elemen
          return std::make_unique<ElementSnapshot>();
  
      std::unique_ptr<ImageBuffer> imageData = snapshotNode(element.renderer()->frame().mainFrame(), element);
@@ -191,9 +191,11 @@ index 2f66601..3202f3d 100644
 +    // the animation property itself came from. Also save the property value to avoid recomputing it again.
 +    HashMap<CSSPropertyID, std::pair<RefPtr<CSSValue>, Element*>> winningAnimationMap;
  
-     StyleResolver& styleResolver = targetElement.document().ensureStyleResolver();
+-    StyleResolver& styleResolver = targetElement.document().ensureStyleResolver();
      LOG(WebReplay, "\nCalculating effective style for element %p\n", &targetElement);
 -    
++
++    snapshotData.addElement(targetElement);
 +
 +    // This loop implements style inheritance by claiming properties from self and closer ancestors first.
      for (Element* element = &targetElement; element; element = element->parentElement()) {
@@ -205,76 +207,80 @@ index 2f66601..3202f3d 100644
 +        else
 +            LOG(WebReplay, "\tFinding inherited properties from ancestor element %p\n", element);
 +
++        StyleResolver& styleResolver = element->document().ensureStyleResolver();
 +        ComputedStyleExtractor styleExtractor(element, true, NOPSEUDO);
-+        RenderStyle& renderStyle = element->renderer()->style();
 +
-+        // 1. Transition Declarations
-+        renderStyle.ensureTransitions();
-+        if (!renderStyle.transitions()->isEmpty()) {
-+            LOG(WebReplay, "\t\tChecking %zu transitions.\n", renderStyle.transitions()->size());
++        if (RenderObject* renderer = element->renderer()) {
++            RenderStyle& renderStyle = renderer->style();
 +
-+            auto transitions = renderStyle.transitions();
-+            for (size_t i = 0; i < transitions->size(); ++i) {
-+                const Animation& animation = transitions->animation(i);
-+                CSSPropertyID animatedPropertyId = animation.property();
-+                if (onlyConsiderInheritedProperties && !CSSProperty::isInheritedProperty(animatedPropertyId)) {
-+                    LOG(WebReplay, "\t\t\tIgnoring non-inheritable property %s\n", getPropertyName(animatedPropertyId));
-+                    continue;
++            // 1. Transition Declarations
++            renderStyle.ensureTransitions();
++            if (!renderStyle.transitions()->isEmpty()) {
++                LOG(WebReplay, "\t\tChecking %zu transitions.\n", renderStyle.transitions()->size());
++
++                auto transitions = renderStyle.transitions();
++                for (size_t i = 0; i < transitions->size(); ++i) {
++                    const Animation& animation = transitions->animation(i);
++                    CSSPropertyID animatedPropertyId = animation.property();
++                    if (onlyConsiderInheritedProperties && !CSSProperty::isInheritedProperty(animatedPropertyId)) {
++                        LOG(WebReplay, "\t\t\tIgnoring non-inheritable property %s\n", getPropertyName(animatedPropertyId));
++                        continue;
++                    }
++                    if (propertyIsClaimed[animatedPropertyId]) {
++                        LOG(WebReplay, "\t\t\tIgnoring overridden property %s\n", getPropertyName(animatedPropertyId));
++                        continue;
++                    }
++
++                    RefPtr<CSSValue> animatedPropertyValue = styleExtractor.propertyValue(animatedPropertyId, DoNotUpdateLayout);
++                    if (!animatedPropertyValue || animatedPropertyValue->isImplicitInitialValue()) {
++                        LOG(WebReplay, "\t\t\tIgnoring implicit initial value for property %s\n", getPropertyName(animatedPropertyId));
++                        continue;
++                    }
++
++                    propertyIsClaimed.set(animatedPropertyId);
++                    auto addResult = winningAnimationMap.set(animatedPropertyId, std::make_pair(animatedPropertyValue, element));
++                    ASSERT_UNUSED(addResult, addResult.isNewEntry);
++                    LOG(WebReplay, "\t\t\tClaimed property  %s: %s\n", getPropertyName(animatedPropertyId), animatedPropertyValue->cssText().utf8().data());
 +                }
-+                if (propertyIsClaimed[animatedPropertyId]) {
-+                    LOG(WebReplay, "\t\t\tIgnoring overridden property %s\n", getPropertyName(animatedPropertyId));
-+                    continue;
-+                }
-+
-+                RefPtr<CSSValue> animatedPropertyValue = styleExtractor.propertyValue(animatedPropertyId, DoNotUpdateLayout);
-+                if (!animatedPropertyValue || animatedPropertyValue->isImplicitInitialValue()) {
-+                    LOG(WebReplay, "\t\t\tIgnoring implicit initial value for property %s\n", getPropertyName(animatedPropertyId));
-+                    continue;
-+                }
-+
-+                propertyIsClaimed.set(animatedPropertyId);
-+                auto addResult = winningAnimationMap.set(animatedPropertyId, std::make_pair(animatedPropertyValue, element));
-+                ASSERT_UNUSED(addResult, addResult.isNewEntry);
-+                LOG(WebReplay, "\t\t\tClaimed property  %s: %s\n", getPropertyName(animatedPropertyId), animatedPropertyValue->cssText().utf8().data());
 +            }
-+        }
 +
-+        // 2. Important User Agent Declarations
-+        // 3. Important User Declarations
-+        // 4. Important Override Declarations
-+        // 5. Important Author Declarations
++            // 2. Important User Agent Declarations
++            // 3. Important User Declarations
++            // 4. Important Override Declarations
++            // 5. Important Author Declarations
 +
-+        // FIXME: implement these, especially handling of '!important' author declarations.
-+        // The others are less important, since they aren't likely to be the cause of a bug.
++            // FIXME: implement these, especially handling of '!important' author declarations.
++            // The others are less important, since they aren't likely to be the cause of a bug.
 +
-+        // 6. Animation Declarations
-+        renderStyle.ensureAnimations();
-+        if (!renderStyle.animations()->isEmpty()) {
-+            LOG(WebReplay, "\t\tChecking %zu animations.\n", renderStyle.animations()->size());
++            // 6. Animation Declarations
++            renderStyle.ensureAnimations();
++            if (!renderStyle.animations()->isEmpty()) {
++                LOG(WebReplay, "\t\tChecking %zu animations.\n", renderStyle.animations()->size());
 +
-+            auto animations = renderStyle.animations();
-+            for (size_t i = 0; i < animations->size(); ++i) {
-+                const Animation& animation = animations->animation(i);
-+                CSSPropertyID animatedPropertyId = animation.property();
-+                if (onlyConsiderInheritedProperties && !CSSProperty::isInheritedProperty(animatedPropertyId)) {
-+                    LOG(WebReplay, "\t\t\tIgnoring non-inheritable property %s\n", getPropertyName(animatedPropertyId));
-+                    continue;
++                auto animations = renderStyle.animations();
++                for (size_t i = 0; i < animations->size(); ++i) {
++                    const Animation& animation = animations->animation(i);
++                    CSSPropertyID animatedPropertyId = animation.property();
++                    if (onlyConsiderInheritedProperties && !CSSProperty::isInheritedProperty(animatedPropertyId)) {
++                        LOG(WebReplay, "\t\t\tIgnoring non-inheritable property %s\n", getPropertyName(animatedPropertyId));
++                        continue;
++                    }
++                    if (propertyIsClaimed[animatedPropertyId]) {
++                        LOG(WebReplay, "\t\t\tIgnoring overridden property %s\n", getPropertyName(animatedPropertyId));
++                        continue;
++                    }
++
++                    RefPtr<CSSValue> animatedPropertyValue = styleExtractor.propertyValue(animatedPropertyId, DoNotUpdateLayout);
++                    if (!animatedPropertyValue || animatedPropertyValue->isImplicitInitialValue()) {
++                        LOG(WebReplay, "\t\t\tIgnoring implicit initial value for property %s\n", getPropertyName(animatedPropertyId));
++                        continue;
++                    }
++
++                    propertyIsClaimed.set(animatedPropertyId);
++                    auto addResult = winningAnimationMap.set(animatedPropertyId, std::make_pair(animatedPropertyValue, element));
++                    ASSERT_UNUSED(addResult, addResult.isNewEntry);
++                    LOG(WebReplay, "\t\t\tClaimed property  %s: %s\n", getPropertyName(animatedPropertyId), animatedPropertyValue->cssText().utf8().data());
 +                }
-+                if (propertyIsClaimed[animatedPropertyId]) {
-+                    LOG(WebReplay, "\t\t\tIgnoring overridden property %s\n", getPropertyName(animatedPropertyId));
-+                    continue;
-+                }
-+
-+                RefPtr<CSSValue> animatedPropertyValue = styleExtractor.propertyValue(animatedPropertyId, DoNotUpdateLayout);
-+                if (!animatedPropertyValue || animatedPropertyValue->isImplicitInitialValue()) {
-+                    LOG(WebReplay, "\t\t\tIgnoring implicit initial value for property %s\n", getPropertyName(animatedPropertyId));
-+                    continue;
-+                }
-+
-+                propertyIsClaimed.set(animatedPropertyId);
-+                auto addResult = winningAnimationMap.set(animatedPropertyId, std::make_pair(animatedPropertyValue, element));
-+                ASSERT_UNUSED(addResult, addResult.isNewEntry);
-+                LOG(WebReplay, "\t\t\tClaimed property  %s: %s\n", getPropertyName(animatedPropertyId), animatedPropertyValue->cssText().utf8().data());
 +            }
 +        }
 +
@@ -317,16 +323,17 @@ index 2f66601..3202f3d 100644
 +
 +        // FIXME: implement. These come from presentational attributes such as |width="40"|.
 +        // Their order in the cascade seems to differ depending on the origin (HTML or SVG).
++
++        // 8. Normal Author Declarations
  
 -        // Then try to claim properties from each rule that matches this element.
 -        // Rules are already sorted by descending specificity, so higher specificity
-+        // 8. Normal Author Declarations
-+
 +        // NOTE: Rules are already sorted by descending specificity, so higher specificity
          // rules and earlier rules will claim properties first.
+-        auto matchedRules = styleResolver.styleRulesForElement(element, StyleResolver::AuthorCSSRules);
 +
 +        // FIXME: pseudo style rules are not matched here, but should be if a pseudo-state is active.
-         auto matchedRules = styleResolver.styleRulesForElement(element, StyleResolver::AuthorCSSRules);
++        auto matchedRules = styleResolver.styleRulesForElement(element, StyleResolver::AuthorCSSRules | StyleResolver::CrossOriginCSSRules);
          for (RefPtr<WebCore::StyleRule> rule : matchedRules) {
              LOG(WebReplay, "\t\tChecking rule with selector: %s\n", rule->selectorList().selectorsText().utf8().data());
  
@@ -694,7 +701,7 @@ index 916a38f..f5551d6 100644
      }
  };
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
-index 50f7e39..5d4cd59 100644
+index 50f7e39..5f65b20 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
 @@ -31,29 +31,36 @@ WebInspector.ElementSnapshotStyleContentView = function(snapshot)
@@ -765,7 +772,7 @@ index 50f7e39..5d4cd59 100644
 -        var hasInheritedProperties = this._inheritedPropertiesTextEditor.style;
 +        var hasMatchedProperties = !!this._matchedPropertiesTextEditor.style;
 +        var hasInheritedProperties = !!this._inheritedPropertiesTextEditor.style;
-+        var hasAnimatedProperties = !!this._inheritedPropertiesTextEditor.style;
++        var hasAnimatedProperties = !!this._animatedPropertiesTextEditor.style;
  
          // Don't hide all property sections; we want "No Properties" to appear at least once for text nodes.
 -        this._matchedPropertiesSection.element.classList.toggle("hidden", !hasMatchedProperties && hasInheritedProperties);

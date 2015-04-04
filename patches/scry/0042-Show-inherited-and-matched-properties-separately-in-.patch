@@ -1,4 +1,4 @@
-From 6b17ba4f16a58eea82f1e7cb9f3277a7c1422ed2 Mon Sep 17 00:00:00 2001
+From af9d385cf9b59ebee62b530f55a99e769176debf Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 1 Apr 2015 11:07:41 -0700
 Subject: [PATCH] Show inherited and matched properties separately in style

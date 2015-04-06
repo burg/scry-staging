@@ -1,4 +1,4 @@
-From e331b694ec67e0dd4c79c0d571736478e0d0528c Mon Sep 17 00:00:00 2001
+From a5a9b056b32a7674eb796f21bcd07a0d2594106e Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Tue, 31 Mar 2015 10:13:38 -0700
 Subject: [PATCH] Stub out a combined Element Snapshot content view with 3

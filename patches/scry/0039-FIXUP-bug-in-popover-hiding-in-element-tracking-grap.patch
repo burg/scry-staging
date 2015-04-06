@@ -1,4 +1,4 @@
-From ffa5793349d3f928ac272a2905e3854e38c7fbbe Mon Sep 17 00:00:00 2001
+From faf4d6c1ad454b561eaf20c5a279d077ad4969e5 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 3 Apr 2015 12:08:18 -0700
 Subject: [PATCH] FIXUP bug in popover hiding in element tracking graph

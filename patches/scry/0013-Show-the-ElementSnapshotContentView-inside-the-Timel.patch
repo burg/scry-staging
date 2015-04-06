@@ -1,4 +1,4 @@
-From 9209b81c68069d32e73972265b0633a18f15e5b4 Mon Sep 17 00:00:00 2001
+From fe71f766a37fc2b9346976938c54532fc81f1e6a Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 4 Mar 2015 15:46:47 -0800
 Subject: [PATCH] Show the ElementSnapshotContentView inside the

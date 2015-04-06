@@ -1,4 +1,4 @@
-From 0c97e52379622892d0f79cc0af0c723c1395697b Mon Sep 17 00:00:00 2001
+From 56ea4ac62e1437c460f32cfbd9d7ddbf2cc1af97 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 12 Feb 2015 18:55:51 -0800
 Subject: [PATCH] Start collecting trace operations for attribute modify/remove
@@ -11,7 +11,7 @@ Subject: [PATCH] Start collecting trace operations for attribute modify/remove
  Source/WebCore/inspector/ElementTraceOperations.h  | 107 +++++++++++++++++++++
  .../WebCore/inspector/InspectorDOMTracingAgent.cpp |  72 ++++++++++++++
  .../WebCore/inspector/InspectorDOMTracingAgent.h   |   8 ++
- .../WebCore/inspector/InspectorInstrumentation.cpp |   4 +
+ .../WebCore/inspector/InspectorInstrumentation.cpp |   8 ++
  .../Localizations/en.lproj/localizedStrings.js     | Bin 59596 -> 60076 bytes
  .../UserInterface/Controllers/DOMTracingManager.js |  36 +++++++
  .../UserInterface/Controllers/TimelineManager.js   |  64 ++++++------
@@ -24,7 +24,7 @@ Subject: [PATCH] Start collecting trace operations for attribute modify/remove
  .../Views/ElementTrackingTimelineView.js           |  18 ++--
  .../Views/TimelineRecordTreeElement.js             |  13 +--
  .../UserInterface/Views/TimelineSidebarPanel.js    |   5 +
- 19 files changed, 426 insertions(+), 106 deletions(-)
+ 19 files changed, 430 insertions(+), 106 deletions(-)
  create mode 100644 Source/WebCore/inspector/ElementTraceOperations.cpp
  create mode 100644 Source/WebCore/inspector/ElementTraceOperations.h
  copy Source/WebInspectorUI/UserInterface/Models/{ElementTrackingTimelineRecord.js => TraceOperationTimelineRecord.js} (51%)
@@ -613,10 +613,42 @@ index fa7dc33..2abbb53 100644
  
      WeakPtr<WebCore::Element> m_targetElement;
 diff --git a/Source/WebCore/inspector/InspectorInstrumentation.cpp b/Source/WebCore/inspector/InspectorInstrumentation.cpp
-index aaecb49..23b0e07 100644
+index aaecb49..edeb061 100644
 --- a/Source/WebCore/inspector/InspectorInstrumentation.cpp
 +++ b/Source/WebCore/inspector/InspectorInstrumentation.cpp
-@@ -162,26 +162,30 @@ void InspectorInstrumentation::willModifyDOMAttrImpl(InstrumentingAgents& instru
+@@ -134,54 +134,62 @@ void InspectorInstrumentation::willInsertDOMNodeImpl(InstrumentingAgents& instru
+     if (InspectorDOMDebuggerAgent* domDebuggerAgent = instrumentingAgents.inspectorDOMDebuggerAgent())
+         domDebuggerAgent->willInsertDOMNode(parent);
+ }
+ 
+ void InspectorInstrumentation::didInsertDOMNodeImpl(InstrumentingAgents& instrumentingAgents, Node& node)
+ {
+     if (InspectorDOMAgent* domAgent = instrumentingAgents.inspectorDOMAgent())
+         domAgent->didInsertDOMNode(node);
+     if (InspectorDOMDebuggerAgent* domDebuggerAgent = instrumentingAgents.inspectorDOMDebuggerAgent())
+         domDebuggerAgent->didInsertDOMNode(node);
++    if (DOMTracingAgent* domTracingAgent = instrumentingAgents.domTracingAgent())
++        domTracingAgent->didInsertDOMNode(node);
+ }
+ 
+ void InspectorInstrumentation::willRemoveDOMNodeImpl(InstrumentingAgents& instrumentingAgents, Node& node)
+ {
+     if (InspectorDOMDebuggerAgent* domDebuggerAgent = instrumentingAgents.inspectorDOMDebuggerAgent())
+         domDebuggerAgent->willRemoveDOMNode(node);
+ }
+ 
+ void InspectorInstrumentation::didRemoveDOMNodeImpl(InstrumentingAgents& instrumentingAgents, Node& node)
+ {
+     if (InspectorDOMDebuggerAgent* domDebuggerAgent = instrumentingAgents.inspectorDOMDebuggerAgent())
+         domDebuggerAgent->didRemoveDOMNode(node);
+     if (InspectorDOMAgent* domAgent = instrumentingAgents.inspectorDOMAgent())
+         domAgent->didRemoveDOMNode(node);
++    if (DOMTracingAgent* domTracingAgent = instrumentingAgents.domTracingAgent())
++        domTracingAgent->didRemoveDOMNode(node);
+ }
+ 
+ void InspectorInstrumentation::willModifyDOMAttrImpl(InstrumentingAgents& instrumentingAgents, Element& element, const AtomicString& oldValue, const AtomicString& newValue)
+ {
      if (InspectorDOMDebuggerAgent* domDebuggerAgent = instrumentingAgents.inspectorDOMDebuggerAgent())
          domDebuggerAgent->willModifyDOMAttr(element);
      if (InspectorDOMAgent* domAgent = instrumentingAgents.inspectorDOMAgent())

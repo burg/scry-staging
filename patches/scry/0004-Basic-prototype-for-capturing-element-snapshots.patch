@@ -1,4 +1,4 @@
-From 7c382f7848d42bbada565bf6052d23ee6f0d9267 Mon Sep 17 00:00:00 2001
+From bf27dbe45fd563371ffdbfd1ac859e2433c4af01 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 23 Jan 2015 15:03:00 -0800
 Subject: [PATCH] Basic prototype for capturing element snapshots.

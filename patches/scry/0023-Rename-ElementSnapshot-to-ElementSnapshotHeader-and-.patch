@@ -1,4 +1,4 @@
-From 2952fa424ce055b0faee9c4636f682378a393a24 Mon Sep 17 00:00:00 2001
+From 957488c9cfef6c605d470f651d10def025d32f03 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Mar 2015 10:57:03 -0700
 Subject: [PATCH] Rename ElementSnapshot to ElementSnapshotHeader, and

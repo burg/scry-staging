@@ -1,4 +1,4 @@
-From c2a0055e2de8b12de1eb702cf8c3980c32052e8c Mon Sep 17 00:00:00 2001
+From 9f457fe7a104fdb3996f381f0bca8046ebbfe3f9 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Tue, 31 Mar 2015 15:31:24 -0700
 Subject: [PATCH] Compute and show effective styles for all subtree elements.

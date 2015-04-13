@@ -1,4 +1,4 @@
-From bf058a1b90a716ccfe202474c72ec9232ab5510c Mon Sep 17 00:00:00 2001
+From 107e8482f7f1c07aaf7223166c8aca3c2db4e5a1 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 19 Mar 2015 14:08:01 -0700
 Subject: [PATCH] Capture snapshots of the DOM tree for committed element

@@ -1,4 +1,4 @@
-From 3409c3626b6ab94d0bd2cbd325f47e5d9a0cb17b Mon Sep 17 00:00:00 2001
+From 7c796ea39f5b136a14ba29e76e992f308f57cf48 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 09:45:51 -0800
 Subject: [PATCH] Add an element tracking timeline that shows collected

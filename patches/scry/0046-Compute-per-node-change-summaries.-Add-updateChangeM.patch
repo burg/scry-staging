@@ -1,4 +1,4 @@
-From 5daa7714b4004d45900a4fe39f7e13788a940d9c Mon Sep 17 00:00:00 2001
+From 47a1751af12dfc9c74e75dcac4a5b9fb490b8655 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sun, 12 Apr 2015 14:02:20 -0700
 Subject: [PATCH] Compute per-node change summaries. Add updateChangeMarker

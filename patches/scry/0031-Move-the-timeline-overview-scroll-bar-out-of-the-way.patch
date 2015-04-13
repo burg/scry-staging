@@ -1,14 +1,43 @@
-From 8e2b2263944c02381aadb820f3b23361257c39f6 Mon Sep 17 00:00:00 2001
+From 15e016fb3c4b51083fad24554ea347c028983a38 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sat, 14 Mar 2015 21:29:26 -0700
 Subject: [PATCH] Move the timeline overview scroll bar out of the way of the
  element tracking timeline.
 
 ---
+ .../Views/ElementTrackingTimelineOverviewGraph.js  |  3 +
  .../UserInterface/Views/TimelineOverview.css       | 27 ++++++-
  .../UserInterface/Views/TimelineOverview.js        | 90 ++++++++++++++++++++++
- 2 files changed, 114 insertions(+), 3 deletions(-)
+ 3 files changed, 117 insertions(+), 3 deletions(-)
 
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+index 5e3166b..7706f30 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+@@ -247,20 +247,23 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+     {
+         // FIXME: should this dismiss the popover?
+         if (!event.target.classList.contains(WebInspector.TimelineRecordStack.StyleClassName))
+             return;
+ 
+         this._showPopoverForHoveredRecordStack(event.target.recordStack);
+     },
+ 
+     _mouseLeaveTimelineGraph: function(event)
+     {
++        if (!this._popover)
++            return;
++
+         this._mouseIsOverPopover = this._popover.element.contains(event.target);
+ 
+         if (!this._mouseIsOverPopover)
+             this._hidePopover();
+     },
+ 
+     _showPopoverForHoveredRecordStack: function(recordStack)
+     {
+         console.assert(recordStack.records.length);
+ 
 diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.css b/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.css
 index 225455d..2f64148 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/TimelineOverview.css

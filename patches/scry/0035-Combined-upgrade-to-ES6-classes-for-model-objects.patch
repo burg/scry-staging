@@ -1,4 +1,4 @@
-From 0e8c43f5554da5ae3b6f3486e2c8713284d09f8b Mon Sep 17 00:00:00 2001
+From 02f2693d562d53b9a4f2dbee45ffc8a5c3878935 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 20 Mar 2015 22:35:07 -0700
 Subject: [PATCH] Combined upgrade to ES6 classes for model objects.

@@ -1,4 +1,4 @@
-From c4e5fe3815fedc9b94f76261e5d2118fd3516114 Mon Sep 17 00:00:00 2001
+From c6d8d14d27ada3fe4af327ee84af1766be820918 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Tue, 31 Mar 2015 15:45:20 -0700
 Subject: [PATCH] Drop the snapshot cluster view in favor of the multi-pane

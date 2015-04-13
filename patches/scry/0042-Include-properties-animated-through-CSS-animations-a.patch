@@ -1,4 +1,4 @@
-From 2a2d8253ace80307b95ac0d46757fb8f75155bef Mon Sep 17 00:00:00 2001
+From 22a47e562edaf0798135c62f44fc37dc36ef7e88 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 2 Apr 2015 14:39:49 -0700
 Subject: [PATCH] Include properties animated through CSS animations and

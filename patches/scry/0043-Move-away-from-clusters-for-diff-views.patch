@@ -1,4 +1,4 @@
-From 2601d0894a01a679174b887ae5a81755228e0b36 Mon Sep 17 00:00:00 2001
+From 9f4033ef1e37e93465dee60f179d1c0b92905133 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 3 Apr 2015 10:52:10 -0700
 Subject: [PATCH] Move away from clusters for diff views.

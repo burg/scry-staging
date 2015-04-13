@@ -1,4 +1,4 @@
-From 9c5bed720d60f6efc151b270d02b40d4b1bf113b Mon Sep 17 00:00:00 2001
+From 721f2f887b81fe4f80bf2625732a416cf113205b Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Tue, 10 Mar 2015 08:54:26 -0700
 Subject: [PATCH] Show effective styles for the target element as a subview of
@@ -9,15 +9,13 @@ Subject: [PATCH] Show effective styles for the target element as a subview of
  Source/WebInspectorUI/UserInterface/Main.html      |   3 +
  .../WebInspectorUI/UserInterface/Models/CSSRule.js |  26 +-
  .../UserInterface/Models/CSSStyleDeclaration.js    |  25 +-
- .../UserInterface/Models/EffectivePropertyData.js  |  86 ++++++
  .../UserInterface/Models/EffectiveStyleSnapshot.js | 304 +++++++++++++++++++++
  .../UserInterface/Models/ElementSnapshot.js        |  11 +-
  .../Views/ElementSnapshotContentView.css           |   4 +
  .../Views/ElementSnapshotContentView.js            |  36 ++-
  ...iew.css => ElementSnapshotStyleContentView.css} |   3 +-
  ...View.css => ElementSnapshotStyleContentView.js} |  33 ++-
- 11 files changed, 496 insertions(+), 39 deletions(-)
- create mode 100644 Source/WebInspectorUI/UserInterface/Models/EffectivePropertyData.js
+ 10 files changed, 410 insertions(+), 39 deletions(-)
  create mode 100644 Source/WebInspectorUI/UserInterface/Models/EffectiveStyleSnapshot.js
  copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotContentView.css => ElementSnapshotStyleContentView.css} (95%)
  copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotContentView.css => ElementSnapshotStyleContentView.js} (54%)
@@ -364,98 +362,6 @@ index fb0c63e..24d437c 100644
 +    Computed: "css-style-declaration-type-computed",
 +    Effective: "css-style-declaration-type-effective"
  };
-diff --git a/Source/WebInspectorUI/UserInterface/Models/EffectivePropertyData.js b/Source/WebInspectorUI/UserInterface/Models/EffectivePropertyData.js
-new file mode 100644
-index 0000000..49fb465
---- /dev/null
-+++ b/Source/WebInspectorUI/UserInterface/Models/EffectivePropertyData.js
-@@ -0,0 +1,86 @@
-+/*
-+ * Copyright (C) 2013 Apple Inc. All rights reserved.
-+ * Copyright (C) 2015 University of Washington.
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions
-+ * are met:
-+ * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer.
-+ * 2. Redistributions in binary form must reproduce the above copyright
-+ *    notice, this list of conditions and the following disclaimer in the
-+ *    documentation and/or other materials provided with the distribution.
-+ *
-+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
-+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
-+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
-+ * THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+WebInspector.EffectivePropertyData = function(data)
-+{
-+    this._text = data.text || "";
-+    this._name = data.name || "";
-+    this._value = data.value || "";
-+    this._priority = data.priority || null;
-+}
-+
-+WebInspector.EffectivePropertyData.fromPayload = function(payload)
-+{
-+    // Convert from protocol values to model values/enums.
-+    var relevantData = {
-+        "text": payload.property.text,
-+        "name": payload.property.name,
-+        "value": payload.property.value,
-+        "priority": payload.property.priority,
-+    };
-+
-+    return new WebInspector.EffectivePropertyData(relevantData);
-+}
-+
-+WebInspector.EffectivePropertyData.prototype = {
-+    constructor: WebInspector.EffectivePropertyData,
-+    __proto__: WebInspector.Object.prototype,
-+
-+    get synthesizedText()
-+    {
-+        var name = this.name;
-+        if (!name)
-+            return "";
-+
-+        var priority = this.priority;
-+        return name + ": " + this.value.trim() + (priority ? " !" + priority : "") + ";";
-+    },
-+
-+    get text()
-+    {
-+        return this._text || this.synthesizedText;
-+    },
-+
-+    get name()
-+    {
-+        return this._name;
-+    },
-+
-+    get value()
-+    {
-+        return this._value;
-+    },
-+
-+    get important()
-+    {
-+        return this.priority === "important";
-+    },
-+
-+    get priority()
-+    {
-+        return this._priority;
-+    },
-+}
 diff --git a/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleSnapshot.js
 new file mode 100644
 index 0000000..5cf0c3e

@@ -1,4 +1,4 @@
-From a74f20aaa9393bd5acd369763b3bce8f722bad2d Mon Sep 17 00:00:00 2001
+From eab1fcbf420f5fb6f4abdc82607bc29c9dc71c3f Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 1 Apr 2015 10:04:56 -0700
 Subject: [PATCH] Exclude properties with implicit initial values from

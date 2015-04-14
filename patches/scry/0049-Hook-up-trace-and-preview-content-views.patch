@@ -1,9 +1,10 @@
-From 3659404418606b87c29216e2f9880e918b3899d9 Mon Sep 17 00:00:00 2001
+From 37787b0bc76b4e2959a39626cdbd356e20b9d73c Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 13 Apr 2015 14:40:33 -0700
 Subject: [PATCH] Hook up trace and preview content views.
 
 ---
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 61780 -> 61988 bytes
  .../UserInterface/Controllers/DOMTracingManager.js |  11 +-
  Source/WebInspectorUI/UserInterface/Main.html      |   5 +
  .../UserInterface/Models/ElementSnapshotDiff.js    |  47 ++++-
@@ -15,12 +16,22 @@ Subject: [PATCH] Hook up trace and preview content views.
  ...erationPreviewView.js => OperationDataGrid.css} |  43 +----
  .../UserInterface/Views/OperationDataGrid.js       | 200 +++++++++++++++++++++
  .../UserInterface/Views/OperationDataGridNode.js   | 173 ++++++++++++++++++
- 11 files changed, 554 insertions(+), 127 deletions(-)
+ 12 files changed, 554 insertions(+), 127 deletions(-)
  copy Source/WebInspectorUI/UserInterface/{Views/ElementSnapshotOperationPreviewView.js => Models/TraceOperation.js} (56%)
  copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotOperationPreviewView.js => ElementSnapshotOperationPreviewView.css} (54%)
  copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotOperationPreviewView.js => OperationDataGrid.css} (54%)
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/OperationDataGrid.js
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/OperationDataGridNode.js
+
+diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
+index 88ccfc1d3b106d44189e37294507cf7d4ce9dbb4..ec5a14e6b9a3ecf905a7230f70fe99a4eb976908 100644
+GIT binary patch
+delta 71
+zcmcceh<V8q<_#Mbv!*f>F(giIlo4h1XDDDuoh<KVzIn~!E5eh{?B-(4WJqGjnOuKK
+Ya<bPRJ}7VDCG*J}cCc)2*nY(l0Oo-lf&c&j
+
+delta 19
+bcmZ4Tg!#%N<_#MbZ{}KZL3ne(jw_Y`YPAYf
 
 diff --git a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
 index ce19893..2d38b8f 100644
@@ -660,7 +671,7 @@ index f681a5c..ef26c6e 100644
      }
  };
 diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationTraceView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationTraceView.js
-index 849ba26..a0ca320 100644
+index 849ba26..88d1042 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationTraceView.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationTraceView.js
 @@ -25,48 +25,90 @@
@@ -675,12 +686,12 @@ index 849ba26..a0ca320 100644
      this._operationTrace = [];
  
 -    // ADD A DATA GRID                                  
-+    var columns = {eventType: {}, initiatorCallFrame: {}, relationToTarget: {}, startTime: {}};
++    var columns = {eventType: {}, initiatorCallFrame: {}, startTime: {}};
 +
-+    columns.eventType.title = WebInspector.UIString("Type");
++    columns.eventType.title = WebInspector.UIString("Operation");
 +    columns.eventType.width = "30%";
 +
-+    columns.initiatorCallFrame.title = WebInspector.UIString("Location");
++    columns.initiatorCallFrame.title = WebInspector.UIString("Responsible Code");
 +    columns.initiatorCallFrame.width = "60%";
 +
 +    columns.startTime.title = WebInspector.UIString("Time");

@@ -1,4 +1,4 @@
-From 066ac9b0baa1d83e2849d845bc048ce5435b7ec5 Mon Sep 17 00:00:00 2001
+From 1a138d1f48f81764b2a5c889f583641a3d84e911 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 30 Mar 2015 10:10:44 -0700
 Subject: [PATCH] Collect effective styles in bulk and reuse rule/element

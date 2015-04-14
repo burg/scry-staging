@@ -1,4 +1,4 @@
-From 9d8bc6c8dc3d17f5d0717262302c90dbd2578405 Mon Sep 17 00:00:00 2001
+From 17b8740a8564005526e9891146f739a5c2930c1d Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sun, 8 Mar 2015 22:15:42 -0700
 Subject: [PATCH] Improve behavior for clicking multi-record snapshot stacks in

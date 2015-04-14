@@ -1,4 +1,4 @@
-From bb038159498f05bc48f656d514216d559ddc04e9 Mon Sep 17 00:00:00 2001
+From 77f7cb44ad35cd6cb5d5028fff2a16e76ca223ad Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 11 Mar 2015 14:03:02 -0700
 Subject: [PATCH] TimelineRecordingContentView now uses a ContentBrownser.

@@ -1,4 +1,4 @@
-From 257db36b1ec5d1de4f8a179db6b69ff5435f2937 Mon Sep 17 00:00:00 2001
+From d248f72d1b59e6710347c84a1bd69783879ac340 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 27 Feb 2015 11:09:08 -0800
 Subject: [PATCH] Collect and dump target element's effective properties and

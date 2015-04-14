@@ -1,4 +1,4 @@
-From 1aa30afd2f00c510265a01f9fa908743d07964c1 Mon Sep 17 00:00:00 2001
+From fe1629e62ea90b463fec9550a758c731e4a9d22b Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 5 Mar 2015 11:06:58 -0800
 Subject: [PATCH] Introduce ElementSnapshotData to hold fetched snapshot data.

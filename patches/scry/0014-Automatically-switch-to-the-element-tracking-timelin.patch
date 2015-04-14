@@ -1,4 +1,4 @@
-From 31543b91e50f8921919ee3846ce732326b992562 Mon Sep 17 00:00:00 2001
+From 70f5eccf5cd728c0f3c56f0dbeeaabd71d3b2c27 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 4 Mar 2015 16:19:32 -0800
 Subject: [PATCH] Automatically switch to the element tracking timeline when

@@ -1,4 +1,4 @@
-From 842d586aaae503d066e0dba637dcb8ca9f5e7f6d Mon Sep 17 00:00:00 2001
+From 233c39fc46df0d9c5acaa2f731b1af5982d8fdc1 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 20 Mar 2015 14:08:28 -0700
 Subject: [PATCH] Refactor DOMNode, DOMTreeElement, DOMTreeOutline to support

@@ -1,4 +1,4 @@
-From 2931f72ccaaa1410218f2799d93c9546e6ac6fcd Mon Sep 17 00:00:00 2001
+From 0d331fd9f968e16c34427cbeeaf848ce8dbe0d67 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sun, 8 Mar 2015 14:59:06 -0700
 Subject: [PATCH] Convert the snapshot content view to be a cluster content

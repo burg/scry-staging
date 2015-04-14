@@ -1,4 +1,4 @@
-From 6a8be070260638287cf1614c1d0a89d7b1c33fe0 Mon Sep 17 00:00:00 2001
+From 1f2cbdeb7239f5b0121a168c0071d08ea684aa4b Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Tue, 10 Mar 2015 08:54:26 -0700
 Subject: [PATCH] Show effective styles for the target element as a subview of

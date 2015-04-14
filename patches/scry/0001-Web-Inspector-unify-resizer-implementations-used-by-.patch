@@ -1,4 +1,4 @@
-From 74e99bb9107658cc36d5fad9e085f3fd9cd669f4 Mon Sep 17 00:00:00 2001
+From ffaafed2bfc0ad3c239687f903288dfe5b651093 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 6 Mar 2015 11:57:52 -0800
 Subject: [PATCH] Web Inspector: unify resizer implementations used by DataGrid

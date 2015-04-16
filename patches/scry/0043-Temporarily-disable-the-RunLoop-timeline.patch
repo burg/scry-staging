@@ -1,0 +1,98 @@
+From 544cd9df64fc5cb9351397dbc80c7be04300da7a Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Sun, 12 Apr 2015 13:10:34 -0700
+Subject: [PATCH] Temporarily disable the RunLoop timeline.
+
+---
+ .../UserInterface/Controllers/TimelineManager.js   | 32 ----------------------
+ .../UserInterface/Models/TimelineRecording.js      |  3 +-
+ 2 files changed, 2 insertions(+), 33 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js b/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
+index 2e51fa1..a504715 100644
+--- a/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
++++ b/Source/WebInspectorUI/UserInterface/Controllers/TimelineManager.js
+@@ -485,52 +485,20 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
+ 
+         var oldRecording = this._activeRecording;
+         if (oldRecording)
+             oldRecording.unloaded();
+ 
+         this._legacyFirstRecordedTimestamp = NaN;
+         this._activeRecording = newRecording;
+         this.dispatchEventToListeners(WebInspector.TimelineManager.Event.RecordingLoaded, {oldRecording});
+     }
+ 
+-<<<<<<< HEAD
+-    _callFramesFromPayload(payload)
+-    {
+-        if (!payload)
+-            return null;
+-
+-        function createCallFrame(payload)
+-        {
+-            var url = payload.url;
+-            var nativeCode = false;
+-
+-            if (url === "[native code]") {
+-                nativeCode = true;
+-                url = null;
+-            }
+-
+-            var sourceCode = WebInspector.frameResourceManager.resourceForURL(url);
+-            if (!sourceCode)
+-                sourceCode = WebInspector.debuggerManager.scriptsForURL(url)[0];
+-
+-            // The lineNumber is 1-based, but we expect 0-based.
+-            var lineNumber = payload.lineNumber - 1;
+-
+-            var sourceCodeLocation = sourceCode ? sourceCode.createLazySourceCodeLocation(lineNumber, payload.columnNumber) : null;
+-            var functionName = payload.functionName !== "global code" ? payload.functionName : null;
+-
+-            return new WebInspector.CallFrame(null, sourceCodeLocation, functionName, null, null, nativeCode);
+-        }
+-
+-        return payload.map(createCallFrame);
+-    }
+-
+     _addRecord(record)
+     {
+         this._activeRecording.addRecord(record);
+ 
+         // Only worry about dead time after the load event.
+         if (!isNaN(WebInspector.frameResourceManager.mainFrame.loadEventTimestamp))
+             this._resetAutoRecordingDeadTimeTimeout();
+     }
+ 
+     _startAutoCapturing(event)
+diff --git a/Source/WebInspectorUI/UserInterface/Models/TimelineRecording.js b/Source/WebInspectorUI/UserInterface/Models/TimelineRecording.js
+index bf7171a..3604616 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/TimelineRecording.js
++++ b/Source/WebInspectorUI/UserInterface/Models/TimelineRecording.js
+@@ -149,21 +149,22 @@ WebInspector.TimelineRecording = class TimelineRecording extends WebInspector.Ob
+     }
+ 
+     addEventMarker(eventMarker)
+     {
+         this._eventMarkers.push(eventMarker);
+     }
+ 
+     addRecord(record)
+     {
+         var hasCorrespondingTimeline = this._timelines.has(record.type);
+-        console.assert(hasCorrespondingTimeline, record, this._timelines);
++        // XXX: hack to disable RunLoop timeline for now.
++        //console.assert(hasCorrespondingTimeline, record, this._timelines);
+         if (!hasCorrespondingTimeline)
+             return;
+ 
+         // Add the record to the global timeline by type.
+         this._timelines.get(record.type).addRecord(record);
+ 
+         // Network and RenderingFrame records don't have source code timelines.
+         if (record.type === WebInspector.TimelineRecord.Type.Network || record.type === WebInspector.TimelineRecord.Type.RenderingFrame)
+             return;
+ 
+-- 
+2.3.5
+

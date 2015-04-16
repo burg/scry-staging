@@ -1,0 +1,510 @@
+From 47e6be08ddd85f227a59ab822b9b5d8cd8c4ed7d Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Tue, 31 Mar 2015 15:45:20 -0700
+Subject: [PATCH] Drop the snapshot cluster view in favor of the multi-pane
+ view.
+
+---
+ .../Views/ElementSnapshotCombinedContentView.css   |   8 +-
+ .../Views/ElementSnapshotCombinedContentView.js    | 121 -----------
+ .../Views/ElementSnapshotContentView.css           |  24 +--
+ .../Views/ElementSnapshotContentView.js            | 236 +++++----------------
+ 4 files changed, 75 insertions(+), 314 deletions(-)
+ delete mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.js
+
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.css b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.css
+index 2b3f885..0c1bf34 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.css
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.css
+@@ -16,23 +16,27 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-.content-view.combined-snapshot-view > .content-view {
++.content-view.element-snapshot > .content-view {
+     position: absolute;
+     left: 0;
+     right: 0;
+     top: 0;
+     bottom: 0;
+ 
+     overflow-y: scroll;
+ }
+ 
+-.content-view.combined-snapshot-view .resizer {
++.content-view.element-snapshot .resizer {
+     border-left: 1px solid rgb(179, 179, 179);
+ }
++
++.element-snapshot-icon > .icon {
++    content: url(../Images/Camera.svg);
++}
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.js
+deleted file mode 100644
+index 035c2ab..0000000
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotCombinedContentView.js
++++ /dev/null
+@@ -1,121 +0,0 @@
+-/*
+- * Copyright (C) 2015 University of Washington. All rights reserved.
+- *
+- * Redistribution and use in source and binary forms, with or without
+- * modification, are permitted provided that the following conditions
+- * are met:
+- * 1. Redistributions of source code must retain the above copyright
+- *    notice, this list of conditions and the following disclaimer.
+- * 2. Redistributions in binary form must reproduce the above copyright
+- *    notice, this list of conditions and the following disclaimer in the
+- *    documentation and/or other materials provided with the distribution.
+- *
+- * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
+- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+- * THE POSSIBILITY OF SUCH DAMAGE.
+- */
+-
+-WebInspector.ElementSnapshotCombinedContentView = function(snapshot)
+-{
+-    WebInspector.ContentView.call(this, snapshot);
+-
+-    this.element.classList.add(WebInspector.ElementSnapshotCombinedContentView.StyleClassName);
+-
+-    var resizerDelegate = this;
+-    this._leftResizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
+-    this.element.appendChild(this._leftResizer.element);
+-    this._rightResizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
+-    this.element.appendChild(this._rightResizer.element);
+-
+-    this._outputContentView = new WebInspector.ElementSnapshotOutputContentView(snapshot);
+-    this.element.appendChild(this._outputContentView.element);
+-
+-    this._domTreeContentView = new WebInspector.ElementSnapshotDOMTreeContentView(snapshot);
+-    this._domTreeContentView.addEventListener(WebInspector.ElementSnapshotDOMTreeContentView.Event.SelectedNodeChanged, this._selectedNodeChanged, this);
+-    this.element.appendChild(this._domTreeContentView.element);
+-
+-    this._styleContentView = new WebInspector.ElementSnapshotStyleContentView(snapshot);
+-    this.element.appendChild(this._styleContentView.element);
+-
+-    this._repositionResizers(0.3, 0.7);
+-};
+-
+-WebInspector.ElementSnapshotCombinedContentView.StyleClassName = "combined-snapshot-view";
+-WebInspector.ElementSnapshotCombinedContentView.IconStyleClassName = "combined-snapshot-view-icon";
+-WebInspector.ElementSnapshotCombinedContentView.SplitPaneStyleClassName = "split-pane";
+-
+-WebInspector.ElementSnapshotCombinedContentView.prototype = {
+-    constructor: WebInspector.ElementSnapshotCombinedContentView,
+-    __proto__: WebInspector.ContentView.prototype,
+-
+-    // Disallow the quick console from popping up, we need a lot of space.
+-    get supportsSplitContentBrowser()
+-    {
+-        return false;
+-    },
+-
+-    // Protected
+-
+-    resizerDragStarted: function(resizer)
+-    {
+-        this._resizerOffsetWhenDragStarted = resizer.initialPosition - this.element.totalOffsetLeft;
+-    },
+-
+-    resizerDragging: function(resizer, positionDelta)
+-    {
+-        var resizerDragPercent = (this._resizerOffsetWhenDragStarted - positionDelta) / this.element.offsetWidth;
+-        if (resizer === this._leftResizer)
+-            this._repositionResizers(Number.constrain(resizerDragPercent, 0.01, this._rightResizerPercent - 0.01), this._rightResizerPercent);
+-        else if (resizer === this._rightResizer)
+-            this._repositionResizers(this._leftResizerPercent, Number.constrain(resizerDragPercent, this._leftResizerPercent + 0.01, 0.99));
+-     },
+-
+-    shown: function()
+-    {
+-        WebInspector.ContentView.prototype.shown.call(this);
+-        this._outputContentView.shown();
+-        this._domTreeContentView.shown();
+-        this._styleContentView.shown();
+-    },
+-
+-    updateLayout: function()
+-    {
+-        WebInspector.ContentView.prototype.updateLayout.call(this);
+-        this._outputContentView.updateLayout();
+-        this._domTreeContentView.updateLayout();
+-        this._styleContentView.updateLayout();
+-    },
+-
+-    // Private
+-
+-    _selectedNodeChanged: function(event)
+-    {
+-        this._styleContentView.showStyleForNode(this._domTreeContentView.selectedNode);
+-    },
+-
+-    _repositionResizers: function(leftResizerPercent, rightResizerPercent)
+-    {
+-        if (leftResizerPercent === this._leftResizerPercent && rightResizerPercent === this._rightResizerPercent)
+-            return;
+-
+-        this._leftResizerPercent = leftResizerPercent || 0.3;
+-        this._rightResizerPercent = rightResizerPercent || 0.7;
+-        this._leftResizer.element.style.left = "%.5f".format(this._leftResizerPercent * 100) + '%';
+-        this._rightResizer.element.style.left = "%.5f".format(this._rightResizerPercent * 100) + '%';
+-
+-        this._outputContentView.element.style.right = "%.5f".format((1.0 - this._leftResizerPercent) * 100) + '%';
+-        this._domTreeContentView.element.style.left = "%.5f".format(this._leftResizerPercent * 100) + '%';
+-        this._domTreeContentView.element.style.right = "%.5f".format((1.0 - this._rightResizerPercent) * 100) + '%';
+-        this._styleContentView.element.style.left = "%.5f".format(this._rightResizerPercent * 100) + '%';
+-
+-        this.updateLayout();
+-    }
+-};
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css
+index 83d0026..0c1bf34 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css
+@@ -16,29 +16,27 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-.visual-output-icon > .icon {
+-    content: url(../Images/Camera.svg);
+-}
+-
+-.combined-view-icon > .icon {
+-    content: url(../Images/Camera.svg);
+-}
++.content-view.element-snapshot > .content-view {
++    position: absolute;
++    left: 0;
++    right: 0;
++    top: 0;
++    bottom: 0;
+ 
+-.effective-style-icon > .icon {
+-    content: url(../Images/NavigationItemBrushAndRuler.svg);
++    overflow-y: scroll;
+ }
+ 
+-.dom-tree-icon > .icon {
+-    content: url(../Images/DOMTree.svg);
++.content-view.element-snapshot .resizer {
++    border-left: 1px solid rgb(179, 179, 179);
+ }
+ 
+-.snapshot-icon > .icon {
+-    content: -webkit-image-set(url(../Images/DocumentImage.png) 1x, url(../Images/DocumentImage@2x.png) 2x);
++.element-snapshot-icon > .icon {
++    content: url(../Images/Camera.svg);
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+index f03d585..652185a 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+@@ -18,224 +18,104 @@
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementSnapshotContentView = function(snapshot)
+ {
+-    console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+-    WebInspector.ClusterContentView.call(this, snapshot);
++    WebInspector.ContentView.call(this, snapshot);
+ 
+-    this._snapshot = snapshot;
++    this.element.classList.add(WebInspector.ElementSnapshotContentView.StyleClassName);
+ 
+-    function createPathComponent(displayName, classNames, identifier)
+-    {
+-        var pathComponent = new WebInspector.HierarchicalPathComponent(displayName, classNames, identifier, false, true);
+-        pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._pathComponentSelected, this);
+-        return pathComponent;
+-    }
++    var resizerDelegate = this;
++    this._leftResizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
++    this.element.appendChild(this._leftResizer.element);
++    this._rightResizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
++    this.element.appendChild(this._rightResizer.element);
+ 
+-    this._combinedPathComponent = createPathComponent.call(this, WebInspector.UIString("Element Snapshot"), WebInspector.ElementSnapshotContentView.CombinedViewIconStyleClassName, WebInspector.ElementSnapshotContentView.CombinedViewIdentifier, false, false);
+-    this._outputPathComponent = createPathComponent.call(this, WebInspector.UIString("Visual Output"), WebInspector.ElementSnapshotContentView.VisualOutputIconStyleClassName, WebInspector.ElementSnapshotContentView.VisualOutputIdentifier, false, false);
+-    this._stylePathComponent = createPathComponent.call(this, WebInspector.UIString("Effective Style"), WebInspector.ElementSnapshotContentView.EffectiveStyleIconStyleClassName, WebInspector.ElementSnapshotContentView.EffectiveStyleIdentifier, false, false);
+-    this._domTreePathComponent = createPathComponent.call(this, WebInspector.UIString("DOM Tree"), WebInspector.ElementSnapshotContentView.DOMTreeIconStyleClassName, WebInspector.ElementSnapshotContentView.DOMTreeIdentifier, false, false);
++    this._outputContentView = new WebInspector.ElementSnapshotOutputContentView(snapshot);
++    this.element.appendChild(this._outputContentView.element);
+ 
+-    // combined <-> output <-> style <-> dom-tree
+-    this._combinedPathComponent.nextSibling = this._outputPathComponent;
+-    this._outputPathComponent.previousSibling = this._combinedPathComponent;
+-    this._outputPathComponent.nextSibling = this._stylePathComponent;
+-    this._stylePathComponent.previousSibling = this._outputPathComponent;
+-    this._stylePathComponent.nextSibling = this._domTreePathComponent;
+-    this._domTreePathComponent.previousSibling = this._stylePathComponent;
+-
+-    this._currentContentViewSetting = new WebInspector.Setting("element-snapshot-current-view", WebInspector.ElementSnapshotContentView.VisualOutputIdentifier);
+-};
++    this._domTreeContentView = new WebInspector.ElementSnapshotDOMTreeContentView(snapshot);
++    this._domTreeContentView.addEventListener(WebInspector.ElementSnapshotDOMTreeContentView.Event.SelectedNodeChanged, this._selectedNodeChanged, this);
++    this.element.appendChild(this._domTreeContentView.element);
+ 
+-WebInspector.ElementSnapshotContentView.ContentViewIdentifierCookieKey = "element-snapshot-content-view-identifier";
++    this._styleContentView = new WebInspector.ElementSnapshotStyleContentView(snapshot);
++    this.element.appendChild(this._styleContentView.element);
+ 
+-WebInspector.ElementSnapshotContentView.CombinedViewIdentifier = "combined-view";
+-WebInspector.ElementSnapshotContentView.VisualOutputIdentifier = "visual-output";
+-WebInspector.ElementSnapshotContentView.EffectiveStyleIdentifier = "effective-style";
+-WebInspector.ElementSnapshotContentView.DOMTreeIdentifier = "dom-tree";
++    this._repositionResizers(0.3, 0.7);
++};
+ 
+-WebInspector.ElementSnapshotContentView.SnapshotIconStyleClass = "snapshot-icon";
+-WebInspector.ElementSnapshotContentView.CombinedViewIconStyleClassName = "combined-view-icon";
+-WebInspector.ElementSnapshotContentView.VisualOutputIconStyleClassName = "visual-output-icon";
+-WebInspector.ElementSnapshotContentView.EffectiveStyleIconStyleClassName = "effective-style-icon";
+-WebInspector.ElementSnapshotContentView.DOMTreeIconStyleClassName = "dom-tree-icon";
++WebInspector.ElementSnapshotContentView.StyleClassName = "element-snapshot";
++WebInspector.ElementSnapshotContentView.SnapshotIconStyleClass = "element-snapshot-icon";
++WebInspector.ElementSnapshotContentView.SplitPaneStyleClassName = "split-pane";
+ 
+ WebInspector.ElementSnapshotContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotContentView,
+-    __proto__: WebInspector.ClusterContentView.prototype,
+-
+-    // Public
++    __proto__: WebInspector.ContentView.prototype,
+ 
+-    get selectionPathComponents()
++    // Disallow the quick console from popping up, we need a lot of space.
++    get supportsSplitContentBrowser()
+     {
+-        var currentContentView = this._contentViewContainer.currentContentView;
+-        if (!currentContentView)
+-            return [];
+-
+-        // Append the current view's path components to the path component representing the current view.
+-        var components = [this._pathComponentForContentView(currentContentView)];
+-        return components.concat(currentContentView.selectionPathComponents);
++        return false;
+     },
+ 
+-    get combinedContentView()
+-    {
+-        if (!this._combinedContentView)
+-            this._combinedContentView = new WebInspector.ElementSnapshotCombinedContentView(this._snapshot);
+-
+-        return this._combinedContentView;
+-    },
+-
+-    get visualOutputContentView()
+-    {
+-        if (!this._visualOutputContentView)
+-            this._visualOutputContentView = new WebInspector.ElementSnapshotOutputContentView(this._snapshot);
+-
+-        return this._visualOutputContentView;
+-    },
++    // Protected
+ 
+-    get effectiveStyleContentView()
++    resizerDragStarted: function(resizer)
+     {
+-        if (!this._effectiveStyleContentView)
+-            this._effectiveStyleContentView = new WebInspector.ElementSnapshotStyleContentView(this._snapshot);
+-
+-        return this._effectiveStyleContentView;
++        this._resizerOffsetWhenDragStarted = resizer.initialPosition - this.element.totalOffsetLeft;
+     },
+ 
+-    get domTreeContentView()
++    resizerDragging: function(resizer, positionDelta)
+     {
+-        if (!this._domTreeContentView)
+-            this._domTreeContentView = new WebInspector.ElementSnapshotDOMTreeContentView(this._snapshot);
+-
+-        return this._domTreeContentView;
+-    },
++        var resizerDragPercent = (this._resizerOffsetWhenDragStarted - positionDelta) / this.element.offsetWidth;
++        if (resizer === this._leftResizer)
++            this._repositionResizers(Number.constrain(resizerDragPercent, 0.01, this._rightResizerPercent - 0.01), this._rightResizerPercent);
++        else if (resizer === this._rightResizer)
++            this._repositionResizers(this._leftResizerPercent, Number.constrain(resizerDragPercent, this._leftResizerPercent + 0.01, 0.99));
++     },
+ 
+     shown: function()
+     {
+-        WebInspector.ClusterContentView.prototype.shown.call(this);
+-
+-        if (this._shownInitialContent)
+-            return;
+-
+-        this._showContentViewForIdentifier(this._currentContentViewSetting.value);
++        WebInspector.ContentView.prototype.shown.call(this);
++        this._outputContentView.shown();
++        this._domTreeContentView.shown();
++        this._styleContentView.shown();
+     },
+ 
+-    closed: function()
++    updateLayout: function()
+     {
+-        WebInspector.ClusterContentView.prototype.closed.call(this);
+-
+-        this._shownInitialContent = false;
+-    },
+-
+-    saveToCookie: function(cookie)
+-    {
+-        cookie[WebInspector.ElementSnapshotContentView.ContentViewIdentifierCookieKey] = this._currentContentViewSetting.value;
+-    },
+-
+-    restoreFromCookie: function(cookie)
+-    {
+-        this._showContentViewForIdentifier(cookie[WebInspector.ElementSnapshotContentView.ContentViewIdentifierCookieKey]);
+-    },
+-
+-    showCombinedView: function()
+-    {
+-        this._shownInitialContent = true;
+-
+-        return this._showContentViewForIdentifier(WebInspector.ElementSnapshotContentView.CombinedViewIdentifier);
+-    },
+-
+-    showVisualOutput: function()
+-    {
+-        this._shownInitialContent = true;
+-
+-        return this._showContentViewForIdentifier(WebInspector.ElementSnapshotContentView.VisualOutputIdentifier);
+-    },
+-
+-    showEffectiveStyle: function()
+-    {
+-        this._shownInitialContent = true;
+-
+-        return this._showContentViewForIdentifier(WebInspector.ElementSnapshotContentView.EffectiveStyleIdentifier);
+-    },
+-
+-    showDOMTree: function()
+-    {
+-        this._shownInitialContent = true;
+-
+-        return this._showContentViewForIdentifier(WebInspector.ElementSnapshotContentView.DOMTreeIdentifier);
++        WebInspector.ContentView.prototype.updateLayout.call(this);
++        this._outputContentView.updateLayout();
++        this._domTreeContentView.updateLayout();
++        this._styleContentView.updateLayout();
+     },
+ 
+     // Private
+ 
+-    _pathComponentForContentView: function(contentView)
++    _selectedNodeChanged: function(event)
+     {
+-        console.assert(contentView);
+-        if (!contentView)
+-            return null;
+-        if (contentView === this._combinedContentView)
+-            return this._combinedPathComponent;
+-        if (contentView === this._visualOutputContentView)
+-            return this._outputPathComponent;
+-        if (contentView === this._effectiveStyleContentView)
+-            return this._stylePathComponent;
+-        if (contentView === this._domTreeContentView)
+-            return this._domTreePathComponent;
+-        console.error("Unknown contentView.");
+-        return null;
++        this._styleContentView.showStyleForNode(this._domTreeContentView.selectedNode);
+     },
+ 
+-    _identifierForContentView: function(contentView)
++    _repositionResizers: function(leftResizerPercent, rightResizerPercent)
+     {
+-        console.assert(contentView);
+-        if (!contentView)
+-            return null;
+-        if (contentView === this._combinedContentView)
+-            return WebInspector.ElementSnapshotContentView.CombinedViewIdentifier;
+-        if (contentView === this._visualOutputContentView)
+-            return WebInspector.ElementSnapshotContentView.VisualOutputIdentifier;
+-        if (contentView === this._effectiveStyleContentView)
+-            return WebInspector.ElementSnapshotContentView.EffectiveStyleIdentifier;
+-        if (contentView === this._domTreeContentView)
+-            return WebInspector.ElementSnapshotContentView.DOMTreeIdentifier;
+-        console.error("Unknown contentView.");
+-        return null;
+-    },
++        if (leftResizerPercent === this._leftResizerPercent && rightResizerPercent === this._rightResizerPercent)
++            return;
+ 
+-    _showContentViewForIdentifier: function(identifier)
+-    {
+-        var contentViewToShow = null;
+-
+-        switch (identifier) {
+-        case WebInspector.ElementSnapshotContentView.CombinedViewIdentifier:
+-            contentViewToShow = this.combinedContentView;
+-            break;
+-        case WebInspector.ElementSnapshotContentView.VisualOutputIdentifier:
+-            contentViewToShow = this.visualOutputContentView;
+-            break;
+-        case WebInspector.ElementSnapshotContentView.EffectiveStyleIdentifier:
+-            contentViewToShow = this.effectiveStyleContentView;
+-            break;
+-        case WebInspector.ElementSnapshotContentView.DOMTreeIdentifier:
+-            contentViewToShow = this.domTreeContentView;
+-            break;
+-        }
+-        if (!contentViewToShow)
+-            contentViewToShow = this.visualOutputContentView;
+-
+-        console.assert(contentViewToShow);
+-
+-        this._currentContentViewSetting.value = this._identifierForContentView(contentViewToShow);
+-
+-        return this.contentViewContainer.showContentView(contentViewToShow);
+-    },
++        this._leftResizerPercent = leftResizerPercent || 0.3;
++        this._rightResizerPercent = rightResizerPercent || 0.7;
++        this._leftResizer.element.style.left = "%.5f".format(this._leftResizerPercent * 100) + '%';
++        this._rightResizer.element.style.left = "%.5f".format(this._rightResizerPercent * 100) + '%';
+ 
+-    _pathComponentSelected: function(event)
+-    {
+-        this._showContentViewForIdentifier(event.data.pathComponent.representedObject);
+-    },
++        this._outputContentView.element.style.right = "%.5f".format((1.0 - this._leftResizerPercent) * 100) + '%';
++        this._domTreeContentView.element.style.left = "%.5f".format(this._leftResizerPercent * 100) + '%';
++        this._domTreeContentView.element.style.right = "%.5f".format((1.0 - this._rightResizerPercent) * 100) + '%';
++        this._styleContentView.element.style.left = "%.5f".format(this._rightResizerPercent * 100) + '%';
++
++        this.updateLayout();
++    }
+ };
+-- 
+2.3.5
+

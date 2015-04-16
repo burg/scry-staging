@@ -1,0 +1,1232 @@
+From ec2f3d08b8715be22d12c6f2a4abb1d50e4207ff Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Mon, 13 Apr 2015 14:40:33 -0700
+Subject: [PATCH] Hook up trace and preview content views.
+
+---
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 63720 -> 63928 bytes
+ .../UserInterface/Controllers/DOMTracingManager.js |  11 +-
+ Source/WebInspectorUI/UserInterface/Main.html      |   5 +
+ .../UserInterface/Models/ElementSnapshotDiff.js    |  47 ++++-
+ .../TraceOperation.js}                             |  38 ++--
+ .../Views/ElementSnapshotDiffContentView.js        |  39 ++--
+ ....js => ElementSnapshotOperationPreviewView.css} |  43 +----
+ .../Views/ElementSnapshotOperationPreviewView.js   |  30 +++-
+ .../Views/ElementSnapshotOperationTraceView.js     |  52 +++++-
+ ...erationPreviewView.js => OperationDataGrid.css} |  43 +----
+ .../UserInterface/Views/OperationDataGrid.js       | 200 +++++++++++++++++++++
+ .../UserInterface/Views/OperationDataGridNode.js   | 173 ++++++++++++++++++
+ 12 files changed, 554 insertions(+), 127 deletions(-)
+ copy Source/WebInspectorUI/UserInterface/{Views/ElementSnapshotOperationPreviewView.js => Models/TraceOperation.js} (56%)
+ copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotOperationPreviewView.js => ElementSnapshotOperationPreviewView.css} (54%)
+ copy Source/WebInspectorUI/UserInterface/Views/{ElementSnapshotOperationPreviewView.js => OperationDataGrid.css} (54%)
+ create mode 100644 Source/WebInspectorUI/UserInterface/Views/OperationDataGrid.js
+ create mode 100644 Source/WebInspectorUI/UserInterface/Views/OperationDataGridNode.js
+
+diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
+index 1045ee742f60c61e1376a8b659316ed1d083d829..1946f863756524ebb676f431aa6859e70362b20c 100644
+GIT binary patch
+delta 83
+zcmaFyk$J~w<_$c{8B-_sdr5NoGZZkSG88c+P7dTZ-psL_OLFp@{T!^B3`q<*lVfj5
+kPEI(?GC5&C7gVJFmic6d{cMxX4v0+dE92U1aA1c80P*!6*8l(j
+
+delta 26
+icmdn-nfb*><_$c{H>WLUlbp<UP-Jpn8P}$RJ1hXMC=5RU
+
+diff --git a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
+index f8f8f2a..d0c97c2 100644
+--- a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
++++ b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
+@@ -24,42 +24,45 @@
+  */
+ 
+ WebInspector.DOMTracingManager = class DOMTracingManager extends WebInspector.Object
+ {
+     constructor()
+     {
+         super();
+ 
+         this._snapshotHeaderMap = new Map;
+         this._targetNode = null;
++        this._activeTimeline = null;
+ 
+         // This maps from key "prestate.snapshotId:poststate.snapshotId" to a promise
+         // that resolves to an ElementSnapshotDiff instance for the states.
+         this._snapshotDiffPromises = new Map;
+ 
+         WebInspector.TimelineManager.addEventListener(WebInspector.TimelineManager.Event.CapturingStopped, this._timelineCapturingStopped, this);
+     }
+ 
+     // Public
+ 
+     startTrackingElement(node)
+     {
+         this._targetNode = node;
+ 
+         var result = Promise.resolve();
+         if (!WebInspector.timelineManager.isCapturing())
+             result = WebInspector.timelineManager.startCapturing();
+ 
+         var recording = WebInspector.timelineManager.activeRecording;
+         var timelineType = WebInspector.TimelineRecord.Type.ElementTracking
+-        if (!recording.timelines.has(timelineType))
+-            recording.addTimeline(WebInspector.Timeline.create(timelineType));
++        if (!recording.timelines.has(timelineType)) {
++            this._activeTimeline = WebInspector.Timeline.create(timelineType);
++            recording.addTimeline(this._activeTimeline);
++        }
+ 
+         result = result.then(function() {
+             DOMTracingAgent.startTrackingElement(node.id);
+         });
+         return result;
+     }
+ 
+     stopTracking()
+     {
+         console.assert(this._targetNode, "Tried to clear target element, but none was set.");
+@@ -88,22 +91,22 @@ WebInspector.DOMTracingManager = class DOMTracingManager extends WebInspector.Ob
+         var [prestate, poststate] = [first, second];
+         if (first.ordinal > second.ordinal)
+             [prestate, poststate] = [second, first];
+ 
+         var key = "%d:%d".format(prestate.snapshotId, poststate.snapshotId);
+         if (this._snapshotDiffPromises.has(key))
+             return this._snapshotDiffPromises.get(key);
+ 
+         var result = Promise.all([prestate.fetchData(), poststate.fetchData()])
+             .then(function([prestateData, poststateData]) {
+-                return new WebInspector.ElementSnapshotDiff(prestateData, poststateData);
+-            });
++                return new WebInspector.ElementSnapshotDiff(prestateData, poststateData, this._activeTimeline);
++            }.bind(this));
+ 
+         this._snapshotDiffPromises.set(key, result);
+         return result;
+     }
+ 
+     // Protected - Called by DOMTracingObserver
+ 
+     snapshotCreated(snapshotPayload)
+     {
+         var header = new WebInspector.ElementSnapshotHeader(snapshotPayload);
+diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
+index 657761c..d971216 100644
+--- a/Source/WebInspectorUI/UserInterface/Main.html
++++ b/Source/WebInspectorUI/UserInterface/Main.html
+@@ -70,20 +70,21 @@
+     <link rel="stylesheet" href="Views/DatabaseContentView.css">
+     <link rel="stylesheet" href="Views/DatabaseIcon.css">
+     <link rel="stylesheet" href="Views/DatabaseTableContentView.css">
+     <link rel="stylesheet" href="Views/DatabaseTableIcon.css">
+     <link rel="stylesheet" href="Views/DebuggerSidebarPanel.css">
+     <link rel="stylesheet" href="Views/DetailsSection.css">
+     <link rel="stylesheet" href="Views/DividerNavigationItem.css">
+     <link rel="stylesheet" href="Views/Editing.css">
+     <link rel="stylesheet" href="Views/ElementSnapshotContentView.css">
+     <link rel="stylesheet" href="Views/ElementSnapshotDiffContentView.css">
++    <link rel="stylesheet" href="Views/ElementSnapshotOperationPreviewView.css">
+     <link rel="stylesheet" href="Views/ElementSnapshotOutputContentView.css">
+     <link rel="stylesheet" href="Views/ElementSnapshotStyleContentView.css">
+     <link rel="stylesheet" href="Views/ElementTrackingTimelineOverviewGraph.css">
+     <link rel="stylesheet" href="Views/EventListenerSectionGroup.css">
+     <link rel="stylesheet" href="Views/FilterBar.css">
+     <link rel="stylesheet" href="Views/FindBanner.css">
+     <link rel="stylesheet" href="Views/FlexibleSpaceNavigationItem.css">
+     <link rel="stylesheet" href="Views/FolderIcon.css">
+     <link rel="stylesheet" href="Views/FontResourceContentView.css">
+     <link rel="stylesheet" href="Views/FormattedValue.css">
+@@ -103,20 +104,21 @@
+     <link rel="stylesheet" href="Views/Main.css">
+     <link rel="stylesheet" href="Views/NavigationBar.css">
+     <link rel="stylesheet" href="Views/NavigationSidebarPanel.css">
+     <link rel="stylesheet" href="Views/NetworkTimelineOverviewGraph.css">
+     <link rel="stylesheet" href="Views/NetworkTimelineView.css">
+     <link rel="stylesheet" href="Views/ObjectPreviewView.css">
+     <link rel="stylesheet" href="Views/ObjectTreeView.css">
+     <link rel="stylesheet" href="Views/ObjectTreeArrayIndexTreeElement.css">
+     <link rel="stylesheet" href="Views/ObjectTreeMapEntryTreeElement.css">
+     <link rel="stylesheet" href="Views/ObjectTreePropertyTreeElement.css">
++    <link rel="stylesheet" href="Views/OperationDataGrid.css">
+     <link rel="stylesheet" href="Views/OverviewTimelineView.css">
+     <link rel="stylesheet" href="Views/PathComponentIcons.css">
+     <link rel="stylesheet" href="Views/Popover.css">
+     <link rel="stylesheet" href="Views/ProbeDetailsSidebarPanel.css">
+     <link rel="stylesheet" href="Views/ProbeSetDataGrid.css">
+     <link rel="stylesheet" href="Views/QuickConsole.css">
+     <link rel="stylesheet" href="Views/RadioButtonNavigationItem.css">
+     <link rel="stylesheet" href="Views/RenderingFrameTimelineOverviewGraph.css">
+     <link rel="stylesheet" href="Views/RenderingFrameTimelineView.css">
+     <link rel="stylesheet" href="Views/ReplayDashboardView.css">
+@@ -305,20 +307,21 @@
+     <script src="Models/SourceCodeRevision.js"></script>
+     <script src="Models/SourceCodeSearchMatchObject.js"></script>
+     <script src="Models/SourceCodeTextRange.js"></script>
+     <script src="Models/SourceCodeTimeline.js"></script>
+     <script src="Models/SourceMap.js"></script>
+     <script src="Models/SourceMapResource.js"></script>
+     <script src="Models/TextMarker.js"></script>
+     <script src="Models/TextRange.js"></script>
+     <script src="Models/TimelineMarker.js"></script>
+     <script src="Models/TimelineRecording.js"></script>
++    <script src="Models/TraceOperation.js"></script>
+     <script src="Models/TraceOperationTimelineRecord.js"></script>
+     <script src="Models/TypeSet.js"></script>
+     <script src="Models/UnitBezier.js"></script>
+ 
+     <script src="Views/ConsoleCommandView.js"></script>
+     <script src="Views/ConsoleMessageView.js"></script>
+     <script src="Views/ContentView.js"></script>
+     <script src="Views/DataGrid.js"></script>
+     <script src="Views/DetailsSectionRow.js"></script>
+     <script src="Views/HierarchicalPathComponent.js"></script>
+@@ -461,20 +464,22 @@
+     <script src="Views/MetricsStyleDetailsPanel.js"></script>
+     <script src="Views/NavigationBar.js"></script>
+     <script src="Views/NetworkTimelineOverviewGraph.js"></script>
+     <script src="Views/NetworkTimelineView.js"></script>
+     <script src="Views/ObjectPreviewView.js"></script>
+     <script src="Views/ObjectTreeArrayIndexTreeElement.js"></script>
+     <script src="Views/ObjectTreeMapEntryTreeElement.js"></script>
+     <script src="Views/ObjectTreePropertyTreeElement.js"></script>
+     <script src="Views/ObjectTreeSetIndexTreeElement.js"></script>
+     <script src="Views/ObjectTreeView.js"></script>
++    <script src="Views/OperationDataGrid.js"></script>
++    <script src="Views/OperationDataGridNode.js"></script>
+     <script src="Views/OverviewTimelineView.js"></script>
+     <script src="Views/Popover.js"></script>
+     <script src="Views/ProbeDetailsSidebarPanel.js"></script>
+     <script src="Views/ProbeSetDataGrid.js"></script>
+     <script src="Views/ProbeSetDataGridNode.js"></script>
+     <script src="Views/ProbeSetDetailsSection.js"></script>
+     <script src="Views/ProfileNodeDataGridNode.js"></script>
+     <script src="Views/ProfileNodeTreeElement.js"></script>
+     <script src="Views/QuickConsole.js"></script>
+     <script src="Views/QuickConsoleNavigationBar.js"></script>
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js
+index 1ed0b6e..2686e18 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js
+@@ -78,30 +78,68 @@ WebInspector.NodeChangeSummary.ChangeTypes = {
+     OrdinalChanged: Symbol("ordinal-changed"),
+     TextChanged: Symbol("text-changed"),
+ 
+     PropertyAdded: Symbol("property-added"),
+     PropertyRemoved: Symbol("property-removed"),
+     PropertyChanged: Symbol("property-changed"),
+ };
+ 
+ WebInspector.ElementSnapshotDiff = class ElementSnapshotDiff extends WebInspector.Object
+ {
+-    constructor(preState, postState)
++    constructor(preState, postState, timeline)
+     {
+         super();
+ 
+         console.assert(preState instanceof WebInspector.ElementSnapshot, preState);
+         console.assert(postState instanceof WebInspector.ElementSnapshot, postState);
+         console.assert(preState !== postState, "Cannot diff a snapshot with itself.");
++        console.assert(timeline instanceof WebInspector.ElementTrackingTimeline, timeline);
+ 
+         this.preState = preState;
+         this.postState = postState;
++        this._timeline = timeline;
++    }
++
++    get relevantOperations()
++    {
++        if (this._relevantOperations)
++            return this._relevantOperations;
++
++        // FIXME: doesn't properly compute an array slice.
++        var records = this._timeline.records;
++        var preStateIndex = 0;
++        var postStateIndex = 0;
++        var i = 0;
++        for (; i < records.length; ++i) {
++            var record = records[i];
++            if (record.eventType !== WebInspector.ElementTrackingTimelineRecord.EventType.OutputChanged)
++                continue;
++
++            if (record.snapshotHeader === this.preState.header)
++                preStateIndex = i;
++            else if (record.snapshotHeader === this.postState.header) {
++                postStateIndex = i;
++                break;
++            }
++        }
++
++        var relevantRecords = this._timeline.records.slice(preStateIndex, postStateIndex);
++        console.log(relevantRecords);
++        this._relevantOperations = [];
++        for (var record of relevantRecords) {
++            if (!(record instanceof WebInspector.TraceOperationTimelineRecord))
++                continue;
++
++            this._relevantOperations.push(new WebInspector.TraceOperation(record));
++        };
++
++        return this._relevantOperations;
+     }
+ 
+     changeSummaryForNode(nodeId)
+     {
+         function createPropertyMap(effectiveStyle) {
+             var result = new Map;
+             var properties = effectiveStyle.allProperties;
+             for (var property of properties)
+                 result.set(property.name, property);
+ 
+@@ -182,11 +220,18 @@ WebInspector.ElementSnapshotDiff = class ElementSnapshotDiff extends WebInspecto
+                 for (var key of prePropertyNames.difference(commonProperties))
+                     styleChanges.push({type: WebInspector.NodeChangeSummary.ChangeTypes.PropertyRemoved, key: key});
+ 
+                 for (var key of postPropertyNames.difference(commonProperties))
+                     styleChanges.push({type: WebInspector.NodeChangeSummary.ChangeTypes.PropertyAdded, key: key});
+             }
+         }
+ 
+         return new WebInspector.NodeChangeSummary(nodeId, nodeChanges, styleChanges);
+     }
++
++    computeOperationTraceForChange(change, nodeId)
++    {
++        console.log(this);
++        // FIXME: IMPLEMENT                             
++        return this.relevantOperations;
++    }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js b/Source/WebInspectorUI/UserInterface/Models/TraceOperation.js
+similarity index 56%
+copy from Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js
+copy to Source/WebInspectorUI/UserInterface/Models/TraceOperation.js
+index f681a5c..43d21d3 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js
++++ b/Source/WebInspectorUI/UserInterface/Models/TraceOperation.js
+@@ -1,12 +1,12 @@
+ /*
+- * Copyright (C) 2015 University of Washington. All rights reserved.
++ * Copyright (C) 2015 University of Washington.
+  *
+  * Redistribution and use in source and binary forms, with or without
+  * modification, are permitted provided that the following conditions
+  * are met:
+  * 1. Redistributions of source code must retain the above copyright
+  *    notice, this list of conditions and the following disclaimer.
+  * 2. Redistributions in binary form must reproduce the above copyright
+  *    notice, this list of conditions and the following disclaimer in the
+  *    documentation and/or other materials provided with the distribution.
+  *
+@@ -16,44 +16,28 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-WebInspector.ElementSnapshotOperationPreviewView = function(snapshot)
++WebInspector.TraceOperation = class TraceOperation extends WebInspector.Object
+ {
+-    console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+-    WebInspector.ContentView.call(this, snapshot);
+-
+-    // TODO: make a content browser or something, show source code
+-
+-    this.element.classList.add(WebInspector.ElementSnapshotOperationPreviewView.StyleClassName);
+-};
+-
+-WebInspector.ElementSnapshotOperationPreviewView.StyleClassName = "element-snapshot-preview";
+-
+-WebInspector.ElementSnapshotOperationPreviewView.prototype = {
+-    constructor: WebInspector.ElementSnapshotOperationPreviewView,
+-    __proto__: WebInspector.ContentView.prototype,
+-
+-    shown: function()
++    constructor(record)
+     {
+-        WebInspector.ContentView.prototype.shown.call(this);
++        super();
+ 
+-        this.updateLayout();
+-    },
++        console.assert(record instanceof WebInspector.TraceOperationTimelineRecord, record);
+ 
+-    updateLayout: function()
+-    {
+-        WebInspector.ContentView.prototype.updateLayout.call(this);
+-    },
++        this._record = record;
++    }
++
++    // Public
+ 
+-    clearPreview: function()
++    get record()
+     {
+-        // TODO: SOMETHING
+-        console.log("cleared preview.");
++        return this._record;
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
+index 4328e8e..a8976d2 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
+@@ -106,22 +106,24 @@ WebInspector.ElementSnapshotDiffContentView = function(snapshotDiff)
+         view.element.classList.add("post-state");
+ 
+     this._preStateDOMTreeContentView.addEventListener(WebInspector.ElementSnapshotDOMTreeContentView.Event.SelectedNodeChanged, this._selectedNodeChanged, this);
+     this._postStateDOMTreeContentView.addEventListener(WebInspector.ElementSnapshotDOMTreeContentView.Event.SelectedNodeChanged, this._selectedNodeChanged, this);
+ 
+     this._preStateStyleContentView.addEventListener(WebInspector.ElementSnapshotStyleContentView.Event.ChangeMarkerSelected, this._changeMarkerSelected, this);
+     this._preStateStyleContentView.addEventListener(WebInspector.ElementSnapshotStyleContentView.Event.ChangeMarkerDeselected, this._changeMarkerDeselected, this);
+     this._postStateStyleContentView.addEventListener(WebInspector.ElementSnapshotStyleContentView.Event.ChangeMarkerSelected, this._changeMarkerSelected, this);
+     this._postStateStyleContentView.addEventListener(WebInspector.ElementSnapshotStyleContentView.Event.ChangeMarkerDeselected, this._changeMarkerDeselected, this);
+ 
+-    this._preStateTraceContentView.addEventListener(WebInspector.ElementSnapshotOperationTraceView.Event.OperationSelected, this._selectedOperationChanged, this);
+-    this._postStateTraceContentView.addEventListener(WebInspector.ElementSnapshotOperationTraceView.Event.OperationSelected, this._selectedOperationChanged, this);
++    this._preStateTraceContentView.addEventListener(WebInspector.ElementSnapshotOperationTraceView.Event.OperationSelected, this._operationSelected, this);
++    this._preStateTraceContentView.addEventListener(WebInspector.ElementSnapshotOperationTraceView.Event.CallFrameSelected, this._operationCallFrameSelected, this);
++    this._postStateTraceContentView.addEventListener(WebInspector.ElementSnapshotOperationTraceView.Event.OperationSelected, this._operationSelected, this);
++    this._postStateTraceContentView.addEventListener(WebInspector.ElementSnapshotOperationTraceView.Event.CallFrameSelected, this._operationCallFrameSelected, this);
+ 
+     this._repositionHeightResizer(0.5);
+     this._repositionWidthResizers(0.3, 0.7);
+ };
+ 
+ WebInspector.ElementSnapshotDiffContentView.IconStyleClassName = "snapshot-diff-icon";
+ WebInspector.ElementSnapshotDiffContentView.StyleClassName = "element-snapshot-diff";
+ 
+ WebInspector.ElementSnapshotDiffContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotDiffContentView,
+@@ -162,25 +164,21 @@ WebInspector.ElementSnapshotDiffContentView.prototype = {
+         this._repositionWidthResizers(this._leftWidthResizerPercent, this._rightWidthResizerPercent, forceUpdates);
+ 
+         if (!this._preStateSelectedChange) {
+             this._preStateTraceContentView.hidden();
+             this._preStatePreviewContentView.hidden();
+             this._preStateDOMTreeContentView.shown();
+             this._preStateStyleContentView.shown();
+             return;
+         }
+ 
+-        // TODO: ask diff object to compute trace.                      
+-        var trackingTimeline = WebInspector.timelineSidebarPanel.displayedRecording.timelines.get(WebInspector.TimelineRecord.Type.ElementTracking);
+-        if (!trackingTimeline)
+-            return;
+-        this._preStateTraceContentView.operationTrace = trackingTimeline.traceRecords;
++        this._preStateTraceContentView.operationTrace = this._snapshotDiff.computeOperationTraceForChange(this._preStateSelectedChange.change, this._preStateSelectedChange.node);
+         this._preStatePreviewContentView.clearPreview();
+ 
+     },
+ 
+     get postStateSelectedChange()
+     {
+         return this._postStateSelectedChange || null;
+     },
+ 
+     set postStateSelectedChange(value)
+@@ -197,25 +195,21 @@ WebInspector.ElementSnapshotDiffContentView.prototype = {
+         this._repositionWidthResizers(this._leftWidthResizerPercent, this._rightWidthResizerPercent, forceUpdates);
+ 
+         if (!this._postStateSelectedChange) {
+             this._postStateTraceContentView.hidden();
+             this._postStatePreviewContentView.hidden();
+             this._postStateDOMTreeContentView.shown();
+             this._postStateStyleContentView.shown();
+             return;
+         }
+ 
+-        // TODO: ask diff object to compute trace.                      
+-        var trackingTimeline = WebInspector.timelineSidebarPanel.displayedRecording.timelines.get(WebInspector.TimelineRecord.Type.ElementTracking);
+-        if (!trackingTimeline)
+-            return;
+-        this._postStateTraceContentView.operationTrace = trackingTimeline.traceRecords;
++        this._postStateTraceContentView.operationTrace = this._snapshotDiff.computeOperationTraceForChange(this._postStateSelectedChange, this._postStateSelectedChange.node);
+         this._postStatePreviewContentView.clearPreview();
+     },
+ 
+     // Protected
+ 
+     shown: function()
+     {
+         WebInspector.ContentView.prototype.shown.call(this);
+ 
+         for (var contentView of this._contentViews)
+@@ -382,32 +376,29 @@ WebInspector.ElementSnapshotDiffContentView.prototype = {
+         this._preStateStyleContentView.showStyleForNode(preStateNodeSnapshot);
+         this._postStateStyleContentView.showStyleForNode(postStateNodeSnapshot);
+ 
+         if (!selectedNodeSnapshot)
+             return;
+ 
+         this._preStateDOMTreeContentView.selectNode(preStateNodeSnapshot, true);
+         this._postStateDOMTreeContentView.selectNode(postStateNodeSnapshot, true);
+ 
+         var changeSummary = this._snapshotDiff.changeSummaryForNode(selectedNodeSnapshot.id);
+-        console.log(changeSummary);
+         this._preStateDOMTreeContentView.updateChangeMarkers(changeSummary.nodeChanges.filter(WebInspector.NodeChangeSummary.changeIsRelevantToPreState));
+         this._postStateDOMTreeContentView.updateChangeMarkers(changeSummary.nodeChanges.filter(WebInspector.NodeChangeSummary.changeIsRelevantToPostState));
+ 
+         this._preStateStyleContentView.updateChangeMarkers(changeSummary.styleChanges.filter(WebInspector.NodeChangeSummary.changeIsRelevantToPreState));
+         this._postStateStyleContentView.updateChangeMarkers(changeSummary.styleChanges.filter(WebInspector.NodeChangeSummary.changeIsRelevantToPostState));
+     },
+ 
+     _changeMarkerSelected: function(event)
+     {
+-        console.log("Change marker selected: ", event.data.node, event.data.change, event.target.representedObject);
+-
+         var selectedChange = {
+             node: event.data.node,
+             change: event.data.change,
+             sourceView: event.target
+         };
+         var snapshot = event.target.representedObject;
+         if (snapshot === this._preState)
+             this.preStateSelectedChange = selectedChange;
+         else if (snapshot === this._postState)
+             this.postStateSelectedChange = selectedChange;
+@@ -415,19 +406,31 @@ WebInspector.ElementSnapshotDiffContentView.prototype = {
+ 
+     _changeMarkerDeselected: function(event)
+     {
+         var snapshot = event.target.representedObject;
+         if (snapshot === this._preState)
+             this.preStateSelectedChange = null;
+         else if (snapshot === this._postState)
+             this.postStateSelectedChange = null;
+     },
+ 
+-    _selectedOperationChanged: function(event)
++    _operationSelected: function(event)
++    {
++        var operation = event.data.operation;
++        var sourceCodeLocation = operation ? operation.record.initiatorCallFrame.sourceCodeLocation : null;
++        if (event.target.representedObject === this._preState) {
++            this._preStatePreviewContentView.showSourceCodeLocation(sourceCodeLocation);
++        } else if (event.target.representedObject === this._postState) {
++            this._postStatePreviewContentView.showSourceCodeLocation(sourceCodeLocation);
++        }
++    },
++
++    _operationCallFrameSelected: function(event)
+     {
++        var sourceCodeLocation = event.data.callFrame.sourceCodeLocation;
+         if (event.target.representedObject === this._preState) {
+-            // DO SOMETHING TO this._preStatePreviewContentView.                            
++            this._preStatePreviewContentView.showSourceCodeLocation(sourceCodeLocation);
+         } else if (event.target.representedObject === this._postState) {
+-            // DO SOMETHING TO this._postStatePreviewContentView.                            
++            this._postStatePreviewContentView.showSourceCodeLocation(sourceCodeLocation);
+         }
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.css
+similarity index 54%
+copy from Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js
+copy to Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.css
+index f681a5c..5662de0 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.css
+@@ -1,12 +1,12 @@
+ /*
+- * Copyright (C) 2015 University of Washington. All rights reserved.
++ * Copyright (C) 2015 University of Washington.
+  *
+  * Redistribution and use in source and binary forms, with or without
+  * modification, are permitted provided that the following conditions
+  * are met:
+  * 1. Redistributions of source code must retain the above copyright
+  *    notice, this list of conditions and the following disclaimer.
+  * 2. Redistributions in binary form must reproduce the above copyright
+  *    notice, this list of conditions and the following disclaimer in the
+  *    documentation and/or other materials provided with the distribution.
+  *
+@@ -16,44 +16,17 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-WebInspector.ElementSnapshotOperationPreviewView = function(snapshot)
+-{
+-    console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+-    WebInspector.ContentView.call(this, snapshot);
+-
+-    // TODO: make a content browser or something, show source code
+-
+-    this.element.classList.add(WebInspector.ElementSnapshotOperationPreviewView.StyleClassName);
+-};
+-
+-WebInspector.ElementSnapshotOperationPreviewView.StyleClassName = "element-snapshot-preview";
+-
+-WebInspector.ElementSnapshotOperationPreviewView.prototype = {
+-    constructor: WebInspector.ElementSnapshotOperationPreviewView,
+-    __proto__: WebInspector.ContentView.prototype,
+-
+-    shown: function()
+-    {
+-        WebInspector.ContentView.prototype.shown.call(this);
+-
+-        this.updateLayout();
+-    },
+-
+-    updateLayout: function()
+-    {
+-        WebInspector.ContentView.prototype.updateLayout.call(this);
+-    },
+-
+-    clearPreview: function()
+-    {
+-        // TODO: SOMETHING
+-        console.log("cleared preview.");
+-    }
+-};
++.content-view.element-snapshot-preview .content-view-container {
++    position: absolute;
++    top: 0;
++    bottom: 0;
++    right: 0;
++    left: 0;
++}
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js
+index f681a5c..ef26c6e 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js
+@@ -21,21 +21,22 @@
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementSnapshotOperationPreviewView = function(snapshot)
+ {
+     console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+     WebInspector.ContentView.call(this, snapshot);
+ 
+-    // TODO: make a content browser or something, show source code
++    this._contentViewContainer = new WebInspector.ContentViewContainer();
++    this.element.appendChild(this._contentViewContainer.element);
+ 
+     this.element.classList.add(WebInspector.ElementSnapshotOperationPreviewView.StyleClassName);
+ };
+ 
+ WebInspector.ElementSnapshotOperationPreviewView.StyleClassName = "element-snapshot-preview";
+ 
+ WebInspector.ElementSnapshotOperationPreviewView.prototype = {
+     constructor: WebInspector.ElementSnapshotOperationPreviewView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+@@ -44,16 +45,41 @@ WebInspector.ElementSnapshotOperationPreviewView.prototype = {
+         WebInspector.ContentView.prototype.shown.call(this);
+ 
+         this.updateLayout();
+     },
+ 
+     updateLayout: function()
+     {
+         WebInspector.ContentView.prototype.updateLayout.call(this);
+     },
+ 
++    showSourceCodeLocation: function(sourceCodeLocation)
++    {
++        if (!sourceCodeLocation) {
++            this.clearPreview();
++            return;
++        }
++
++        var positionToReveal = sourceCodeLocation.displayPosition();
++        var representedObject = sourceCodeLocation.displaySourceCode;
++
++        if (representedObject instanceof WebInspector.Script) {
++            // A script represented by a resource should always show the resource.
++            representedObject = representedObject.resource || representedObject;
++        }
++
++        // A main resource is always represented by its parent frame.
++        if (representedObject instanceof WebInspector.Resource && representedObject.isMainResource())
++            representedObject = representedObject.parentFrame;
++
++        var cookie = positionToReveal ? {lineNumber: positionToReveal.lineNumber, columnNumber: positionToReveal.columnNumber} : {};
++        var contentView = this._contentViewContainer.contentViewForRepresentedObject(representedObject);
++        this._contentViewContainer.element.classList.remove("hidden");
++        this._contentViewContainer.showContentView(contentView, cookie);
++    },
++
+     clearPreview: function()
+     {
+-        // TODO: SOMETHING
++        this._contentViewContainer.element.classList.add("hidden");
+         console.log("cleared preview.");
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationTraceView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationTraceView.js
+index 849ba26..88d1042 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationTraceView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationTraceView.js
+@@ -25,48 +25,90 @@
+ 
+ WebInspector.ElementSnapshotOperationTraceView = function(snapshot)
+ {
+     console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+     WebInspector.ContentView.call(this, snapshot);
+ 
+     this.element.classList.add(WebInspector.ElementSnapshotOperationTraceView.StyleClassName);
+ 
+     this._operationTrace = [];
+ 
+-    // ADD A DATA GRID                                  
++    var columns = {eventType: {}, initiatorCallFrame: {}, startTime: {}};
++
++    columns.eventType.title = WebInspector.UIString("Operation");
++    columns.eventType.width = "30%";
++
++    columns.initiatorCallFrame.title = WebInspector.UIString("Responsible Code");
++    columns.initiatorCallFrame.width = "60%";
++
++    columns.startTime.title = WebInspector.UIString("Time");
++    columns.startTime.width = "1%";
++    columns.startTime.aligned = "right";
++    columns.startTime.sortable = true;
++    columns.startTime.hidden = true;
++
++    this._dataGrid = new WebInspector.OperationDataGrid(columns, this);
++    this._dataGrid.addEventListener(WebInspector.DataGrid.Event.SelectedNodeChanged, this._dataGridSelectedNodeChanged, this);
++
++    this._dataGrid.sortColumnIdentifier = "startTime";
++    this._dataGrid.sortOrder = WebInspector.DataGrid.SortOrder.Ascending;
++
++    this.element.appendChild(this._dataGrid.element);
+ };
+ 
+ WebInspector.ElementSnapshotOperationTraceView.Event = {
++    CallFrameSelected: Symbol("call-frame-selected"),
+     OperationSelected: Symbol("operation-selected"),
+ }
+ 
+ WebInspector.ElementSnapshotOperationTraceView.StyleClassName = "element-snapshot-trace";
+ 
+ WebInspector.ElementSnapshotOperationTraceView.prototype = {
+     constructor: WebInspector.ElementSnapshotOperationTraceView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+     shown: function()
+     {
+         WebInspector.ContentView.prototype.shown.call(this);
+-
+-        this.updateLayout();
+     },
+ 
+     updateLayout: function()
+     {
+         WebInspector.ContentView.prototype.updateLayout.call(this);
++
++        this._dataGrid.updateLayout();
+     },
+ 
+     get operationTrace()
+     {
+         return this._operationTrace.slice();
+     },
+ 
+     set operationTrace(value)
+     {
+         this._operationTrace = value || [];
+ 
+-        // DO SOMETHING WITH TRACE                                      
+-        this.dispatchEventToListeners(WebInspector.ElementSnapshotOperationTraceView.Event.OperationSelected, null);
++        this._dataGrid.reset();
++        for (var operation of this._operationTrace)
++            this._dataGrid.appendChild(new WebInspector.OperationDataGridNode(operation));
++
++        this.dispatchEventToListeners(WebInspector.ElementSnapshotOperationTraceView.Event.OperationSelected, {operation: null});
++    },
++
++    // Protected
++
++    operationDataGridShowCallFrame: function(callFrame)
++    {
++        console.log("show call frame event");
++        this.dispatchEventToListeners(WebInspector.ElementSnapshotOperationTraceView.Event.CallFrameSelected, {callFrame});
++    },
++
++    // Private
++
++    _dataGridSelectedNodeChanged: function(event)
++    {
++        if (!this._dataGrid.selectedNode)
++            return; // Deselection.
++
++        this.dispatchEventToListeners(WebInspector.ElementSnapshotOperationTraceView.Event.OperationSelected, {operation: this._dataGrid.selectedNode.operation});
+     },
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js b/Source/WebInspectorUI/UserInterface/Views/OperationDataGrid.css
+similarity index 54%
+copy from Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js
+copy to Source/WebInspectorUI/UserInterface/Views/OperationDataGrid.css
+index f681a5c..283bd94 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOperationPreviewView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/OperationDataGrid.css
+@@ -1,12 +1,12 @@
+ /*
+- * Copyright (C) 2015 University of Washington. All rights reserved.
++ * Copyright (C) 2015 University of Washington.
+  *
+  * Redistribution and use in source and binary forms, with or without
+  * modification, are permitted provided that the following conditions
+  * are met:
+  * 1. Redistributions of source code must retain the above copyright
+  *    notice, this list of conditions and the following disclaimer.
+  * 2. Redistributions in binary form must reproduce the above copyright
+  *    notice, this list of conditions and the following disclaimer in the
+  *    documentation and/or other materials provided with the distribution.
+  *
+@@ -16,44 +16,17 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-WebInspector.ElementSnapshotOperationPreviewView = function(snapshot)
+-{
+-    console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+-    WebInspector.ContentView.call(this, snapshot);
+-
+-    // TODO: make a content browser or something, show source code
+-
+-    this.element.classList.add(WebInspector.ElementSnapshotOperationPreviewView.StyleClassName);
+-};
+-
+-WebInspector.ElementSnapshotOperationPreviewView.StyleClassName = "element-snapshot-preview";
+-
+-WebInspector.ElementSnapshotOperationPreviewView.prototype = {
+-    constructor: WebInspector.ElementSnapshotOperationPreviewView,
+-    __proto__: WebInspector.ContentView.prototype,
+-
+-    shown: function()
+-    {
+-        WebInspector.ContentView.prototype.shown.call(this);
+-
+-        this.updateLayout();
+-    },
+-
+-    updateLayout: function()
+-    {
+-        WebInspector.ContentView.prototype.updateLayout.call(this);
+-    },
+-
+-    clearPreview: function()
+-    {
+-        // TODO: SOMETHING
+-        console.log("cleared preview.");
+-    }
+-};
++.content-view.element-snapshot-trace > .data-grid {
++    position: absolute;
++    top: 0;
++    left: 0;
++    right: 0;
++    bottom: 0;
++}
+diff --git a/Source/WebInspectorUI/UserInterface/Views/OperationDataGrid.js b/Source/WebInspectorUI/UserInterface/Views/OperationDataGrid.js
+new file mode 100644
+index 0000000..4eae449
+--- /dev/null
++++ b/Source/WebInspectorUI/UserInterface/Views/OperationDataGrid.js
+@@ -0,0 +1,200 @@
++/*
++ * Copyright (C) 2013 Apple Inc. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++WebInspector.OperationDataGrid = function(columns, delegate)
++{
++    WebInspector.DataGrid.call(this, columns);
++
++    this.element.classList.add(WebInspector.OperationDataGrid.StyleClassName);
++
++    this.addEventListener(WebInspector.DataGrid.Event.SelectedNodeChanged, this._dataGridSelectedNodeChanged, this);
++
++    window.addEventListener("resize", this._windowResized.bind(this));
++}
++
++WebInspector.OperationDataGrid.StyleClassName = "operation";
++WebInspector.OperationDataGrid.DelayedPopoverShowTimeout = 250;
++WebInspector.OperationDataGrid.DelayedPopoverHideContentClearTimeout = 500;
++
++WebInspector.OperationDataGrid.Event = {
++    FiltersDidChange: "OperationDataGrid-filters-did-change"
++};
++
++WebInspector.OperationDataGrid.prototype = {
++    constructor: WebInspector.OperationDataGrid,
++    __proto__: WebInspector.DataGrid.prototype,
++
++    // Public
++
++    reset: function()
++    {
++        // May be overridden by subclasses. If so, they should call the superclass.
++
++        this._hidePopover();
++    },
++
++    hidden: function()
++    {
++        // May be overridden by subclasses. If so, they should call the superclass.
++
++        this._hidePopover();
++    },
++
++    callFramePopoverAnchorElement: function()
++    {
++        return this.selectedNode.elementWithColumnIdentifier("initiatorCallFrame");
++    },
++
++    shouldIgnoreSelectionEvent: function()
++    {
++        return this._ignoreSelectionEvent || false;
++    },
++
++    // Protected
++
++    // Private
++    _dataGridSelectedNodeChanged: function(event)
++    {
++        if (!this.selectedNode) {
++            this._hidePopover();
++            return;
++        }
++
++        var record = this.selectedNode.record;
++        if (!record || !record.callFrames || !record.callFrames.length) {
++            this._hidePopover();
++            return;
++        }
++
++        this._showPopoverForSelectedNodeSoon();
++    },
++
++    _windowResized: function(event)
++    {
++        if (this._popover && this._popover.visible)
++            this._updatePopoverForSelectedNode(false);
++    },
++
++    _showPopoverForSelectedNodeSoon: function()
++    {
++        if (this._showPopoverTimeout)
++            return;
++
++        function delayedWork()
++        {
++            if (!this._popover)
++                this._popover = new WebInspector.Popover;
++
++            this._updatePopoverForSelectedNode(true);
++        }
++
++        this._showPopoverTimeout = setTimeout(delayedWork.bind(this), WebInspector.OperationDataGrid.DelayedPopoverShowTimeout);
++    },
++
++    _hidePopover: function()
++    {
++        if (this._showPopoverTimeout) {
++            clearTimeout(this._showPopoverTimeout);
++            delete this._showPopoverTimeout;
++        }
++
++        if (this._popover)
++            this._popover.dismiss();
++
++        function delayedWork()
++        {
++            if (this._popoverCallStackTreeOutline)
++                this._popoverCallStackTreeOutline.removeChildren();
++        }
++
++        if (this._hidePopoverContentClearTimeout)
++            clearTimeout(this._hidePopoverContentClearTimeout);
++        this._hidePopoverContentClearTimeout = setTimeout(delayedWork.bind(this), WebInspector.OperationDataGrid.DelayedPopoverHideContentClearTimeout);
++    },
++
++    _updatePopoverForSelectedNode: function(updateContent)
++    {
++        if (!this._popover || !this.selectedNode)
++            return;
++
++        var targetPopoverElement = this.callFramePopoverAnchorElement();
++        console.assert(targetPopoverElement, "OperationDataGrid should always return a valid element from callFramePopoverAnchorElement.");
++        if (!targetPopoverElement)
++            return;
++
++        var targetFrame = WebInspector.Rect.rectFromClientRect(targetPopoverElement.getBoundingClientRect());
++
++        // The element might be hidden if it does not have a width and height.
++        if (!targetFrame.size.width && !targetFrame.size.height)
++            return;
++
++        if (this._hidePopoverContentClearTimeout) {
++            clearTimeout(this._hidePopoverContentClearTimeout);
++            delete this._hidePopoverContentClearTimeout;
++        }
++
++        if (updateContent)
++            this._popover.content = this._createPopoverContent();
++
++        this._popover.present(targetFrame.pad(2), [WebInspector.RectEdge.MAX_Y, WebInspector.RectEdge.MIN_Y, WebInspector.RectEdge.MAX_X]);
++    },
++
++    _createPopoverContent: function()
++    {
++        if (!this._popoverCallStackTreeOutline) {
++            var contentElement = document.createElement("ol");
++            contentElement.classList.add("timeline-data-grid-tree-outline");
++            this._popoverCallStackTreeOutline = new TreeOutline(contentElement);
++            this._popoverCallStackTreeOutline.onselect = this._popoverCallStackTreeElementSelected.bind(this);
++        } else
++            this._popoverCallStackTreeOutline.removeChildren();
++
++        var callFrames = this.selectedNode.record.callFrames;
++        for (var i = 0 ; i < callFrames.length; ++i) {
++            var callFrameTreeElement = new WebInspector.CallFrameTreeElement(callFrames[i]);
++            this._popoverCallStackTreeOutline.appendChild(callFrameTreeElement);
++        }
++
++        var content = document.createElement("div");
++        content.className = "timeline-data-grid-popover";
++        content.appendChild(this._popoverCallStackTreeOutline.element);
++        return content;
++    },
++
++    _popoverCallStackTreeElementSelected: function(treeElement, selectedByUser)
++    {
++        this._popover.dismiss();
++
++        console.assert(treeElement instanceof WebInspector.CallFrameTreeElement, "TreeElements in OperationDataGrid popover should always be CallFrameTreeElements");
++        var callFrame = treeElement.callFrame;
++        if (!callFrame.sourceCodeLocation)
++            return;
++
++        if (this._delegate && typeof this._delegate.operationDataGridShowSourceCodeLocation === "function")
++            this._delegate.operationDataGridShowCallFrame(callFrame);
++        else
++            WebInspector.resourceSidebarPanel.showSourceCodeLocation(callFrame.sourceCodeLocation);
++    }
++};
+diff --git a/Source/WebInspectorUI/UserInterface/Views/OperationDataGridNode.js b/Source/WebInspectorUI/UserInterface/Views/OperationDataGridNode.js
+new file mode 100644
+index 0000000..2cc14fa
+--- /dev/null
++++ b/Source/WebInspectorUI/UserInterface/Views/OperationDataGridNode.js
+@@ -0,0 +1,173 @@
++/*
++ * Copyright (C) 2015 University of Washington. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++WebInspector.OperationDataGridNode = function(operation)
++{
++    console.assert(operation instanceof WebInspector.TraceOperation, operation);
++
++    WebInspector.DataGridNode.call(this, false, null);
++
++    this._operation = operation;
++};
++
++// FIXME: Move to a WebInspector.Object subclass and we can remove this.
++WebInspector.Object.deprecatedAddConstructorFunctions(WebInspector.OperationDataGridNode);
++
++WebInspector.OperationDataGridNode.IconStyleClassName = "icon";
++WebInspector.OperationDataGridNode.SubtitleStyleClassName = "subtitle";
++
++WebInspector.OperationDataGridNode.prototype = {
++    constructor: WebInspector.OperationDataGridNode,
++    __proto__: WebInspector.DataGridNode.prototype,
++
++    // Public
++
++    get data()
++    {
++        return this._operation.record;
++    },
++
++    get operation()
++    {
++        return this._operation;
++    },
++
++    createCellContent: function(columnIdentifier, cell)
++    {
++        var value = this.data[columnIdentifier];
++        if (!value)
++            return "\u2014";
++
++        // This is copied from TimelineDataGrid. It should go in base class.
++        if (value instanceof WebInspector.SourceCodeLocation) {
++            if (value.sourceCode instanceof WebInspector.Resource) {
++                cell.classList.add(WebInspector.ResourceTreeElement.ResourceIconStyleClassName);
++                cell.classList.add(value.sourceCode.type);
++            } else if (value.sourceCode instanceof WebInspector.Script) {
++                if (value.sourceCode.url) {
++                    cell.classList.add(WebInspector.ResourceTreeElement.ResourceIconStyleClassName);
++                    cell.classList.add(WebInspector.Resource.Type.Script);
++                } else
++                    cell.classList.add(WebInspector.ScriptTreeElement.AnonymousScriptIconStyleClassName);
++            } else
++                console.error("Unknown SourceCode subclass.");
++
++            // Give the whole cell a tooltip and keep it up to date.
++            value.populateLiveDisplayLocationTooltip(cell);
++
++            var fragment = document.createDocumentFragment();
++
++            var goToArrowButtonLink = WebInspector.createSourceCodeLocationLink(value, false, true);
++            fragment.appendChild(goToArrowButtonLink);
++
++            var icon = document.createElement("div");
++            icon.className = WebInspector.ScriptTimelineDataGridNode.IconStyleClassName;
++            fragment.appendChild(icon);
++
++            var titleElement = document.createElement("span");
++            value.populateLiveDisplayLocationString(titleElement, "textContent");
++            fragment.appendChild(titleElement);
++
++            return fragment;
++        }
++
++        if (value instanceof WebInspector.CallFrame) {
++            var callFrame = value;
++
++            var isAnonymousFunction = false;
++            var functionName = callFrame.functionName;
++            if (!functionName) {
++                functionName = WebInspector.UIString("(anonymous function)");
++                isAnonymousFunction = true;
++            }
++
++            cell.classList.add(WebInspector.CallFrameTreeElement.FunctionIconStyleClassName);
++
++            var fragment = document.createDocumentFragment();
++
++            if (callFrame.sourceCodeLocation && callFrame.sourceCodeLocation.sourceCode) {
++                // Give the whole cell a tooltip and keep it up to date.
++                callFrame.sourceCodeLocation.populateLiveDisplayLocationTooltip(cell);
++
++                var goToArrowButtonLink = WebInspector.createSourceCodeLocationLink(callFrame.sourceCodeLocation, false, true);
++                fragment.appendChild(goToArrowButtonLink);
++
++                var icon = document.createElement("div");
++                icon.className = WebInspector.LayoutTimelineDataGridNode.IconStyleClassName;
++                fragment.appendChild(icon);
++
++                if (isAnonymousFunction) {
++                    // For anonymous functions we show the resource or script icon and name.
++                    if (callFrame.sourceCodeLocation.sourceCode instanceof WebInspector.Resource) {
++                        cell.classList.add(WebInspector.ResourceTreeElement.ResourceIconStyleClassName);
++                        cell.classList.add(callFrame.sourceCodeLocation.sourceCode.type);
++                    } else if (callFrame.sourceCodeLocation.sourceCode instanceof WebInspector.Script) {
++                        if (callFrame.sourceCodeLocation.sourceCode.url) {
++                            cell.classList.add(WebInspector.ResourceTreeElement.ResourceIconStyleClassName);
++                            cell.classList.add(WebInspector.Resource.Type.Script);
++                        } else
++                            cell.classList.add(WebInspector.ScriptTreeElement.AnonymousScriptIconStyleClassName);
++                    } else
++                        console.error("Unknown SourceCode subclass.");
++
++                    var titleElement = document.createElement("span");
++                    callFrame.sourceCodeLocation.populateLiveDisplayLocationString(titleElement, "textContent");
++
++                    fragment.appendChild(titleElement);
++                } else {
++                    // Show the function name and icon.
++                    cell.classList.add(WebInspector.CallFrameTreeElement.FunctionIconStyleClassName);
++
++                    fragment.appendChild(document.createTextNode(functionName));
++
++                    var subtitleElement = document.createElement("span");
++                    subtitleElement.className = WebInspector.LayoutTimelineDataGridNode.SubtitleStyleClassName;
++                    callFrame.sourceCodeLocation.populateLiveDisplayLocationString(subtitleElement, "textContent");
++
++                    fragment.appendChild(subtitleElement);
++                }
++
++                return fragment;
++            }
++
++            var icon = document.createElement("div");
++            icon.className = WebInspector.LayoutTimelineDataGridNode.IconStyleClassName;
++            fragment.appendChild(icon);
++
++            fragment.appendChild(document.createTextNode(functionName));
++
++            return fragment;
++        }
++
++        switch (columnIdentifier) {
++        case "eventType":
++            return WebInspector.TraceOperationTimelineRecord.displayNameForEventType(value);
++        case "startTime":
++            return Number.secondsToString(value, true);
++        }
++
++        return WebInspector.DataGridNode.prototype.createCellContent.call(this, columnIdentifier, cell);
++    }
++};
+-- 
+2.3.5
+

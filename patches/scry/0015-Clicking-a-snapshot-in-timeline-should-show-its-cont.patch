@@ -1,0 +1,114 @@
+From ec172695859852c59a5558dc4b6e88088cc41c32 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Thu, 5 Mar 2015 10:41:44 -0800
+Subject: [PATCH] Clicking a snapshot in timeline should show its content view.
+
+- This also changes the selection model to work like standard click/cmd-click.
+- Selections beyond the first two replace the most recent selection.
+---
+ .../Views/ElementTrackingTimelineOverviewGraph.js  | 43 ++++++++++++++++------
+ .../Views/ElementTrackingTimelineView.js           |  5 ++-
+ 2 files changed, 36 insertions(+), 12 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+index 3edcd54..d11cf3a 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+@@ -142,32 +142,53 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+ 
+     _recordStackClicked: function(event)
+     {
+         var recordStack = event.target.recordStack;
+         console.assert(recordStack instanceof WebInspector.TimelineRecordStack, recordStack);
+ 
+         // Can only select if it represents a single snapshot.
+         if (recordStack.records.length !== 1)
+             return;
+ 
++        // Don't process the selection if its tree element is not visible with current filters.
++        // FIXME: we may want to revise or delete this if it's too awkward.
+         var selectedRecord = recordStack.records[0];
++        var provisionalTreeElement = WebInspector.timelineSidebarPanel.treeElementForRepresentedObject(selectedRecord.snapshot);
++        if (!provisionalTreeElement || provisionalTreeElement.hidden)
++            return;
+ 
+         // If already selected, deselect it.
+         var foundIndex = this._selectedRecords.indexOf(selectedRecord);
+         if (foundIndex !== -1)
+             this._selectedRecords.splice(foundIndex, 1);
++        // If not a cmd-click, only select one stack.
++        else if (!WebInspector.modifierKeys.metaKey)
++            this._selectedRecords = [selectedRecord];
++        // If two stacks are already selected, replace the most recent selection.
++        else if (this._selectedRecords.length == 2)
++            this._selectedRecords.splice(1, 1, selectedRecord);
++        // This is a cmd-click that adds a second selection.
++        else
++            this._selectedRecords.push(selectedRecord);
+ 
+-        // If two stacks are already selected, start over.
+-        if (this._selectedRecords.length > 1)
+-            this._selectedRecords = [];
+-
+-        this._selectedRecords.push(selectedRecord);
+         this.needsLayout();
+ 
+-        // If one stack is selected, try to show it.
+-        if (this._selectedRecords.length === 1)
+-            return; //                                              
+-        // If two stacks are selected, request a SnapshotDiff then show it.
+-        if (this._selectedRecords.length === 2)
+-            return; //                                              
++        // Decide which views to show, if any.
++        if (!this._selectedRecords.length) {
++            var selectedTimeline = WebInspector.timelineSidebarPanel.selectedTimeline;
++            if (selectedTimeline)
++                WebInspector.timelineSidebarPanel.showTimelineViewForTimeline(selectedTimeline);
++            else
++                WebInspector.timelineSidebarPanel.showDefaultContentView();
++        } else if (this._selectedRecords.length === 1) {
++            var treeElement = WebInspector.timelineSidebarPanel.treeElementForRepresentedObject(this._selectedRecords[0].snapshot);
++            const omitFocus = true;
++            const selectedByUser = true;
++            const suppressOnSelect = false;
++            const suppressOnDeselect = false;
++            treeElement.revealAndSelect(omitFocus, selectedByUser, suppressOnSelect, suppressOnDeselect);
++        } else {
++            console.assert(this._selectedRecords.length === 2);
++            return; // TODO: request diff object, show it                                              
++        }
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js
+index 98d8355..64a3259 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js
+@@ -169,21 +169,24 @@ WebInspector.ElementTrackingTimelineView.prototype = {
+     },
+ 
+     // Private
+ 
+     _processPendingRecords: function()
+     {
+         if (!this._pendingRecords.length)
+             return;
+ 
+         for (var timelineRecord of this._pendingRecords) {
+-            var treeElement = new WebInspector.TimelineRecordTreeElement(timelineRecord, WebInspector.SourceCodeLocation.NameStyle.Short);
++            const includeTimerIdentifier = false;
++            const sourceCodeLocation = null;
++            const representedObject = timelineRecord instanceof WebInspector.ElementTrackingTimelineRecord ? timelineRecord.snapshot : timelineRecord;
++            var treeElement = new WebInspector.TimelineRecordTreeElement(timelineRecord, WebInspector.SourceCodeLocation.NameStyle.Short, includeTimerIdentifier, sourceCodeLocation, representedObject);
+             var dataGridNode = new WebInspector.ElementTrackingTimelineDataGridNode(timelineRecord, this.zeroTime);
+ 
+             this._dataGrid.addRowInSortOrder(treeElement, dataGridNode);
+         }
+ 
+         this._pendingRecords = [];
+     },
+ 
+     _elementTrackingTimelineRecordAdded: function(event)
+     {
+-- 
+2.3.5
+

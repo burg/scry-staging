@@ -1,0 +1,685 @@
+From 2e90602bdaf38d61cbee647483b65660c99cf4af Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Thu, 15 Jan 2015 13:51:04 -0800
+Subject: [PATCH] Stub out an agent for new DOMTracing domain.
+
+---
+ Source/JavaScriptCore/DerivedSources.make          |  1 +
+ .../inspector/protocol/DOMTracing.json             | 24 ++++++
+ Source/WebCore/CMakeLists.txt                      |  1 +
+ Source/WebCore/WebCore.xcodeproj/project.pbxproj   |  8 ++
+ Source/WebCore/inspector/InspectorAllInOne.cpp     |  1 +
+ Source/WebCore/inspector/InspectorController.cpp   |  3 +
+ .../WebCore/inspector/InspectorDOMTracingAgent.cpp | 97 ++++++++++++++++++++++
+ .../WebCore/inspector/InspectorDOMTracingAgent.h   | 78 +++++++++++++++++
+ .../WebCore/inspector/InspectorInstrumentation.cpp |  8 ++
+ Source/WebCore/inspector/InstrumentingAgents.cpp   |  2 +
+ Source/WebCore/inspector/InstrumentingAgents.h     |  5 ++
+ 11 files changed, 228 insertions(+)
+ create mode 100644 Source/JavaScriptCore/inspector/protocol/DOMTracing.json
+ create mode 100644 Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+ create mode 100644 Source/WebCore/inspector/InspectorDOMTracingAgent.h
+
+diff --git a/Source/JavaScriptCore/DerivedSources.make b/Source/JavaScriptCore/DerivedSources.make
+index 699ac7e..6835ee3 100644
+--- a/Source/JavaScriptCore/DerivedSources.make
++++ b/Source/JavaScriptCore/DerivedSources.make
+@@ -114,20 +114,21 @@ InitBytecodes.asm: $(JavaScriptCore)/generate-bytecode-files $(JavaScriptCore)/b
+ 
+ # Inspector interfaces
+ 
+ INSPECTOR_DOMAINS = \
+     $(JavaScriptCore)/inspector/protocol/ApplicationCache.json \
+     $(JavaScriptCore)/inspector/protocol/CSS.json \
+     $(JavaScriptCore)/inspector/protocol/Console.json \
+     $(JavaScriptCore)/inspector/protocol/DOM.json \
+     $(JavaScriptCore)/inspector/protocol/DOMDebugger.json \
+     $(JavaScriptCore)/inspector/protocol/DOMStorage.json \
++    $(JavaScriptCore)/inspector/protocol/DOMTracing.json \
+     $(JavaScriptCore)/inspector/protocol/Database.json \
+     $(JavaScriptCore)/inspector/protocol/Debugger.json \
+     $(JavaScriptCore)/inspector/protocol/GenericTypes.json \
+     $(JavaScriptCore)/inspector/protocol/Inspector.json \
+     $(JavaScriptCore)/inspector/protocol/LayerTree.json \
+     $(JavaScriptCore)/inspector/protocol/Network.json \
+     $(JavaScriptCore)/inspector/protocol/OverlayTypes.json \
+     $(JavaScriptCore)/inspector/protocol/Page.json \
+     $(JavaScriptCore)/inspector/protocol/Runtime.json \
+     $(JavaScriptCore)/inspector/protocol/Timeline.json \
+diff --git a/Source/JavaScriptCore/inspector/protocol/DOMTracing.json b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
+new file mode 100644
+index 0000000..9559dc0
+--- /dev/null
++++ b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
+@@ -0,0 +1,24 @@
++{
++    "domain": "DOMTracing",
++    "description": "DOM tracing allows working backwards from visual changes to the DOM operations that caused them.",
++    "types": [
++        {
++            "id": "DOMBreakpointType",
++            "type": "string",
++            "enum": ["subtree-modified", "attribute-modified", "node-removed"],
++            "description": "DOM breakpoint type."
++        }
++    ],
++    "commands": [
++        {
++            "name": "commandDummy",
++            "description": "Sets breakpoint on particular operation with DOM."
++        }
++     ],
++    "events": [
++        {
++            "name": "eventDummy",
++            "description": "Called when shadow root is popped from the element."
++        }
++    ]
++}
+diff --git a/Source/WebCore/CMakeLists.txt b/Source/WebCore/CMakeLists.txt
+index a690515..563a06f 100644
+--- a/Source/WebCore/CMakeLists.txt
++++ b/Source/WebCore/CMakeLists.txt
+@@ -1797,20 +1797,21 @@ set(WebCore_SOURCES
+     inspector/CommandLineAPIModule.cpp
+     inspector/DOMEditor.cpp
+     inspector/DOMPatchSupport.cpp
+     inspector/InspectorApplicationCacheAgent.cpp
+     inspector/InspectorCSSAgent.cpp
+     inspector/InspectorClient.cpp
+     inspector/InspectorController.cpp
+     inspector/InspectorDOMAgent.cpp
+     inspector/InspectorDOMDebuggerAgent.cpp
+     inspector/InspectorDOMStorageAgent.cpp
++    inspector/InspectorDOMTracingAgent.cpp
+     inspector/InspectorDatabaseAgent.cpp
+     inspector/InspectorDatabaseResource.cpp
+     inspector/InspectorFrontendClientLocal.cpp
+     inspector/InspectorFrontendHost.cpp
+     inspector/InspectorHistory.cpp
+     inspector/InspectorIndexedDBAgent.cpp
+     inspector/InspectorInstrumentation.cpp
+     inspector/InspectorInstrumentationCookie.cpp
+     inspector/InspectorLayerTreeAgent.cpp
+     inspector/InspectorNodeFinder.cpp
+diff --git a/Source/WebCore/WebCore.xcodeproj/project.pbxproj b/Source/WebCore/WebCore.xcodeproj/project.pbxproj
+index c306523..adb28cb 100644
+--- a/Source/WebCore/WebCore.xcodeproj/project.pbxproj
++++ b/Source/WebCore/WebCore.xcodeproj/project.pbxproj
+@@ -5613,20 +5613,22 @@
+ 		C348612315FDE21E007A1CC9 /* InputTypeNames.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C348612115FDE21E007A1CC9 /* InputTypeNames.cpp */; };
+ 		C348612415FDE21E007A1CC9 /* InputTypeNames.h in Headers */ = {isa = PBXBuildFile; fileRef = C348612215FDE21E007A1CC9 /* InputTypeNames.h */; };
+ 		C375D7FD16639519006184AB /* TypeAhead.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C375D7FB16639519006184AB /* TypeAhead.cpp */; };
+ 		C375D7FE16639519006184AB /* TypeAhead.h in Headers */ = {isa = PBXBuildFile; fileRef = C375D7FC16639519006184AB /* TypeAhead.h */; settings = {ATTRIBUTES = (Private, ); }; };
+ 		C37CDEBD149EF2030042090D /* ColorChooserClient.h in Headers */ = {isa = PBXBuildFile; fileRef = C37CDEBC149EF2030042090D /* ColorChooserClient.h */; settings = {ATTRIBUTES = (Private, ); }; };
+ 		C3CF17A415B0063F00276D39 /* IdTargetObserver.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C3CF17A015B0063F00276D39 /* IdTargetObserver.cpp */; };
+ 		C3CF17A515B0063F00276D39 /* IdTargetObserver.h in Headers */ = {isa = PBXBuildFile; fileRef = C3CF17A115B0063F00276D39 /* IdTargetObserver.h */; settings = {ATTRIBUTES = (Private, ); }; };
+ 		C3CF17A615B0063F00276D39 /* IdTargetObserverRegistry.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C3CF17A215B0063F00276D39 /* IdTargetObserverRegistry.cpp */; };
+ 		C3CF17A715B0063F00276D39 /* IdTargetObserverRegistry.h in Headers */ = {isa = PBXBuildFile; fileRef = C3CF17A315B0063F00276D39 /* IdTargetObserverRegistry.h */; settings = {ATTRIBUTES = (Private, ); }; };
+ 		C400D10918F1C8F60090D863 /* EventLoopInput.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C400D10818F1C8F60090D863 /* EventLoopInput.cpp */; };
++		C4948B2B1AA1103B00FFCB25 /* InspectorDOMTracingAgent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C46871B81A67220B00860C87 /* InspectorDOMTracingAgent.cpp */; };
++		C4948B2C1AA1103F00FFCB25 /* InspectorDOMTracingAgent.h in Headers */ = {isa = PBXBuildFile; fileRef = C46871B91A67220B00860C87 /* InspectorDOMTracingAgent.h */; };
+ 		C4CD629A18383766007EBAF1 /* FrameSnapshotting.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C4CD629818383766007EBAF1 /* FrameSnapshotting.cpp */; };
+ 		C4CD629B18383766007EBAF1 /* FrameSnapshotting.h in Headers */ = {isa = PBXBuildFile; fileRef = C4CD629918383766007EBAF1 /* FrameSnapshotting.h */; settings = {ATTRIBUTES = (Private, ); }; };
+ 		C4E657F21A97F7A700479C15 /* InspectorCSSId.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F11A97F7A700479C15 /* InspectorCSSId.h */; };
+ 		C4E657FA1A97FBED00479C15 /* InspectorInlineStyleRuleSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C4E657F31A97FBED00479C15 /* InspectorInlineStyleRuleSet.cpp */; };
+ 		C4E657FB1A97FBED00479C15 /* InspectorInlineStyleRuleSet.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F41A97FBED00479C15 /* InspectorInlineStyleRuleSet.h */; };
+ 		C4E657FC1A97FBED00479C15 /* InspectorStyleRule.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F51A97FBED00479C15 /* InspectorStyleRule.h */; };
+ 		C4E657FD1A97FBED00479C15 /* InspectorStyleProperty.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F61A97FBED00479C15 /* InspectorStyleProperty.h */; };
+ 		C4E657FE1A97FBED00479C15 /* InspectorStyleRuleSet.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F71A97FBED00479C15 /* InspectorStyleRuleSet.h */; };
+ 		C4E657FF1A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C4E657F81A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp */; };
+ 		C4E658001A97FBED00479C15 /* InspectorStylesheetRuleSet.h in Headers */ = {isa = PBXBuildFile; fileRef = C4E657F91A97FBED00479C15 /* InspectorStylesheetRuleSet.h */; };
+@@ -13146,20 +13148,22 @@
+ 		C348612215FDE21E007A1CC9 /* InputTypeNames.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InputTypeNames.h; sourceTree = "<group>"; };
+ 		C375D7FB16639519006184AB /* TypeAhead.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = TypeAhead.cpp; sourceTree = "<group>"; };
+ 		C375D7FC16639519006184AB /* TypeAhead.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TypeAhead.h; sourceTree = "<group>"; };
+ 		C37CDEBC149EF2030042090D /* ColorChooserClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ColorChooserClient.h; sourceTree = "<group>"; };
+ 		C3CF17A015B0063F00276D39 /* IdTargetObserver.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = IdTargetObserver.cpp; sourceTree = "<group>"; };
+ 		C3CF17A115B0063F00276D39 /* IdTargetObserver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IdTargetObserver.h; sourceTree = "<group>"; };
+ 		C3CF17A215B0063F00276D39 /* IdTargetObserverRegistry.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = IdTargetObserverRegistry.cpp; sourceTree = "<group>"; };
+ 		C3CF17A315B0063F00276D39 /* IdTargetObserverRegistry.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = IdTargetObserverRegistry.h; sourceTree = "<group>"; };
+ 		C3E61C653A64807A83E76FB8 /* MathMLMencloseElement.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MathMLMencloseElement.cpp; sourceTree = "<group>"; };
+ 		C400D10818F1C8F60090D863 /* EventLoopInput.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = EventLoopInput.cpp; sourceTree = "<group>"; };
++		C46871B81A67220B00860C87 /* InspectorDOMTracingAgent.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = InspectorDOMTracingAgent.cpp; sourceTree = "<group>"; };
++		C46871B91A67220B00860C87 /* InspectorDOMTracingAgent.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorDOMTracingAgent.h; sourceTree = "<group>"; };
+ 		C4CD629818383766007EBAF1 /* FrameSnapshotting.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = FrameSnapshotting.cpp; sourceTree = "<group>"; };
+ 		C4CD629918383766007EBAF1 /* FrameSnapshotting.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FrameSnapshotting.h; sourceTree = "<group>"; };
+ 		C4E657F11A97F7A700479C15 /* InspectorCSSId.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorCSSId.h; sourceTree = "<group>"; };
+ 		C4E657F31A97FBED00479C15 /* InspectorInlineStyleRuleSet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = InspectorInlineStyleRuleSet.cpp; sourceTree = "<group>"; };
+ 		C4E657F41A97FBED00479C15 /* InspectorInlineStyleRuleSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorInlineStyleRuleSet.h; sourceTree = "<group>"; };
+ 		C4E657F51A97FBED00479C15 /* InspectorStyleRule.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStyleRule.h; sourceTree = "<group>"; };
+ 		C4E657F61A97FBED00479C15 /* InspectorStyleProperty.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStyleProperty.h; sourceTree = "<group>"; };
+ 		C4E657F71A97FBED00479C15 /* InspectorStyleRuleSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStyleRuleSet.h; sourceTree = "<group>"; };
+ 		C4E657F81A97FBED00479C15 /* InspectorStylesheetRuleSet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = InspectorStylesheetRuleSet.cpp; sourceTree = "<group>"; };
+ 		C4E657F91A97FBED00479C15 /* InspectorStylesheetRuleSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InspectorStylesheetRuleSet.h; sourceTree = "<group>"; };
+@@ -15419,20 +15423,22 @@
+ 				7AB0B1BF1211A62200A76940 /* InspectorDatabaseAgent.h */,
+ 				F3F5CF1212ED81B30084C569 /* InspectorDatabaseInstrumentation.h */,
+ 				41F062130F5F192600A07EAC /* InspectorDatabaseResource.cpp */,
+ 				41F062120F5F192600A07EAC /* InspectorDatabaseResource.h */,
+ 				7A2458791021EAF4000A00AA /* InspectorDOMAgent.cpp */,
+ 				7A24587A1021EAF4000A00AA /* InspectorDOMAgent.h */,
+ 				F3D4C47612E07663003DA150 /* InspectorDOMDebuggerAgent.cpp */,
+ 				F3D4C47712E07663003DA150 /* InspectorDOMDebuggerAgent.h */,
+ 				7A74ECB8101839A500BF939E /* InspectorDOMStorageAgent.cpp */,
+ 				7A74ECB9101839A600BF939E /* InspectorDOMStorageAgent.h */,
++				C46871B81A67220B00860C87 /* InspectorDOMTracingAgent.cpp */,
++				C46871B91A67220B00860C87 /* InspectorDOMTracingAgent.h */,
+ 				2277775F1345DEA9008EA455 /* InspectorForwarding.h */,
+ 				F344C7121125B82C00F26EEE /* InspectorFrontendClient.h */,
+ 				F344C75711294FF600F26EEE /* InspectorFrontendClientLocal.cpp */,
+ 				F344C75211294D9D00F26EEE /* InspectorFrontendClientLocal.h */,
+ 				7A0E770B10C00A8800A0276E /* InspectorFrontendHost.cpp */,
+ 				7A0E770C10C00A8800A0276E /* InspectorFrontendHost.h */,
+ 				7A0E770D10C00A8800A0276E /* InspectorFrontendHost.idl */,
+ 				7A54857D14E02D51006AE05A /* InspectorHistory.cpp */,
+ 				7A54857E14E02D51006AE05A /* InspectorHistory.h */,
+ 				7ACD88D114C08BD60084EDD2 /* InspectorIndexedDBAgent.cpp */,
+@@ -24890,20 +24896,21 @@
+ 				A871DB250A150BD600B12A68 /* HTMLTableSectionElement.h in Headers */,
+ 				D66817FB166FE6D700FA07B4 /* HTMLTemplateElement.h in Headers */,
+ 				A81369D6097374F600D74463 /* HTMLTextAreaElement.h in Headers */,
+ 				9BC6C21B13CCC97B008E0337 /* HTMLTextFormControlElement.h in Headers */,
+ 				A871DC280A15205700B12A68 /* HTMLTitleElement.h in Headers */,
+ 				977B3878122883E900B81FF8 /* HTMLTokenizer.h in Headers */,
+ 				0707568C142262D600414161 /* HTMLTrackElement.h in Headers */,
+ 				5CD9F5661AA0F73C00DA45FF /* DFABytecode.h in Headers */,
+ 				977B37261228721700B81FF8 /* HTMLTreeBuilder.h in Headers */,
+ 				A8EA79F20A1916DF00A8EF5F /* HTMLUListElement.h in Headers */,
++				C4948B2C1AA1103F00FFCB25 /* InspectorDOMTracingAgent.h in Headers */,
+ 				AD49914318F0815100BF0092 /* HTMLUnknownElement.h in Headers */,
+ 				E44613AB0CD6331000FADA75 /* HTMLVideoElement.h in Headers */,
+ 				839AAFED1A0C0C8D00605F99 /* HTMLWBRElement.h in Headers */,
+ 				514C76710CE923A1007EF3CD /* HTTPHeaderMap.h in Headers */,
+ 				1AB5EBD2194A50F30059AC70 /* HTTPHeaderNames.h in Headers */,
+ 				514C76730CE923A1007EF3CD /* HTTPParsers.h in Headers */,
+ 				375CD232119D43C800A2A859 /* Hyphenation.h in Headers */,
+ 				862F12A018C1DD02005C54AF /* HysteresisActivity.h in Headers */,
+ 				B275356E0B053814002CE64F /* Icon.h in Headers */,
+ 				97E4029013A696ED00913D67 /* IconController.h in Headers */,
+@@ -29598,20 +29605,21 @@
+ 				3571883EEF618793751E4089 /* RenderMathMLMenclose.cpp in Sources */,
+ 				439046DF12DA25E800AF80A2 /* RenderMathMLOperator.cpp in Sources */,
+ 				439046DF12DA25E800BF80A3 /* RenderMathMLRadicalOperator.cpp in Sources */,
+ 				439046E112DA25E800AF80A2 /* RenderMathMLRoot.cpp in Sources */,
+ 				439046E312DA25E800AF80A2 /* RenderMathMLRow.cpp in Sources */,
+ 				439046E712DA25E800AF80A2 /* RenderMathMLScripts.cpp in Sources */,
+ 				5B7A208D2E12979B4AE19DE6 /* RenderMathMLSpace.cpp in Sources */,
+ 				439046E512DA25E800AF80A2 /* RenderMathMLSquareRoot.cpp in Sources */,
+ 				439046EB12DA25E800AF80A9 /* RenderMathMLToken.cpp in Sources */,
+ 				439046E912DA25E800AF80A2 /* RenderMathMLUnderOver.cpp in Sources */,
++				C4948B2B1AA1103B00FFCB25 /* InspectorDOMTracingAgent.cpp in Sources */,
+ 				E4C279580CF9741900E97B98 /* RenderMedia.cpp in Sources */,
+ 				DE49B309165F2FE10010338D /* RenderMediaControlElements.cpp in Sources */,
+ 				41FA303E1316C29C00C0BFC5 /* RenderMediaControls.cpp in Sources */,
+ 				ABDDFE790A5C6E7000A3E11D /* RenderMenuList.cpp in Sources */,
+ 				A454424E119B3687009BE912 /* RenderMeter.cpp in Sources */,
+ 				1A3586DF15264C450022A659 /* RenderMultiColumnFlowThread.cpp in Sources */,
+ 				BCE32B9E1517C22700F542EC /* RenderMultiColumnSet.cpp in Sources */,
+ 				E43AF8E61AC5B7E800CA717E /* CacheValidation.cpp in Sources */,
+ 				BC1A7D9718FCB5B000421879 /* RenderMultiColumnSpannerPlaceholder.cpp in Sources */,
+ 				8AC822FC180FC03300FB64D5 /* RenderNamedFlowFragment.cpp in Sources */,
+diff --git a/Source/WebCore/inspector/InspectorAllInOne.cpp b/Source/WebCore/inspector/InspectorAllInOne.cpp
+index a2a266c..e848d31 100644
+--- a/Source/WebCore/inspector/InspectorAllInOne.cpp
++++ b/Source/WebCore/inspector/InspectorAllInOne.cpp
+@@ -29,20 +29,21 @@
+ #include "CommandLineAPIModule.cpp"
+ #include "DOMEditor.cpp"
+ #include "DOMPatchSupport.cpp"
+ #include "InspectorApplicationCacheAgent.cpp"
+ #include "InspectorCSSAgent.cpp"
+ #include "InspectorClient.cpp"
+ #include "InspectorController.cpp"
+ #include "InspectorDOMAgent.cpp"
+ #include "InspectorDOMDebuggerAgent.cpp"
+ #include "InspectorDOMStorageAgent.cpp"
++#include "InspectorDOMTracingAgent.cpp"
+ #include "InspectorDatabaseAgent.cpp"
+ #include "InspectorDatabaseResource.cpp"
+ #include "InspectorFrontendClientLocal.cpp"
+ #include "InspectorFrontendHost.cpp"
+ #include "InspectorHistory.cpp"
+ #include "InspectorIndexedDBAgent.cpp"
+ #include "InspectorInstrumentation.cpp"
+ #include "InspectorInstrumentationCookie.cpp"
+ #include "InspectorLayerTreeAgent.cpp"
+ #include "InspectorNodeFinder.cpp"
+diff --git a/Source/WebCore/inspector/InspectorController.cpp b/Source/WebCore/inspector/InspectorController.cpp
+index a19ba4a..7289d24 100644
+--- a/Source/WebCore/inspector/InspectorController.cpp
++++ b/Source/WebCore/inspector/InspectorController.cpp
+@@ -34,20 +34,21 @@
+ 
+ #include "CommandLineAPIHost.h"
+ #include "DOMWrapperWorld.h"
+ #include "GraphicsContext.h"
+ #include "InspectorApplicationCacheAgent.h"
+ #include "InspectorCSSAgent.h"
+ #include "InspectorClient.h"
+ #include "InspectorDOMAgent.h"
+ #include "InspectorDOMDebuggerAgent.h"
+ #include "InspectorDOMStorageAgent.h"
++#include "InspectorDOMTracingAgent.h"
+ #include "InspectorDatabaseAgent.h"
+ #include "InspectorFrontendClient.h"
+ #include "InspectorIndexedDBAgent.h"
+ #include "InspectorInstrumentation.h"
+ #include "InspectorLayerTreeAgent.h"
+ #include "InspectorPageAgent.h"
+ #include "InspectorReplayAgent.h"
+ #include "InspectorResourceAgent.h"
+ #include "InspectorTimelineAgent.h"
+ #include "InspectorWorkerAgent.h"
+@@ -129,20 +130,22 @@ InspectorController::InspectorController(Page& page, InspectorClient* inspectorC
+ #endif
+ 
+ #if ENABLE(WEB_REPLAY)
+     m_agents.append(std::make_unique<InspectorReplayAgent>(m_instrumentingAgents.get(), pageAgent));
+ #endif
+ 
+     auto domStorageAgentPtr = std::make_unique<InspectorDOMStorageAgent>(m_instrumentingAgents.get(), m_pageAgent);
+     InspectorDOMStorageAgent* domStorageAgent = domStorageAgentPtr.get();
+     m_agents.append(WTF::move(domStorageAgentPtr));
+ 
++    m_agents.append(std::make_unique<DOMTracingAgent>(m_instrumentingAgents.get()));
++
+     auto timelineAgentPtr = std::make_unique<InspectorTimelineAgent>(m_instrumentingAgents.get(), pageAgent, InspectorTimelineAgent::PageInspector, inspectorClient);
+     m_timelineAgent = timelineAgentPtr.get();
+     m_agents.append(WTF::move(timelineAgentPtr));
+ 
+     auto resourceAgentPtr = std::make_unique<InspectorResourceAgent>(m_instrumentingAgents.get(), pageAgent, inspectorClient);
+     m_resourceAgent = resourceAgentPtr.get();
+     m_agents.append(WTF::move(resourceAgentPtr));
+ 
+     auto consoleAgentPtr = std::make_unique<PageConsoleAgent>(m_injectedScriptManager.get(), m_domAgent);
+     WebConsoleAgent* consoleAgent = consoleAgentPtr.get();
+diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+new file mode 100644
+index 0000000..766c8db
+--- /dev/null
++++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+@@ -0,0 +1,97 @@
++/*
++ * Copyright (C) 2015 University of Washington. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1.  Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ * 2.  Redistributions in binary form must reproduce the above copyright
++ *     notice, this list of conditions and the following disclaimer in the
++ *     documentation and/or other materials provided with the distribution.
++ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
++ *     its contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
++ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED. IN NO EVENT SHALL APPLE OR ITS CONTRIBUTORS BE LIABLE FOR ANY
++ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
++ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include "config.h"
++
++#include "InspectorDOMTracingAgent.h"
++
++#include "Element.h"
++#include "InstrumentingAgents.h"
++#include "MainFrame.h"
++#include "Node.h"
++#include <inspector/InspectorFrontendChannel.h>
++
++using namespace WebCore;
++
++namespace Inspector {
++
++DOMTracingAgent::DOMTracingAgent(InstrumentingAgents* instrumentingAgents)
++    : InspectorAgentBase(ASCIILiteral("DOMTracing"), instrumentingAgents)
++{
++}
++
++DOMTracingAgent::~DOMTracingAgent()
++{
++}
++
++void DOMTracingAgent::didCreateFrontendAndBackend(FrontendChannel* frontendChannel, BackendDispatcher* backendDispatcher)
++{
++    m_frontendDispatcher = std::make_unique<DOMTracingFrontendDispatcher>(frontendChannel);
++    m_backendDispatcher = DOMTracingBackendDispatcher::create(backendDispatcher, this);
++
++    m_instrumentingAgents->setDOMTracingAgent(this);
++}
++
++void DOMTracingAgent::willDestroyFrontendAndBackend(DisconnectReason)
++{
++    m_frontendDispatcher = nullptr;
++    m_backendDispatcher.clear();
++
++    m_instrumentingAgents->setDOMTracingAgent(nullptr);
++}
++
++void DOMTracingAgent::didInsertDOMNode(Node& node)
++{
++    if (!m_nodeIdMap.contains(&node))
++        m_nodeIdMap.set(&node, m_nextNodeId++);
++}
++
++void DOMTracingAgent::didRemoveDOMNode(Node&)
++{
++}
++
++void DOMTracingAgent::frameNavigated(Frame& frame)
++{
++    if (!frame.isMainFrame())
++        return;
++
++    resetCounters();
++}
++
++// Methods called from the frontend.
++void DOMTracingAgent::commandDummy(ErrorString&)
++{
++}
++
++void DOMTracingAgent::resetCounters()
++{
++    m_nodeIdMap.clear();
++    m_nextNodeId = 1;
++}
++
++} // namespace Inspector
+diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.h b/Source/WebCore/inspector/InspectorDOMTracingAgent.h
+new file mode 100644
+index 0000000..dbf0429
+--- /dev/null
++++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.h
+@@ -0,0 +1,78 @@
++/*
++ * Copyright (C) 2015 University of Washington. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1.  Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ * 2.  Redistributions in binary form must reproduce the above copyright
++ *     notice, this list of conditions and the following disclaimer in the
++ *     documentation and/or other materials provided with the distribution.
++ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
++ *     its contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
++ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED. IN NO EVENT SHALL APPLE OR ITS CONTRIBUTORS BE LIABLE FOR ANY
++ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
++ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#ifndef InspectorDOMTracingAgent_h
++#define InspectorDOMTracingAgent_h
++
++#include "InspectorWebAgentBase.h"
++#include <inspector/InspectorBackendDispatchers.h>
++#include <inspector/InspectorFrontendDispatchers.h>
++#include <wtf/Forward.h>
++
++namespace WebCore {
++class CharacterData;
++class Document;
++class Element;
++class Frame;
++class Node;
++}
++
++namespace Inspector {
++
++class DOMTracingAgent final : public WebCore::InspectorAgentBase
++                            , public DOMTracingBackendDispatcherHandler {
++    WTF_MAKE_NONCOPYABLE(DOMTracingAgent);
++    WTF_MAKE_FAST_ALLOCATED;
++public:
++    DOMTracingAgent(WebCore::InstrumentingAgents*);
++    virtual ~DOMTracingAgent();
++
++    virtual void didCreateFrontendAndBackend(FrontendChannel*, BackendDispatcher*) override;
++    virtual void willDestroyFrontendAndBackend(DisconnectReason) override;
++
++    // Methods called from the frontend.
++    virtual void commandDummy(Inspector::ErrorString&) override;
++
++    // InspectorInstrumentation callbacks.
++    void didInsertDOMNode(WebCore::Node&);
++    void didRemoveDOMNode(WebCore::Node&);
++    void frameNavigated(WebCore::Frame&);
++
++private:
++    void resetCounters();
++    std::unique_ptr<DOMTracingFrontendDispatcher> m_frontendDispatcher;
++
++    RefPtr<DOMTracingBackendDispatcher> m_backendDispatcher;
++
++    HashMap<WebCore::Node*, uint64_t> m_nodeIdMap;
++    uint64_t m_nextNodeId {1};
++};
++
++} // namespace Inspector
++
++#endif // !defined(InspectorDOMTracingAgent_h)
+diff --git a/Source/WebCore/inspector/InspectorInstrumentation.cpp b/Source/WebCore/inspector/InspectorInstrumentation.cpp
+index e60f0d6..db58876 100644
+--- a/Source/WebCore/inspector/InspectorInstrumentation.cpp
++++ b/Source/WebCore/inspector/InspectorInstrumentation.cpp
+@@ -39,20 +39,21 @@
+ #include "Database.h"
+ #include "DocumentLoader.h"
+ #include "Event.h"
+ #include "EventDispatcher.h"
+ #include "InspectorApplicationCacheAgent.h"
+ #include "InspectorController.h"
+ #include "InspectorCSSAgent.h"
+ #include "InspectorDOMAgent.h"
+ #include "InspectorDOMDebuggerAgent.h"
+ #include "InspectorDOMStorageAgent.h"
++#include "InspectorDOMTracingAgent.h"
+ #include "InspectorDatabaseAgent.h"
+ #include "InspectorLayerTreeAgent.h"
+ #include "InspectorPageAgent.h"
+ #include "InspectorResourceAgent.h"
+ #include "InspectorTimelineAgent.h"
+ #include "InspectorWorkerAgent.h"
+ #include "InstrumentingAgents.h"
+ #include "MainFrame.h"
+ #include "PageDebuggerAgent.h"
+ #include "PageRuntimeAgent.h"
+@@ -133,34 +134,38 @@ void InspectorInstrumentation::willInsertDOMNodeImpl(InstrumentingAgents& instru
+     if (InspectorDOMDebuggerAgent* domDebuggerAgent = instrumentingAgents.inspectorDOMDebuggerAgent())
+         domDebuggerAgent->willInsertDOMNode(parent);
+ }
+ 
+ void InspectorInstrumentation::didInsertDOMNodeImpl(InstrumentingAgents& instrumentingAgents, Node& node)
+ {
+     if (InspectorDOMAgent* domAgent = instrumentingAgents.inspectorDOMAgent())
+         domAgent->didInsertDOMNode(node);
+     if (InspectorDOMDebuggerAgent* domDebuggerAgent = instrumentingAgents.inspectorDOMDebuggerAgent())
+         domDebuggerAgent->didInsertDOMNode(node);
++    if (DOMTracingAgent* domTracingAgent = instrumentingAgents.domTracingAgent())
++        domTracingAgent->didInsertDOMNode(node);
+ }
+ 
+ void InspectorInstrumentation::willRemoveDOMNodeImpl(InstrumentingAgents& instrumentingAgents, Node& node)
+ {
+     if (InspectorDOMDebuggerAgent* domDebuggerAgent = instrumentingAgents.inspectorDOMDebuggerAgent())
+         domDebuggerAgent->willRemoveDOMNode(node);
+ }
+ 
+ void InspectorInstrumentation::didRemoveDOMNodeImpl(InstrumentingAgents& instrumentingAgents, Node& node)
+ {
+     if (InspectorDOMDebuggerAgent* domDebuggerAgent = instrumentingAgents.inspectorDOMDebuggerAgent())
+         domDebuggerAgent->didRemoveDOMNode(node);
+     if (InspectorDOMAgent* domAgent = instrumentingAgents.inspectorDOMAgent())
+         domAgent->didRemoveDOMNode(node);
++    if (DOMTracingAgent* domTracingAgent = instrumentingAgents.domTracingAgent())
++        domTracingAgent->didRemoveDOMNode(node);
+ }
+ 
+ void InspectorInstrumentation::willModifyDOMAttrImpl(InstrumentingAgents& instrumentingAgents, Element& element, const AtomicString& oldValue, const AtomicString& newValue)
+ {
+     if (InspectorDOMDebuggerAgent* domDebuggerAgent = instrumentingAgents.inspectorDOMDebuggerAgent())
+         domDebuggerAgent->willModifyDOMAttr(element);
+     if (InspectorDOMAgent* domAgent = instrumentingAgents.inspectorDOMAgent())
+         domAgent->willModifyDOMAttr(element, oldValue, newValue);
+ }
+ 
+@@ -758,20 +763,23 @@ void InspectorInstrumentation::didCommitLoadImpl(InstrumentingAgents& instrument
+         if (InspectorDOMAgent* domAgent = instrumentingAgents.inspectorDOMAgent())
+             domAgent->setDocument(page->mainFrame().document());
+ 
+         if (InspectorLayerTreeAgent* layerTreeAgent = instrumentingAgents.inspectorLayerTreeAgent())
+             layerTreeAgent->reset();
+     }
+ 
+     if (InspectorDOMAgent* domAgent = instrumentingAgents.inspectorDOMAgent())
+         domAgent->didCommitLoad(loader->frame()->document());
+ 
++    if (DOMTracingAgent* domTracingAgent = instrumentingAgents.domTracingAgent())
++        domTracingAgent->frameNavigated(*loader->frame());
++
+     if (InspectorPageAgent* pageAgent = instrumentingAgents.inspectorPageAgent())
+         pageAgent->frameNavigated(loader);
+ 
+ #if ENABLE(WEB_REPLAY)
+     if (InspectorReplayAgent* replayAgent = instrumentingAgents.inspectorReplayAgent())
+         replayAgent->frameNavigated(loader);
+ #endif
+ }
+ 
+ void InspectorInstrumentation::frameDocumentUpdatedImpl(InstrumentingAgents& instrumentingAgents, Frame* frame)
+diff --git a/Source/WebCore/inspector/InstrumentingAgents.cpp b/Source/WebCore/inspector/InstrumentingAgents.cpp
+index ec04642..b4387ce 100644
+--- a/Source/WebCore/inspector/InstrumentingAgents.cpp
++++ b/Source/WebCore/inspector/InstrumentingAgents.cpp
+@@ -57,20 +57,21 @@ InstrumentingAgents::InstrumentingAgents(InspectorEnvironment& environment)
+     , m_persistentInspectorTimelineAgent(nullptr)
+     , m_inspectorDOMStorageAgent(nullptr)
+ #if ENABLE(WEB_REPLAY)
+     , m_inspectorReplayAgent(nullptr)
+ #endif
+     , m_inspectorDatabaseAgent(nullptr)
+     , m_inspectorApplicationCacheAgent(nullptr)
+     , m_inspectorDebuggerAgent(nullptr)
+     , m_pageDebuggerAgent(nullptr)
+     , m_inspectorDOMDebuggerAgent(nullptr)
++    , m_domTracingAgent(nullptr)
+     , m_inspectorWorkerAgent(nullptr)
+ {
+ }
+ 
+ void InstrumentingAgents::reset()
+ {
+     m_inspectorAgent = nullptr;
+     m_inspectorPageAgent = nullptr;
+     m_inspectorCSSAgent = nullptr;
+     m_inspectorLayerTreeAgent = nullptr;
+@@ -83,14 +84,15 @@ void InstrumentingAgents::reset()
+     m_persistentInspectorTimelineAgent = nullptr;
+     m_inspectorDOMStorageAgent = nullptr;
+ #if ENABLE(WEB_REPLAY)
+     m_inspectorReplayAgent = nullptr;
+ #endif
+     m_inspectorDatabaseAgent = nullptr;
+     m_inspectorApplicationCacheAgent = nullptr;
+     m_inspectorDebuggerAgent = nullptr;
+     m_pageDebuggerAgent = nullptr;
+     m_inspectorDOMDebuggerAgent = nullptr;
++    m_domTracingAgent = nullptr;
+     m_inspectorWorkerAgent = nullptr;
+ }
+ 
+ } // namespace WebCore
+diff --git a/Source/WebCore/inspector/InstrumentingAgents.h b/Source/WebCore/inspector/InstrumentingAgents.h
+index f91a685..37f6efb 100644
+--- a/Source/WebCore/inspector/InstrumentingAgents.h
++++ b/Source/WebCore/inspector/InstrumentingAgents.h
+@@ -32,20 +32,21 @@
+ #ifndef InstrumentingAgents_h
+ #define InstrumentingAgents_h
+ 
+ #include <inspector/InspectorEnvironment.h>
+ #include <wtf/FastMalloc.h>
+ #include <wtf/Noncopyable.h>
+ #include <wtf/PassRefPtr.h>
+ #include <wtf/RefCounted.h>
+ 
+ namespace Inspector {
++class DOMTracingAgent;
+ class InspectorAgent;
+ class InspectorDebuggerAgent;
+ }
+ 
+ namespace WebCore {
+ 
+ class InspectorApplicationCacheAgent;
+ class InspectorCSSAgent;
+ class InspectorDOMAgent;
+ class InspectorDOMDebuggerAgent;
+@@ -123,20 +124,23 @@ public:
+ 
+     Inspector::InspectorDebuggerAgent* inspectorDebuggerAgent() const { return m_inspectorDebuggerAgent; }
+     void setInspectorDebuggerAgent(Inspector::InspectorDebuggerAgent* agent) { m_inspectorDebuggerAgent = agent; }
+ 
+     PageDebuggerAgent* pageDebuggerAgent() const { return m_pageDebuggerAgent; }
+     void setPageDebuggerAgent(PageDebuggerAgent* agent) { m_pageDebuggerAgent = agent; }
+ 
+     InspectorDOMDebuggerAgent* inspectorDOMDebuggerAgent() const { return m_inspectorDOMDebuggerAgent; }
+     void setInspectorDOMDebuggerAgent(InspectorDOMDebuggerAgent* agent) { m_inspectorDOMDebuggerAgent = agent; }
+ 
++    Inspector::DOMTracingAgent* domTracingAgent() const { return m_domTracingAgent; }
++    void setDOMTracingAgent(Inspector::DOMTracingAgent* agent) { m_domTracingAgent = agent; }
++
+     InspectorWorkerAgent* inspectorWorkerAgent() const { return m_inspectorWorkerAgent; }
+     void setInspectorWorkerAgent(InspectorWorkerAgent* agent) { m_inspectorWorkerAgent = agent; }
+ 
+     InspectorLayerTreeAgent* inspectorLayerTreeAgent() const { return m_inspectorLayerTreeAgent; }
+     void setInspectorLayerTreeAgent(InspectorLayerTreeAgent* agent) { m_inspectorLayerTreeAgent = agent; }
+ 
+ private:
+     InstrumentingAgents(Inspector::InspectorEnvironment&);
+ 
+     Inspector::InspectorEnvironment& m_environment;
+@@ -154,16 +158,17 @@ private:
+     InspectorTimelineAgent* m_persistentInspectorTimelineAgent;
+     InspectorDOMStorageAgent* m_inspectorDOMStorageAgent;
+ #if ENABLE(WEB_REPLAY)
+     InspectorReplayAgent* m_inspectorReplayAgent;
+ #endif
+     InspectorDatabaseAgent* m_inspectorDatabaseAgent;
+     InspectorApplicationCacheAgent* m_inspectorApplicationCacheAgent;
+     Inspector::InspectorDebuggerAgent* m_inspectorDebuggerAgent;
+     PageDebuggerAgent* m_pageDebuggerAgent;
+     InspectorDOMDebuggerAgent* m_inspectorDOMDebuggerAgent;
++    Inspector::DOMTracingAgent* m_domTracingAgent;
+     InspectorWorkerAgent* m_inspectorWorkerAgent;
+ };
+ 
+ }
+ 
+ #endif // !defined(InstrumentingAgents_h)
+-- 
+2.3.5
+

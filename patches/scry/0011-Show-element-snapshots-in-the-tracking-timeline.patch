@@ -1,0 +1,228 @@
+From b2fcf71a97bb39d8e2625eb345211ff8d1f0d846 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Tue, 3 Mar 2015 11:22:41 -0800
+Subject: [PATCH] Show element snapshots in the tracking timeline.
+
+---
+ .../Views/ElementTrackingTimelineOverviewGraph.js  | 18 +++++++++++++++-
+ .../UserInterface/Views/TimelineRecordStack.css    | 21 +++++++++++++++----
+ .../UserInterface/Views/TimelineRecordStack.js     | 24 +++++++++++++++++++++-
+ 3 files changed, 57 insertions(+), 6 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+index c2f7a2b..3edcd54 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+@@ -103,20 +103,28 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+             if (!stack.element.parentNode)
+                 this.element.appendChild(stack.element);
+ 
+             if (records.length !== 1)
+                 stack.selected = false;
+             else if (this._selectedRecords.indexOf(records[0]) !== -1)
+                 stack.selected = true;
+             else
+                 stack.selected = false;
+ 
++            if (records.length) {
++                var snapshot = records[0].snapshot;
++                console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
++                snapshot.fetchImageData().then(function(contentURL) {
++                    stack.previewContentURL = contentURL;
++                });
++            }
++
+             ++stackIndex;
+         }
+ 
+         WebInspector.TimelineRecordStack.createStacksForVisibleRecords(this.representedObject.snapshotRecords, secondsPerPixel, this, createStack.bind(this));
+         // Neuter any remaining objects not used in this layout iteration.
+         for (; stackIndex < this._timelineRecordStacks.length; ++stackIndex)
+             this._timelineRecordStacks[stackIndex].records = null;
+     },
+ 
+     // Private
+@@ -136,22 +144,30 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+     {
+         var recordStack = event.target.recordStack;
+         console.assert(recordStack instanceof WebInspector.TimelineRecordStack, recordStack);
+ 
+         // Can only select if it represents a single snapshot.
+         if (recordStack.records.length !== 1)
+             return;
+ 
+         var selectedRecord = recordStack.records[0];
+ 
++        // If already selected, deselect it.
+         var foundIndex = this._selectedRecords.indexOf(selectedRecord);
+         if (foundIndex !== -1)
+             this._selectedRecords.splice(foundIndex, 1);
+ 
++        // If two stacks are already selected, start over.
+         if (this._selectedRecords.length > 1)
+             this._selectedRecords = [];
+ 
+         this._selectedRecords.push(selectedRecord);
+-
+         this.needsLayout();
++
++        // If one stack is selected, try to show it.
++        if (this._selectedRecords.length === 1)
++            return; //                                              
++        // If two stacks are selected, request a SnapshotDiff then show it.
++        if (this._selectedRecords.length === 2)
++            return; //                                              
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
+index a015df1..1cbd749 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
+@@ -20,36 +20,49 @@
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ .timeline-record-stack {
+     position: absolute;
+     height: 36px;
+-    background-color: rgba(200, 200, 200, 0.8);
+     z-index: 10;
+     min-width: 48px;
+-    border-left: 1px solid rgb(200, 200, 200);
+-    border-right: 1px solid rgb(200, 200, 200);
++    border-left: 2px solid transparent;
++    border-right: 2px solid transparent;
++
++    /* Make a checkered background for transparent colors to show against. */
++    background-image: url(../Images/Checkers.svg);
++    background-color: rgba(230, 230, 230, 0.5);
++    background-repeat: repeat;
++    background-size: 8px;
++}
++
++.timeline-record-stack .preview-image {
++    pointer-events: none;
++
++    position: absolute;
++    width: 48px;
++    height: 35px;
+ }
+ 
+ .timeline-record-stack.selected {
+     border-left: 2px solid rgb(150, 150, 150);
+     border-right: 2px solid rgb(150, 150, 150);
+-    background-color: rgb(200, 200, 200);
+ }
+ 
+ .timeline-record-stack-counter {
+     position: absolute;
+     bottom: 2px;
+     right: 1px;
+     height: 13px;
++    z-index: 50;
+ 
+     background-color: rgb(150, 150, 150);
+     color: rgb(255, 255, 255);
+     border-radius: 4px;
+     font-size: 9px;
+     text-align: center;
+     padding: 1px 4px 2px;
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
+index ef291af..9ffb76c 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
+@@ -40,20 +40,21 @@ WebInspector.TimelineRecordStack = function(records)
+ 
+     // Set this last, since it triggers relayout using the above elements.
+     this.records = records;
+ };
+ 
+ WebInspector.Object.addConstructorFunctions(WebInspector.TimelineRecordStack);
+ 
+ WebInspector.TimelineRecordStack.StyleClassName = "timeline-record-stack";
+ WebInspector.TimelineRecordStack.CounterStyleClassName = "timeline-record-stack-counter";
+ WebInspector.TimelineRecordStack.SelectedStyleClassName = "selected";
++WebInspector.TimelineRecordStack.PreviewImageStyleClassName = "preview-image";
+ WebInspector.TimelineRecordStack.MinimumWidthPixels = 48;
+ WebInspector.TimelineRecordStack.MinimumMarginPixels = 2;
+ 
+ WebInspector.TimelineRecordStack.createStacksForVisibleRecords = function(records, secondsPerPixel, graphDataSource, createStackCallback)
+ {
+     if (!records.length)
+         return;
+ 
+     var startTime = graphDataSource.startTime;
+     var currentTime = graphDataSource.currentTime;
+@@ -178,20 +179,42 @@ WebInspector.TimelineRecordStack.prototype = {
+     },
+ 
+     set selected(value)
+     {
+         console.assert(!value || this._records.length === 1, this);
+ 
+         this._isSelected = !!value;
+         this._element.classList.toggle(WebInspector.TimelineRecordStack.SelectedStyleClassName, value);
+     },
+ 
++    get previewContentURL()
++    {
++        return this._previewContentURL;
++    },
++
++    set previewContentURL(value)
++    {
++        if (this._previewElement) {
++            this._previewElement.remove();
++            delete this._previewElement;
++        }
++
++        this._previewContentURL = value;
++
++        if (this._previewContentURL) {
++            this._previewElement = document.createElement("img");
++            this._previewElement.classList.add(WebInspector.TimelineRecordStack.PreviewImageStyleClassName);
++            this._previewElement.src = this._previewContentURL;
++            this._element.appendChild(this._previewElement);
++        }
++    },
++
+     refresh: function(graphDataSource)
+     {
+         if (!this._records || !this._records.length)
+             return false;
+ 
+         var firstRecord = this._records[0];
+         var barStartTime = firstRecord.startTime;
+ 
+         // If this bar has no time info, return early.
+         if (isNaN(barStartTime))
+@@ -221,21 +244,20 @@ WebInspector.TimelineRecordStack.prototype = {
+ 
+         // FIXME: may need to adjust the stack creation code to match ranges used here to avoid visual glitches.
+ 
+         // Find the center of this stack's records, then push out to include max(record span, min width).
+         var secondsPerPixel = graphDataSource.timelineOverview ? graphDataSource.timelineOverview.secondsPerPixel : 0;
+         var barCenterTime = barStartTime + (barEndTime - barStartTime) / 2;
+         var adjustedDuration = Math.max(barEndTime - barStartTime, secondsPerPixel * WebInspector.TimelineRecordStack.MinimumWidthPixels);
+         var adjustedStartTime = barCenterTime - (adjustedDuration / 2);
+         var adjustedEndTime = barCenterTime + (adjustedDuration / 2);
+ 
+-        //                                                                                  
+         var graphDuration = graphEndTime - graphStartTime;
+         var newBarLeftPosition = (adjustedStartTime - graphStartTime) / graphDuration;
+         this._updateElementPosition(this._element, newBarLeftPosition, "left");
+ 
+         var newBarWidth = ((adjustedEndTime - graphStartTime) / graphDuration) - newBarLeftPosition;
+         this._updateElementPosition(this._element, newBarWidth, "width");
+ 
+         return true;
+     },
+ 
+-- 
+2.3.5
+

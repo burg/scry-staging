@@ -1,0 +1,574 @@
+From 7a3c7a6fe8884aae6bb376fc56b5d65dc39aad99 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Wed, 11 Mar 2015 14:03:02 -0700
+Subject: [PATCH] TimelineRecordingContentView now uses a ContentBrownser.
+ Support split navigation bar for hierarchical/selection path components.
+
+---
+ .../UserInterface/Models/ElementSnapshot.js        | 10 +++
+ .../UserInterface/Views/ContentBrowser.js          |  7 +-
+ .../Views/ElementSnapshotContentView.css           |  4 +
+ .../Views/ElementSnapshotContentView.js            |  1 +
+ .../Views/TimelineRecordTreeElement.js             |  2 +-
+ .../Views/TimelineRecordingContentView.css         | 15 +++-
+ .../Views/TimelineRecordingContentView.js          | 97 ++++++++++++++++------
+ 7 files changed, 105 insertions(+), 31 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+index e532e42..defb810 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+@@ -49,39 +49,49 @@ WebInspector.ElementSnapshotHeader.prototype = {
+                     return new WebInspector.ElementSnapshot(this, response.payload);
+                 }.bind(this))
+                 .catch(function(error) {
+                     console.log(error); throw error;
+                 });
+         }
+ 
+         return this._payloadPromise;
+     },
+ 
++    get displayName()
++    {
++        return WebInspector.UIString("Snapshot %d").format(this.ordinal || " ");
++    },
++
+     saveIdentityToCookie: function(cookie)
+     {
+         // Do nothing, since snapshots are not saved across reloads or reopens.
+     }
+ }
+ 
+ WebInspector.ElementSnapshot = function(header, payload)
+ {
+     console.assert(header instanceof WebInspector.ElementSnapshotHeader);
+ 
+     this._header = header;
+     this._imageDataURL = payload.imageData;
+     this._effectiveStyle = WebInspector.EffectiveStyleSnapshot.fromPayload(payload.styleData);
+ }
+ 
+ WebInspector.ElementSnapshot.prototype = {
+     constructor: WebInspector.ElementSnapshot,
+     __proto__: WebInspector.Object.prototype,
+ 
++    get displayName()
++    {
++        return this._header.displayName;
++    },
++
+     get snapshotId()
+     {
+         return this._header.snapshotId;
+     },
+ 
+     get ordinal()
+     {
+         return this._header.ordinal;
+     },
+ 
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ContentBrowser.js b/Source/WebInspectorUI/UserInterface/Views/ContentBrowser.js
+index 1dcb6d7..faed108 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ContentBrowser.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ContentBrowser.js
+@@ -366,21 +366,26 @@ WebInspector.ContentBrowser.prototype = {
+             var pathComponent = new WebInspector.GeneralTreeElementPathComponent(treeElement);
+             pathComponents.unshift(pathComponent);
+             treeElement = treeElement.parent;
+         }
+ 
+         this._hierarchicalPathNavigationItem.components = pathComponents;
+     },
+ 
+     _updateContentViewSelectionPathNavigationItem: function(contentView)
+     {
+-        var selectionPathComponents = contentView ? contentView.selectionPathComponents || [] : [];
++        var selectionPathComponents = [];
++        if (contentView && this.delegate && typeof this.delegate.contentBrowserSelectionPathPrefixForContentView === "function")
++            selectionPathComponents = selectionPathComponents.concat(this.delegate.contentBrowserSelectionPathPrefixForContentView(this, contentView) || []);
++        if (contentView)
++            selectionPathComponents = selectionPathComponents.concat(contentView.selectionPathComponents || []);
++
+         this._contentViewSelectionPathNavigationItem.components = selectionPathComponents;
+ 
+         if (!selectionPathComponents.length) {
+             this._hierarchicalPathNavigationItem.alwaysShowLastPathComponentSeparator = false;
+             this._navigationBar.removeNavigationItem(this._contentViewSelectionPathNavigationItem);
+             return;
+         }
+ 
+         // Insert the _contentViewSelectionPathNavigationItem after the _hierarchicalPathNavigationItem, if needed.
+         if (!this._navigationBar.navigationItems.includes(this._contentViewSelectionPathNavigationItem)) {
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css
+index 0fd118f..45f4a81 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css
+@@ -23,10 +23,14 @@
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ .visual-output-icon > .icon {
+     content: url(../Images/Camera.svg);
+ }
+ 
+ .effective-style-icon > .icon {
+     content: url(../Images/NavigationItemBrushAndRuler.svg);
+ }
++
++.snapshot-icon > .icon {
++    content: -webkit-image-set(url(../Images/DocumentImage.png) 1x, url(../Images/DocumentImage@2x.png) 2x);
++}
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+index 23c55f9..cbb22cc 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+@@ -44,20 +44,21 @@ WebInspector.ElementSnapshotContentView = function(snapshot)
+     this._stylePathComponent.previousSibling = this._outputPathComponent;
+ 
+     this._currentContentViewSetting = new WebInspector.Setting("element-snapshot-current-view", WebInspector.ElementSnapshotContentView.VisualOutputIdentifier);
+ };
+ 
+ WebInspector.ElementSnapshotContentView.ContentViewIdentifierCookieKey = "element-snapshot-content-view-identifier";
+ 
+ WebInspector.ElementSnapshotContentView.VisualOutputIdentifier = "visual-output";
+ WebInspector.ElementSnapshotContentView.EffectiveStyleIdentifier = "effective-style";
+ 
++WebInspector.ElementSnapshotContentView.SnapshotIconStyleClass = "snapshot-icon";
+ WebInspector.ElementSnapshotContentView.VisualOutputIconStyleClassName = "visual-output-icon";
+ WebInspector.ElementSnapshotContentView.EffectiveStyleIconStyleClassName = "effective-style-icon";
+ 
+ WebInspector.ElementSnapshotContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotContentView,
+     __proto__: WebInspector.ClusterContentView.prototype,
+ 
+     // Public
+ 
+     get selectionPathComponents()
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
+index 56946b3..a2223e9 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
+@@ -101,21 +101,21 @@ WebInspector.TimelineRecordTreeElement = class TimelineRecordTreeElement extends
+             break;
+ 
+         case WebInspector.TimelineRecord.Type.RenderingFrame:
+             title = WebInspector.UIString("Frame %d").format(timelineRecord.frameNumber);
+             iconStyleClass = WebInspector.TimelineRecordTreeElement.RenderingFrameRecordIconStyleClass;
+             break;
+ 
+         case WebInspector.TimelineRecord.Type.ElementTracking:
+             if (timelineRecord instanceof WebInspector.ElementTrackingTimelineRecord) {
+                 title = WebInspector.ElementTrackingTimelineRecord.displayNameForEventType(timelineRecord.eventType);
+-                subtitle = WebInspector.UIString("Snapshot %d").format(timelineRecord.snapshotHeader.ordinal || " ");
++                subtitle = timelineRecord.snapshotHeader.displayName;
+                 iconStyleClass = WebInspector.TimelineRecordTreeElement.OutputChangedIconStyleClass;
+             }
+ 
+             if (timelineRecord instanceof WebInspector.TraceOperationTimelineRecord) {
+                 title = WebInspector.TraceOperationTimelineRecord.displayNameForEventType(timelineRecord.eventType);
+                 iconStyleClass = WebInspector.TimelineRecordTreeElement.EvaluatedRecordIconStyleClass;
+             }
+             break;
+ 
+         default:
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.css b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.css
+index 2c2a1a3..8a0071a 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.css
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.css
+@@ -23,27 +23,36 @@
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ .content-view.timeline-recording > .timeline-overview {
+     position: absolute;
+     top: 0;
+     left: 0;
+     right: 0;
+ }
+ 
+-.content-view.timeline-recording > .content-view-container {
++.content-view.timeline-recording > .content-browser {
+     position: absolute;
+     left: 0;
+     right: 0;
+     bottom: 0;
+     overflow: hidden;
+ }
+ 
+-.content-view.timeline-recording > .content-view-container > .timeline-view > .data-grid td {
++.content-view.timeline-recording > .content-browser .navigation-bar {
++    height: 23px;
++    border-top: 1px solid rgb(179, 179, 179);
++}
++
++.content-view.timeline-recording.showing-datagrid-subview > .content-browser .navigation-bar {
++    display: none;
++}
++
++.content-view.timeline-recording .timeline-view > .data-grid td {
+     height: 16px;
+     line-height: 16px;
+ }
+ 
+-.content-view.timeline-recording > .content-view-container > .timeline-view > .data-grid table.data {
++.content-view.timeline-recording .timeline-view > .data-grid table.data {
+     background-image: linear-gradient(to bottom, white, white 50%, rgb(243, 243, 243) 50%, rgb(243, 243, 243));
+     background-size: 100% 40px;
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
+index f9249ee..c945f3e 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
+@@ -29,23 +29,24 @@ WebInspector.TimelineRecordingContentView = function(recording)
+     WebInspector.ContentView.call(this, recording);
+ 
+     this._recording = recording;
+ 
+     this.element.classList.add(WebInspector.TimelineRecordingContentView.StyleClassName);
+ 
+     this._timelineOverview = new WebInspector.TimelineOverview(this._recording);
+     this._timelineOverview.addEventListener(WebInspector.TimelineOverview.Event.TimeRangeSelectionChanged, this._timeRangeSelectionChanged, this);
+     this.element.appendChild(this._timelineOverview.element);
+ 
+-    this._contentViewContainer = new WebInspector.ContentViewContainer();
+-    this._contentViewContainer.addEventListener(WebInspector.ContentViewContainer.Event.CurrentContentViewDidChange, this._currentContentViewDidChange, this);
+-    this.element.appendChild(this._contentViewContainer.element);
++    var disableBackForwardForSubviews = true;
++    this._subviewContentBrowser = new WebInspector.ContentBrowser(null, this, disableBackForwardForSubviews);
++    this._subviewContentBrowser.addEventListener(WebInspector.ContentBrowser.Event.CurrentContentViewDidChange, this._currentContentViewDidChange, this);
++    this.element.appendChild(this._subviewContentBrowser.element);
+ 
+     var trashImage;
+     if (WebInspector.Platform.isLegacyMacOS)
+         trashImage = {src: "Images/Legacy/NavigationItemTrash.svg", width: 16, height: 16};
+     else
+         trashImage = {src: "Images/NavigationItemTrash.svg", width: 15, height: 15};
+ 
+     this._clearTimelineNavigationItem = new WebInspector.ButtonNavigationItem("clear-timeline", WebInspector.UIString("Clear Timeline"), trashImage.src, trashImage.width, trashImage.height);
+     this._clearTimelineNavigationItem.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this._clearTimeline, this);
+ 
+@@ -71,179 +72,203 @@ WebInspector.TimelineRecordingContentView = function(recording)
+     WebInspector.debuggerManager.addEventListener(WebInspector.DebuggerManager.Event.Paused, this._debuggerPaused, this);
+     WebInspector.debuggerManager.addEventListener(WebInspector.DebuggerManager.Event.Resumed, this._debuggerResumed, this);
+ 
+     WebInspector.ContentView.addEventListener(WebInspector.ContentView.Event.SelectionPathComponentsDidChange, this._contentViewSelectionPathComponentDidChange, this);
+     WebInspector.ContentView.addEventListener(WebInspector.ContentView.Event.SupplementalRepresentedObjectsDidChange, this._contentViewSupplementalRepresentedObjectsDidChange, this);
+ 
+     for (var timeline of this._recording.timelines.values())
+         this._timelineAdded(timeline);
+ 
+     this.showOverviewTimelineView();
++
++    // If true, the selection path will appear above the subview.
++    this.__experimentalShowSplitNavigationBars = true;
++
++    if (!this.__experimentalShowSplitNavigationBars)
++        this.element.classList.add(WebInspector.TimelineRecordingContentView.ShowingDatagridSubviewStyleClassName);
+ };
+ 
+ WebInspector.TimelineRecordingContentView.StyleClassName = "timeline-recording";
++WebInspector.TimelineRecordingContentView.ShowingDatagridSubviewStyleClassName = "showing-datagrid-subview";
+ 
+ WebInspector.TimelineRecordingContentView.SelectedTimelineTypeCookieKey = "timeline-recording-content-view-selected-timeline-type";
+ WebInspector.TimelineRecordingContentView.OverviewTimelineViewCookieValue = "timeline-recording-content-view-overview-timeline-view";
+ 
+ WebInspector.TimelineRecordingContentView.prototype = {
+     constructor: WebInspector.TimelineRecordingContentView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+     // Public
+ 
+     showOverviewTimelineView: function()
+     {
+-        this._contentViewContainer.showContentView(this._overviewTimelineView);
++        if (this.__experimentalShowSplitNavigationBars)
++            this.element.classList.add(WebInspector.TimelineRecordingContentView.ShowingDatagridSubviewStyleClassName);
++
++        this._subviewContentBrowser.showContentView(this._overviewTimelineView);
+     },
+ 
+     showContentViewForRepresentedObject: function(representedObject)
+     {
+-        this._contentViewContainer.showContentViewForRepresentedObject(representedObject);
++        if (this.__experimentalShowSplitNavigationBars) {
++            var shouldHideNavigationBar = representedObject instanceof WebInspector.Timeline || representedObject instanceof WebInspector.TimelineRecording;
++            this.element.classList.toggle(WebInspector.TimelineRecordingContentView.ShowingDatagridSubviewStyleClassName, shouldHideNavigationBar);
++        }
++
++        this._subviewContentBrowser.showContentViewForRepresentedObject(representedObject);
+     },
+ 
+     showTimelineViewForTimeline: function(timeline)
+     {
+         console.assert(timeline instanceof WebInspector.Timeline, timeline);
+         console.assert(this._timelineViewMap.has(timeline), timeline);
+         if (!this._timelineViewMap.has(timeline))
+             return;
+ 
+-        this._contentViewContainer.showContentView(this._timelineViewMap.get(timeline));
++        if (this.__experimentalShowSplitNavigationBars)
++            this.element.classList.add(WebInspector.TimelineRecordingContentView.ShowingDatagridSubviewStyleClassName);
++
++        this._subviewContentBrowser.showContentView(this._timelineViewMap.get(timeline));
+     },
+ 
+     get allowedNavigationSidebarPanels()
+     {
+         return [WebInspector.timelineSidebarPanel.identifier];
+     },
+ 
+     get supportsSplitContentBrowser()
+     {
+         // The layout of the overview and split content browser don't work well.
+         return false;
+     },
+ 
+     get selectionPathComponents()
+     {
+-        if (!this._contentViewContainer.currentContentView)
++        if (!this._subviewContentBrowser.currentContentView)
+             return [];
+ 
+-        var pathComponents = this._contentViewContainer.currentContentView.selectionPathComponents || [];
+         var selectedTimeline = WebInspector.timelineSidebarPanel.selectedTimeline;
++        var pathComponents = [];
+         if (this._pathComponentMap.has(selectedTimeline))
+-            pathComponents.unshift(this._pathComponentMap.get(selectedTimeline));
++            pathComponents.push(this._pathComponentMap.get(selectedTimeline));
++
++        if (!this.__experimentalShowSplitNavigationBars) {
++            if (this._subviewContentBrowser.currentContentView.representedObject instanceof WebInspector.ElementSnapshot)
++                pathComponents.push(this._syntheticPathComponentForSnapshot(this._subviewContentBrowser.currentContentView.representedObject));
+ 
++            pathComponents = pathComponents.concat(this._subviewContentBrowser.currentContentView.selectionPathComponents || []);
++        }
+         return pathComponents;
+     },
+ 
+     get supplementalRepresentedObjects()
+     {
+-        if (!this._contentViewContainer.currentContentView)
++        if (!this._subviewContentBrowser.currentContentView)
+             return [];
+-        return this._contentViewContainer.currentContentView.supplementalRepresentedObjects;
++        return this._subviewContentBrowser.currentContentView.supplementalRepresentedObjects;
+     },
+ 
+     get navigationItems()
+     {
+         return [this._clearTimelineNavigationItem];
+     },
+ 
+     get handleCopyEvent()
+     {
+-        var currentContentView = this._contentViewContainer.currentContentView;
++        var currentContentView = this._subviewContentBrowser.currentContentView;
+         return currentContentView && typeof currentContentView.handleCopyEvent === "function" ? currentContentView.handleCopyEvent.bind(currentContentView) : null;
+     },
+ 
+     get supportsSave()
+     {
+-        var currentContentView = this._contentViewContainer.currentContentView;
++        var currentContentView = this._subviewContentBrowser.currentContentView;
+         return currentContentView && currentContentView.supportsSave;
+     },
+ 
+     get saveData()
+     {
+-        var currentContentView = this._contentViewContainer.currentContentView;
++        var currentContentView = this._subviewContentBrowser.currentContentView;
+         return currentContentView && currentContentView.saveData || null;
+     },
+ 
+     get lastShownTimelineView()
+     {
+         // This could return the timeline view even if it is not currently visible in the view container.
+         // Since this timeline view's content outline could be showing in the timeline sidebar, we need
+         // to keep its current time range, filters, etc in sync even if the data grid is not visible.
+         if (!WebInspector.timelineSidebarPanel.selectedTimeline)
+             return this._overviewTimelineView;
+ 
+         return this._timelineViewMap.get(WebInspector.timelineSidebarPanel.selectedTimeline);
+     },
+ 
+     shown: function()
+     {
+         this._timelineOverview.shown();
+-        this._contentViewContainer.shown();
++        this._subviewContentBrowser.contentViewContainer.shown();
+         this._clearTimelineNavigationItem.enabled = this._recording.isWritable();
+ 
+         if (!this._updating && WebInspector.timelineManager.activeRecording === this._recording && WebInspector.timelineManager.isCapturing())
+             this._startUpdatingCurrentTime();
+     },
+ 
+     hidden: function()
+     {
+         this._timelineOverview.hidden();
+-        this._contentViewContainer.hidden();
++        this._subviewContentBrowser.contentViewContainer.hidden();
+ 
+         if (this._updating)
+             this._stopUpdatingCurrentTime();
+     },
+ 
+     closed: function()
+     {
+-        this._contentViewContainer.closeAllContentViews();
++        this._subviewContentBrowser.contentViewContainer.closeAllContentViews();
+ 
+         WebInspector.ContentView.removeEventListener(WebInspector.ContentView.Event.SelectionPathComponentsDidChange, this._contentViewSelectionPathComponentDidChange, this);
+         WebInspector.ContentView.removeEventListener(WebInspector.ContentView.Event.SupplementalRepresentedObjectsDidChange, this._contentViewSupplementalRepresentedObjectsDidChange, this);
+     },
+ 
+     canGoBack: function()
+     {
+-        return this._contentViewContainer.canGoBack();
++        return this._subviewContentBrowser.canGoBack();
+     },
+ 
+     canGoForward: function()
+     {
+-        return this._contentViewContainer.canGoForward();
++        return this._subviewContentBrowser.canGoForward();
+     },
+ 
+     goBack: function()
+     {
+-        this._contentViewContainer.goBack();
++        this._subviewContentBrowser.goBack();
+     },
+ 
+     goForward: function()
+     {
+-        this._contentViewContainer.goForward();
++        this._subviewContentBrowser.goForward();
+     },
+ 
+     updateLayout: function()
+     {
+         this._timelineOverview.updateLayoutForResize();
+ 
+-        var currentContentView = this._contentViewContainer.currentContentView;
++        var currentContentView = this._subviewContentBrowser.currentContentView;
+         if (currentContentView)
+             currentContentView.updateLayout();
+     },
+ 
+     saveToCookie: function(cookie)
+     {
+         cookie.type = WebInspector.ContentViewCookieType.Timelines;
+ 
+-        var visibleView = this._contentViewContainer.currentContentView;
++        var visibleView = this._subviewContentBrowser.currentContentView;
+         if (!visibleView || visibleView === this._overviewTimelineView)
+             cookie[WebInspector.TimelineRecordingContentView.SelectedTimelineTypeCookieKey] = WebInspector.TimelineRecordingContentView.OverviewTimelineViewCookieValue;
+         else if (visibleView.representedObject instanceof WebInspector.Timeline)
+             cookie[WebInspector.TimelineRecordingContentView.SelectedTimelineTypeCookieKey] = visibleView.representedObject.type;
+         else {
+             // FIXME: this does not save container subview state into a cookie. This could be done by saving
+             // that content view's state into the same cookie, possibly using prefixes if collisions could happen.
+         }
+     },
+ 
+@@ -318,22 +343,42 @@ WebInspector.TimelineRecordingContentView.prototype = {
+ 
+         if (treeElement instanceof WebInspector.TimelineRecordTreeElement) {
+             var record = treeElement.record;
+             return checkTimeBounds(record.startTime, record.endTime);
+         }
+ 
+         console.error("Unknown TreeElement, can't filter by time.");
+         return true;
+     },
+ 
++    // Protected
++
++    contentBrowserSelectionPathPrefixForContentView: function(contentBrowser, contentView)
++    {
++        if (!this.__experimentalShowSplitNavigationBars)
++            return [];
++
++        pathComponents = [];
++        if (contentView instanceof WebInspector.ElementSnapshotContentView)
++            pathComponents.push(this._syntheticPathComponentForSnapshot(contentView.representedObject));
++
++        return pathComponents;
++    },
++
+     // Private
+ 
++    _syntheticPathComponentForSnapshot: function(snapshot)
++    {
++        console.assert(snapshot instanceof WebInspector.ElementSnapshot || snapshot instanceof WebInspector.ElementSnapshotHeader, snapshot);
++        return new WebInspector.HierarchicalPathComponent(snapshot.displayName, WebInspector.ElementSnapshotContentView.SnapshotIconStyleClass, snapshot, false, false);
++    },
++
+     _currentContentViewDidChange: function(event)
+     {
+         var timelineView = this.lastShownTimelineView;
+         if (timelineView) {
+             WebInspector.timelineSidebarPanel.contentTreeOutline = timelineView.navigationSidebarTreeOutline;
+             WebInspector.timelineSidebarPanel.contentTreeOutlineLabel = timelineView.navigationSidebarTreeOutlineLabel;
+ 
+             timelineView.startTime = this._timelineOverview.selectionStartTime;
+             timelineView.endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
+             timelineView.currentTime = this._currentTime;
+@@ -343,28 +388,28 @@ WebInspector.TimelineRecordingContentView.prototype = {
+         this.dispatchEventToListeners(WebInspector.ContentView.Event.NavigationItemsDidChange);
+     },
+ 
+     _pathComponentSelected: function(event)
+     {
+         WebInspector.timelineSidebarPanel.showTimelineViewForTimeline(event.data.pathComponent.representedObject);
+     },
+ 
+     _contentViewSelectionPathComponentDidChange: function(event)
+     {
+-        if (event.target !== this._contentViewContainer.currentContentView)
++        if (event.target !== this._subviewContentBrowser.currentContentView)
+             return;
+         this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
+     },
+ 
+     _contentViewSupplementalRepresentedObjectsDidChange: function(event)
+     {
+-        if (event.target !== this._contentViewContainer.currentContentView)
++        if (event.target !== this._subviewContentBrowser.currentContentView)
+             return;
+         this.dispatchEventToListeners(WebInspector.ContentView.Event.SupplementalRepresentedObjectsDidChange);
+     },
+ 
+     _update: function(timestamp)
+     {
+         if (this._waitingToResetCurrentTime) {
+             requestAnimationFrame(this._updateCallback);
+             return;
+         }
+@@ -554,21 +599,21 @@ WebInspector.TimelineRecordingContentView.prototype = {
+                 pathComponent.previousSibling = previousPathComponent;
+             }
+ 
+             previousPathComponent = pathComponent;
+         }
+ 
+         var timelineCount = this._timelineViewMap.size;
+         const timelineHeight = 36;
+         const extraOffset = 22;
+         this._timelineOverview.element.style.height = (timelineCount * timelineHeight + extraOffset) + "px";
+-        this._contentViewContainer.element.style.top = (timelineCount * timelineHeight + extraOffset) + "px";
++        this._subviewContentBrowser.element.style.top = (timelineCount * timelineHeight + extraOffset) + "px";
+     },
+ 
+     _recordingReset: function(event)
+     {
+         this._currentTime = NaN;
+ 
+         if (!this._updating) {
+             // Force the time ruler and views to reset to 0.
+             this._startTimeNeedsReset = true;
+             this._updateTimes(0, 0, 0);
+-- 
+2.3.5
+

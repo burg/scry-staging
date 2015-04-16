@@ -1,0 +1,763 @@
+From bb8596000ca57db75158ff463b31eddc484fb8b0 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Fri, 20 Mar 2015 10:09:03 -0700
+Subject: [PATCH] Add content views to show DOM tree snapshots and diff them.
+
+---
+ Source/WebInspectorUI/UserInterface/Main.html      |   2 +
+ .../UserInterface/Models/DOMNodeSnapshot.js        |  50 ++++++++-
+ .../Views/ElementSnapshotContentView.css           |   4 +
+ .../Views/ElementSnapshotContentView.js            |  28 +++++
+ .../Views/ElementSnapshotDOMTreeContentView.js     | 123 +++++++++++++++++++++
+ .../Views/ElementSnapshotDiffContentView.css       |   9 +-
+ .../Views/ElementSnapshotDiffContentView.js        |  27 +++++
+ .../Views/ElementSnapshotDiffDOMTreeContentView.js | 121 ++++++++++++++++++++
+ 8 files changed, 357 insertions(+), 7 deletions(-)
+ create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDOMTreeContentView.js
+ create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffDOMTreeContentView.js
+
+diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
+index 44abc26..1b632dd 100644
+--- a/Source/WebInspectorUI/UserInterface/Main.html
++++ b/Source/WebInspectorUI/UserInterface/Main.html
+@@ -409,22 +409,24 @@
+     <script src="Views/DatabaseTableContentView.js"></script>
+     <script src="Views/DatabaseTableTreeElement.js"></script>
+     <script src="Views/DatabaseTreeElement.js"></script>
+     <script src="Views/DebuggerDashboardView.js"></script>
+     <script src="Views/DebuggerSidebarPanel.js"></script>
+     <script src="Views/DefaultDashboardView.js"></script>
+     <script src="Views/DividerNavigationItem.js"></script>
+     <script src="Views/EditingSupport.js"></script>
+     <script src="Views/ElementSnapshotContentView.js"></script>
+     <script src="Views/ElementSnapshotDiffContentView.js"></script>
++    <script src="Views/ElementSnapshotDiffDOMTreeContentView.js"></script>
+     <script src="Views/ElementSnapshotDiffOutputContentView.js"></script>
+     <script src="Views/ElementSnapshotDiffStyleContentView.js"></script>
++    <script src="Views/ElementSnapshotDOMTreeContentView.js"></script>
+     <script src="Views/ElementSnapshotOutputContentView.js"></script>
+     <script src="Views/ElementSnapshotStyleContentView.js"></script>
+     <script src="Views/ElementTrackingTimelineDataGridNode.js"></script>
+     <script src="Views/ElementTrackingTimelineView.js"></script>
+     <script src="Views/ElementTrackingTimelineOverviewGraph.js"></script>
+     <script src="Views/EventListenerSection.js"></script>
+     <script src="Views/EventListenerSectionGroup.js"></script>
+     <script src="Views/FilterBar.js"></script>
+     <script src="Views/FilterBarButton.js"></script>
+     <script src="Views/FindBanner.js"></script>
+diff --git a/Source/WebInspectorUI/UserInterface/Models/DOMNodeSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/DOMNodeSnapshot.js
+index 2bad348c..18ef8bf 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/DOMNodeSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/DOMNodeSnapshot.js
+@@ -35,23 +35,23 @@ WebInspector.DOMNodeSnapshot = function(type, name, value, childOrdinals, attrib
+     this._nodeType = type;
+     this._nodeName = name;
+     this._nodeValue = value;
+ }
+ 
+ WebInspector.DOMNodeSnapshot.fromPayload = function(payload)
+ {
+     var attributeList = payload.attributes || [];
+     console.assert(attributeList.length % 2 === 0, "Attribute list for node snapshot must have even number of entries.");
+ 
+-    var attributeMap = attributeList.length ? {} : null;
++    var attributeMap = attributeList.length ? new Map : null;
+     for (var i = 0; i < attributeList.length; i += 2)
+-        attributeMap[attributeList[i]] = attributeList[i + 1];
++        attributeMap.set(attributeList[i], attributeList[i + 1]);
+ 
+     return new WebInspector.DOMNodeSnapshot(payload.nodeType, payload.nodeName, payload.nodeValue, payload.children, attributeMap)
+ }
+ 
+ WebInspector.DOMNodeSnapshot.prototype = {
+     constructor: WebInspector.DOMNodeSnapshot,
+     __proto__: WebInspector.Object.prototype,
+ 
+     // Public
+ 
+@@ -92,20 +92,66 @@ WebInspector.DOMNodeSnapshot.prototype = {
+     get previousSibling()
+     {
+         return this._previousSibling || null;
+     },
+ 
+     get childNodeCount()
+     {
+         return this._children ? this._children.length : 0;
+     },
+ 
++    nodeType: function()
++    {
++        return this._nodeType;
++    },
++
++    nodeName: function()
++    {
++        return this._nodeName;
++    },
++
++    nodeValue: function()
++    {
++        return this._nodeValue;
++    },
++
++    attributes: function()
++    {
++        if (!this._attributeMap)
++            return null;
++
++        var attributesList = [];
++        for (var [name, value] of this._attributeMap)
++            attributesList.push({name, value});
++
++        return attributesList;
++    },
++
++    getAttribute: function(name)
++    {
++        return this._attributeMap ? this._attributeMap.get(name) : null;
++    },
++
++    // APIs that are cruft or redundant, but must exist to placate DOMTreeOutline / DOMTreeElement.
++
++    isXMLNode: function() { return false; },
++    isInShadowTree: function() { return false; },
++    isEditable: function() { return false; },
++    isTrackable: function() { return false; },
++    hasChildNodes: function() { return this.childNodeCount > 0; },
++    hasShadowRoots: function() { return false; },
++    hasAttributes: function() { return !!this._attributeMap; },
++    nodeNameInCorrectCase: function() { return this.nodeName().toLowerCase(); },
++    getSubtree: function(depth, callback) { setTimeout(callback, 0); },
++    getChildNodes: function(callback) { setTimeout(callback, 0); },
++    get enabledPseudoClasses() { return []; },
++
+     // Protected
+ 
+     resolveChildren: function(nodeList)
+     {
+         console.assert(this._nodesToResolve, "Already resolved nodes.");
+         if (!this._nodesToResolve)
+             return;
+ 
+         if (this._nodesToResolve.length) {
+             this._children = [];
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css
+index 45f4a81..4ca7950 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.css
+@@ -24,13 +24,17 @@
+  */
+ 
+ .visual-output-icon > .icon {
+     content: url(../Images/Camera.svg);
+ }
+ 
+ .effective-style-icon > .icon {
+     content: url(../Images/NavigationItemBrushAndRuler.svg);
+ }
+ 
++.dom-tree-icon > .icon {
++    content: url(../Images/DOMTree.svg);
++}
++
+ .snapshot-icon > .icon {
+     content: -webkit-image-set(url(../Images/DocumentImage.png) 1x, url(../Images/DocumentImage@2x.png) 2x);
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+index cbb22cc..db6124c 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+@@ -32,35 +32,41 @@ WebInspector.ElementSnapshotContentView = function(snapshot)
+ 
+     function createPathComponent(displayName, classNames, identifier)
+     {
+         var pathComponent = new WebInspector.HierarchicalPathComponent(displayName, classNames, identifier, false, true);
+         pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._pathComponentSelected, this);
+         return pathComponent;
+     }
+ 
+     this._outputPathComponent = createPathComponent.call(this, WebInspector.UIString("Visual Output"), WebInspector.ElementSnapshotContentView.VisualOutputIconStyleClassName, WebInspector.ElementSnapshotContentView.VisualOutputIdentifier, false, false);
+     this._stylePathComponent = createPathComponent.call(this, WebInspector.UIString("Effective Style"), WebInspector.ElementSnapshotContentView.EffectiveStyleIconStyleClassName, WebInspector.ElementSnapshotContentView.EffectiveStyleIdentifier, false, false);
++    this._domTreePathComponent = createPathComponent.call(this, WebInspector.UIString("DOM Tree"), WebInspector.ElementSnapshotContentView.DOMTreeIconStyleClassName, WebInspector.ElementSnapshotContentView.DOMTreeIdentifier, false, false);
+ 
++    // output <-> style <-> dom-tree
+     this._outputPathComponent.nextSibling = this._stylePathComponent;
+     this._stylePathComponent.previousSibling = this._outputPathComponent;
++    this._stylePathComponent.nextSibling = this._domTreePathComponent;
++    this._domTreePathComponent.previousSibling = this._stylePathComponent;
+ 
+     this._currentContentViewSetting = new WebInspector.Setting("element-snapshot-current-view", WebInspector.ElementSnapshotContentView.VisualOutputIdentifier);
+ };
+ 
+ WebInspector.ElementSnapshotContentView.ContentViewIdentifierCookieKey = "element-snapshot-content-view-identifier";
+ 
+ WebInspector.ElementSnapshotContentView.VisualOutputIdentifier = "visual-output";
+ WebInspector.ElementSnapshotContentView.EffectiveStyleIdentifier = "effective-style";
++WebInspector.ElementSnapshotContentView.DOMTreeIdentifier = "dom-tree";
+ 
+ WebInspector.ElementSnapshotContentView.SnapshotIconStyleClass = "snapshot-icon";
+ WebInspector.ElementSnapshotContentView.VisualOutputIconStyleClassName = "visual-output-icon";
+ WebInspector.ElementSnapshotContentView.EffectiveStyleIconStyleClassName = "effective-style-icon";
++WebInspector.ElementSnapshotContentView.DOMTreeIconStyleClassName = "effective-style-icon";
+ 
+ WebInspector.ElementSnapshotContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotContentView,
+     __proto__: WebInspector.ClusterContentView.prototype,
+ 
+     // Public
+ 
+     get selectionPathComponents()
+     {
+         var currentContentView = this._contentViewContainer.currentContentView;
+@@ -81,20 +87,28 @@ WebInspector.ElementSnapshotContentView.prototype = {
+     },
+ 
+     get effectiveStyleContentView()
+     {
+         if (!this._effectiveStyleContentView)
+             this._effectiveStyleContentView = new WebInspector.ElementSnapshotStyleContentView(this._snapshot);
+ 
+         return this._effectiveStyleContentView;
+     },
+ 
++    get domTreeContentView()
++    {
++        if (!this._domTreeContentView)
++            this._domTreeContentView = new WebInspector.ElementSnapshotDOMTreeContentView(this._snapshot);
++
++        return this._domTreeContentView;
++    },
++
+     shown: function()
+     {
+         WebInspector.ClusterContentView.prototype.shown.call(this);
+ 
+         if (this._shownInitialContent)
+             return;
+ 
+         this._showContentViewForIdentifier(this._currentContentViewSetting.value);
+     },
+ 
+@@ -122,59 +136,73 @@ WebInspector.ElementSnapshotContentView.prototype = {
+         return this._showContentViewForIdentifier(WebInspector.ElementSnapshotContentView.VisualOutputIdentifier);
+     },
+ 
+     showEffectiveStyle: function()
+     {
+         this._shownInitialContent = true;
+ 
+         return this._showContentViewForIdentifier(WebInspector.ElementSnapshotContentView.EffectiveStyleIdentifier);
+     },
+ 
++    showDOMTree: function()
++    {
++        this._shownInitialContent = true;
++
++        return this._showContentViewForIdentifier(WebInspector.ElementSnapshotContentView.DOMTreeIdentifier);
++    },
++
+     // Private
+ 
+     _pathComponentForContentView: function(contentView)
+     {
+         console.assert(contentView);
+         if (!contentView)
+             return null;
+         if (contentView === this._visualOutputContentView)
+             return this._outputPathComponent;
+         if (contentView === this._effectiveStyleContentView)
+             return this._stylePathComponent;
++        if (contentView === this._domTreeContentView)
++            return this._domTreePathComponent;
+         console.error("Unknown contentView.");
+         return null;
+     },
+ 
+     _identifierForContentView: function(contentView)
+     {
+         console.assert(contentView);
+         if (!contentView)
+             return null;
+         if (contentView === this._visualOutputContentView)
+             return WebInspector.ElementSnapshotContentView.VisualOutputIdentifier;
+         if (contentView === this._effectiveStyleContentView)
+             return WebInspector.ElementSnapshotContentView.EffectiveStyleIdentifier;
++        if (contentView === this._domTreeContentView)
++            return WebInspector.ElementSnapshotContentView.DOMTreeIdentifier;
+         console.error("Unknown contentView.");
+         return null;
+     },
+ 
+     _showContentViewForIdentifier: function(identifier)
+     {
+         var contentViewToShow = null;
+ 
+         switch (identifier) {
+         case WebInspector.ElementSnapshotContentView.VisualOutputIdentifier:
+             contentViewToShow = this.visualOutputContentView;
+             break;
+         case WebInspector.ElementSnapshotContentView.EffectiveStyleIdentifier:
+             contentViewToShow = this.effectiveStyleContentView;
+             break;
++        case WebInspector.ElementSnapshotContentView.DOMTreeIdentifier:
++            contentViewToShow = this.domTreeContentView;
++            break;
+         }
+         if (!contentViewToShow)
+             contentViewToShow = this.visualOutputContentView;
+ 
+         console.assert(contentViewToShow);
+ 
+         this._currentContentViewSetting.value = this._identifierForContentView(contentViewToShow);
+ 
+         return this.contentViewContainer.showContentView(contentViewToShow);
+     },
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDOMTreeContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDOMTreeContentView.js
+new file mode 100644
+index 0000000..150bd33
+--- /dev/null
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDOMTreeContentView.js
+@@ -0,0 +1,123 @@
++/*
++ * Copyright (C) 2015 University of Washington. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++WebInspector.ElementSnapshotDOMTreeContentView = function(snapshot)
++{
++    console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
++    WebInspector.ContentView.call(this, snapshot);
++
++    this.element.classList.add(WebInspector.ElementSnapshotDOMTreeContentView.StyleClassName);
++
++    var options = [
++        false, // omitRootDOMNode
++        true, // selectEnabled
++        false, // revealInDOMTreeEnabled
++    ];
++    this._domTreeOutline = new WebInspector.DOMTreeOutline(...options);
++    this._domTreeOutline.addEventListener(WebInspector.DOMTreeOutline.Event.SelectedNodeChanged, this._selectedNodeDidChange, this);
++
++    function showHighlightForNode(node) {
++        console.log("highlighting node", node);
++    }
++
++    function hideNodeHighlight() {
++        console.log("hiding highlight");
++    }
++
++    this._domTreeOutline.delegate = { showHighlightForNode, hideNodeHighlight };
++    this.element.appendChild(this._domTreeOutline.element);
++
++    this._domTreeOutline.rootDOMNode = snapshot.treeSnapshot.rootNode;
++};
++
++WebInspector.ElementSnapshotDOMTreeContentView.StyleClassName = "element-snapshot-dom-tree";
++
++WebInspector.ElementSnapshotDOMTreeContentView.prototype = {
++    constructor: WebInspector.ElementSnapshotDOMTreeContentView,
++    __proto__: WebInspector.ContentView.prototype,
++
++    // Public
++
++    updateLayout: function()
++    {
++        WebInspector.ContentView.prototype.updateLayout.call(this);
++
++        this._domTreeOutline.updateSelection();
++    },
++
++    shown: function()
++    {
++        WebInspector.ContentView.prototype.shown.call(this);
++
++        this._domTreeOutline.setVisible(true, WebInspector.isConsoleFocused());
++    },
++
++    hidden: function()
++    {
++        this._domTreeOutline.setVisible(false);
++    },
++
++    closed: function()
++    {
++        this._domTreeOutline.close();
++    },
++
++    get selectionPathComponents()
++    {
++        var treeElement = this._domTreeOutline.selectedTreeElement;
++        var pathComponents = [];
++
++        while (treeElement && !treeElement.root) {
++            // The close tag is contained within the element it closes. So skip it since we don't want to
++            // show the same node twice in the hierarchy.
++            if (treeElement.isCloseTag()) {
++                treeElement = treeElement.parent;
++                continue;
++            }
++
++            var pathComponent = new WebInspector.DOMTreeElementPathComponent(treeElement, treeElement.representedObject);
++            pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._pathComponentSelected, this);
++            pathComponents.unshift(pathComponent);
++            treeElement = treeElement.parent;
++        }
++
++        return pathComponents;
++    },
++
++    // Private
++
++    _pathComponentSelected: function(event)
++    {
++        console.assert(event.data.pathComponent instanceof WebInspector.DOMTreeElementPathComponent);
++        console.assert(event.data.pathComponent.domTreeElement instanceof WebInspector.DOMTreeElement);
++
++        this._domTreeOutline.selectDOMNode(event.data.pathComponent.domTreeElement.representedObject, true);
++    },
++
++    _selectedNodeDidChange: function(event)
++    {
++        this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
++    },
++};
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
+index 784c1c67..1baf5f7 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
+@@ -24,34 +24,33 @@
+  */
+ 
+ .content-view.element-snapshot-diff .content-view > .split-pane {
+     position: absolute;
+     top: 0;
+     bottom: 0;
+     left: 0;
+     right: 0;
+ }
+ 
+-.split-pane {
+-    /* Fallback to an opaque color in case a subclass hasn't specified one. */
+-    background-color: #fff;
+-}
+-
+ .content-view.element-snapshot-diff .content-view > .resizer {
+     border-left: 1px solid rgb(179, 179, 179);
+ }
+ 
+ .snapshot-diff-icon .icon {
+     content: url(../Images/Diff.svg);
+ }
+ 
+ .diff-visual-output-icon > .icon {
+     content: url(../Images/Camera.svg);
+ }
+ 
+ .diff-effective-style-icon > .icon {
+     content: url(../Images/NavigationItemBrushAndRuler.svg);
+ }
+ 
++.diff-effective-style-icon > .icon {
++    content: url(../Images/DOMTree.svg);
++}
++
+ .snapshot-icon > .icon {
+     content: -webkit-image-set(url(../Images/DocumentImage.png) 1x, url(../Images/DocumentImage@2x.png) 2x);
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
+index cb06887..9c7a8aa 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
+@@ -38,35 +38,40 @@ WebInspector.ElementSnapshotDiffContentView = function(snapshotDiff)
+ 
+     function createClusterPathComponent(displayName, classNames, identifier)
+     {
+         var pathComponent = new WebInspector.HierarchicalPathComponent(displayName, classNames, identifier, false, true);
+         pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._pathComponentSelected, this);
+         return pathComponent;
+     }
+ 
+     this._outputPathComponent = createClusterPathComponent.call(this, WebInspector.UIString("Visual Output"), WebInspector.ElementSnapshotDiffContentView.VisualOutputIconStyleClassName, WebInspector.ElementSnapshotDiffContentView.VisualOutputIdentifier, false, false);
+     this._stylePathComponent = createClusterPathComponent.call(this, WebInspector.UIString("Effective Style"), WebInspector.ElementSnapshotDiffContentView.EffectiveStyleIconStyleClassName, WebInspector.ElementSnapshotDiffContentView.EffectiveStyleIdentifier, false, false);
++    this._domTreePathComponent = createClusterPathComponent.call(this, WebInspector.UIString("DOM Tree"), WebInspector.ElementSnapshotDiffContentView.DOMTreeIconStyleClassName, WebInspector.ElementSnapshotDiffContentView.DOMTreeIdentifier, false, false);
+ 
+     this._outputPathComponent.nextSibling = this._stylePathComponent;
+     this._stylePathComponent.previousSibling = this._outputPathComponent;
++    this._stylePathComponent.nextSibling = this._domTreePathComponent;
++    this._domTreePathComponent.previousSibling = this._stylePathComponent;
+ 
+     this._currentContentViewSetting = new WebInspector.Setting("element-snapshot-diff-current-view", WebInspector.ElementSnapshotDiffContentView.VisualOutputIdentifier);
+ 
+     this.element.classList.add(WebInspector.ElementSnapshotDiffContentView.StyleClassName);
+ };
+ 
+ WebInspector.ElementSnapshotDiffContentView.VisualOutputIdentifier = "visual-output";
+ WebInspector.ElementSnapshotDiffContentView.EffectiveStyleIdentifier = "effective-style";
++WebInspector.ElementSnapshotDiffContentView.DOMTreeIdentifier = "dom-tree";
+ 
+ WebInspector.ElementSnapshotDiffContentView.IconStyleClassName = "snapshot-diff-icon";
+ WebInspector.ElementSnapshotDiffContentView.VisualOutputIconStyleClassName = "visual-output-icon";
+ WebInspector.ElementSnapshotDiffContentView.EffectiveStyleIconStyleClassName = "effective-style-icon";
++WebInspector.ElementSnapshotDiffContentView.DOMTreeIconStyleClassName = "dom-tree-icon";
+ 
+ WebInspector.ElementSnapshotDiffContentView.StyleClassName = "element-snapshot-diff";
+ WebInspector.ElementSnapshotDiffContentView.SplitPaneStyleClassName = "split-pane";
+ 
+ WebInspector.ElementSnapshotDiffContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotDiffContentView,
+     __proto__: WebInspector.ClusterContentView.prototype,
+ 
+     get selectionPathComponents()
+     {
+@@ -99,20 +104,28 @@ WebInspector.ElementSnapshotDiffContentView.prototype = {
+     },
+ 
+     get effectiveStyleContentView()
+     {
+         if (!this._effectiveStyleContentView)
+             this._effectiveStyleContentView = new WebInspector.ElementSnapshotDiffStyleContentView(this._snapshotDiff);
+ 
+         return this._effectiveStyleContentView;
+     },
+ 
++    get domTreeContentView()
++    {
++        if (!this._domTreeContentView)
++            this._domTreeContentView = new WebInspector.ElementSnapshotDiffDOMTreeContentView(this._snapshotDiff);
++
++        return this._domTreeContentView;
++    },
++
+     shown: function()
+     {
+         WebInspector.ClusterContentView.prototype.shown.call(this);
+ 
+         if (this._shownInitialContent)
+             return;
+ 
+         this._showContentViewForIdentifier(this._currentContentViewSetting.value);
+     },
+ 
+@@ -140,57 +153,71 @@ WebInspector.ElementSnapshotDiffContentView.prototype = {
+         return this._showContentViewForIdentifier(WebInspector.ElementSnapshotDiffContentView.VisualOutputIdentifier);
+     },
+ 
+     showEffectiveStyle: function()
+     {
+         this._shownInitialContent = true;
+ 
+         return this._showContentViewForIdentifier(WebInspector.ElementSnapshotDiffContentView.EffectiveStyleIdentifier);
+     },
+ 
++    showDOMTree: function()
++    {
++        this._shownInitialContent = true;
++
++        return this._showContentViewForIdentifier(WebInspector.ElementSnapshotDiffContentView.DOMTreeIdentifier);
++    },
++
+     _pathComponentForContentView: function(contentView)
+     {
+         console.assert(contentView);
+         if (!contentView)
+             return null;
+         if (contentView === this._visualOutputContentView)
+             return this._outputPathComponent;
+         if (contentView === this._effectiveStyleContentView)
+             return this._stylePathComponent;
++        if (contentView === this._domTreeContentView)
++            return this._domTreePathComponent;
+         console.error("Unknown contentView.");
+         return null;
+     },
+ 
+     _identifierForContentView: function(contentView)
+     {
+         console.assert(contentView);
+         if (!contentView)
+             return null;
+         if (contentView === this._visualOutputContentView)
+             return WebInspector.ElementSnapshotDiffContentView.VisualOutputIdentifier;
+         if (contentView === this._effectiveStyleContentView)
+             return WebInspector.ElementSnapshotDiffContentView.EffectiveStyleIdentifier;
++        if (contentView === this._domTreeContentView)
++            return WebInspector.ElementSnapshotDiffContentView.DOMTreeIdentifier;
+         console.error("Unknown contentView.");
+         return null;
+     },
+ 
+     _showContentViewForIdentifier: function(identifier)
+     {
+         var contentViewToShow = null;
+ 
+         switch (identifier) {
+         case WebInspector.ElementSnapshotDiffContentView.VisualOutputIdentifier:
+             contentViewToShow = this.visualOutputContentView;
+             break;
+         case WebInspector.ElementSnapshotDiffContentView.EffectiveStyleIdentifier:
+             contentViewToShow = this.effectiveStyleContentView;
+             break;
++        case WebInspector.ElementSnapshotDiffContentView.DOMTreeIdentifier:
++            contentViewToShow = this.domTreeContentView;
++            break;
+         }
+         if (!contentViewToShow)
+             contentViewToShow = this.visualOutputContentView;
+ 
+         console.assert(contentViewToShow);
+ 
+         this._currentContentViewSetting.value = this._identifierForContentView(contentViewToShow);
+ 
+         return this.contentViewContainer.showContentView(contentViewToShow);
+     },
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffDOMTreeContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffDOMTreeContentView.js
+new file mode 100644
+index 0000000..fc716ca
+--- /dev/null
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffDOMTreeContentView.js
+@@ -0,0 +1,121 @@
++/*
++ * Copyright (C) 2015 University of Washington. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++WebInspector.ElementSnapshotDiffDOMTreeContentView = function(snapshotDiff)
++{
++    WebInspector.ContentView.call(this, snapshotDiff);
++
++    this._preState = snapshotDiff.preState;
++    this._postState = snapshotDiff.postState;
++
++    this.element.classList.add(WebInspector.ElementSnapshotDiffDOMTreeContentView.StyleClassName);
++
++    var resizerDelegate = this;
++    this._resizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
++    this.element.appendChild(this._resizer.element);
++
++    this._preStateContentView = new WebInspector.ElementSnapshotDOMTreeContentView(this._preState);
++    this._preStateContentView.element.classList.add(WebInspector.ElementSnapshotDiffDOMTreeContentView.SplitPaneStyleClassName);
++    this.element.appendChild(this._preStateContentView.element);
++
++    this._postStateContentView = new WebInspector.ElementSnapshotDOMTreeContentView(this._postState);
++    this._postStateContentView.element.classList.add(WebInspector.ElementSnapshotDiffDOMTreeContentView.SplitPaneStyleClassName);
++    this.element.appendChild(this._postStateContentView.element);
++
++    this._repositionSplitPanes(0.5);
++};
++
++WebInspector.ElementSnapshotDiffDOMTreeContentView.StyleClassName = "compare-dom-tree";
++WebInspector.ElementSnapshotDiffDOMTreeContentView.IconStyleClassName = "diff-dom-tree-icon";
++WebInspector.ElementSnapshotDiffDOMTreeContentView.SplitPaneStyleClassName = "split-pane";
++
++WebInspector.ElementSnapshotDiffDOMTreeContentView.prototype = {
++    constructor: WebInspector.ElementSnapshotDiffDOMTreeContentView,
++    __proto__: WebInspector.ContentView.prototype,
++
++    // Disallow the quick console from popping up, we need a lot of space.
++    get supportsSplitContentBrowser()
++    {
++        return false;
++    },
++
++    // Protected
++
++    resizerDragStarted: function(resizer)
++    {
++        this._centerOffsetBeforeDrag = resizer.initialPosition - this.element.totalOffsetLeft;
++    },
++
++    resizerDragging: function(resizer, positionDelta)
++    {
++        var availableWidth = this.element.offsetWidth;
++        var centerPercent = (this._centerOffsetBeforeDrag - positionDelta) / availableWidth;
++        this._repositionSplitPanes(Number.constrain(centerPercent, 0.01, 0.99));
++    },
++
++    shown: function()
++    {
++        WebInspector.ContentView.prototype.shown.call(this);
++        this._preStateContentView.shown();
++        this._postStateContentView.shown();
++    },
++
++    hidden: function()
++    {
++        WebInspector.ContentView.prototype.hidden.call(this);
++        this._preStateContentView.hidden();
++        this._postStateContentView.hidden();
++    },
++
++    closed: function()
++    {
++        WebInspector.ContentView.prototype.closed.call(this);
++        this._preStateContentView.closed();
++        this._postStateContentView.closed();
++    },
++
++    updateLayout: function()
++    {
++        WebInspector.ContentView.prototype.updateLayout.call(this);
++        this._preStateContentView.updateLayout();
++        this._postStateContentView.updateLayout();
++    },
++
++    // Private
++
++    _repositionSplitPanes: function(centerPercent)
++    {
++        if (centerPercent === this._centerPercent)
++            return;
++
++        this._centerPercent = centerPercent || 0.5;
++        this._resizer.element.style.left = "%.5f".format(this._centerPercent * 100) + '%';
++        this._preStateContentView.element.style.right = "%.5f".format((1.0 - this._centerPercent) * 100) + '%';
++        this._postStateContentView.element.style.left = "%.5f".format(this._centerPercent * 100) + '%';
++
++        this._preStateContentView.updateLayout();
++        this._postStateContentView.updateLayout();
++    }
++};
+-- 
+2.3.5
+

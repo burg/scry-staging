@@ -1,0 +1,45 @@
+From a17eb8e43ca991d47e140bbd0de93a99adf9e9ed Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Sun, 12 Apr 2015 13:42:13 -0700
+Subject: [PATCH] Fix exception when selecting DOM node that doesn't exist in
+ both snapshots.
+
+---
+ .../UserInterface/Views/ElementSnapshotDOMTreeContentView.js       | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDOMTreeContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDOMTreeContentView.js
+index 600ad81..9113aaa 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDOMTreeContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDOMTreeContentView.js
+@@ -124,20 +124,27 @@ WebInspector.ElementSnapshotDOMTreeContentView.prototype = {
+             pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._pathComponentSelected, this);
+             pathComponents.unshift(pathComponent);
+             treeElement = treeElement.parent;
+         }
+ 
+         return pathComponents;
+     },
+ 
+     selectNode: function(node, suppressEvents)
+     {
++        if (!node) {
++            if (this._domTreeOutline.selectedNode)
++                this._domTreeOutline.selectedNode.deselect();
++
++            return;
++        }
++
+         var treeElement = this._domTreeOutline.findTreeElement(node);
+         if (!treeElement)
+             return;
+ 
+         var options = [
+             true, // omitFocus
+             false, // selectedByUser
+             true, // suppressOnSelect
+             false, // suppressOnDeselect
+         ];
+-- 
+2.3.5
+

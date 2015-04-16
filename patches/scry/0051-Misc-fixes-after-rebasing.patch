@@ -1,0 +1,209 @@
+From b35719b2448a9f6c9094add9cd4d77ef879c90ca Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Thu, 16 Apr 2015 15:32:27 -0700
+Subject: [PATCH] Misc fixes after rebasing.
+
+---
+ .../UserInterface/Models/DOMTreeSnapshot.js        |  2 +-
+ .../Models/ElementTrackingTimeline.js              |  1 +
+ .../UserInterface/Models/TimelineRecord.js         |  2 +-
+ .../UserInterface/Views/DOMTreeElement.js          | 26 +++++++++++-----------
+ .../Views/TimelineRecordingContentView.js          |  2 +-
+ .../UserInterface/Views/TimelineSidebarPanel.js    |  2 +-
+ 6 files changed, 18 insertions(+), 17 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Models/DOMTreeSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/DOMTreeSnapshot.js
+index 9cd6fea..c51c1d1 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/DOMTreeSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/DOMTreeSnapshot.js
+@@ -103,21 +103,21 @@ WebInspector.DOMTreeSnapshot = class DOMTreeSnapshot extends WebInspector.Object
+                     if (!propertyEntry.hasOwnProperty("sourceRule"))
+                         continue;
+ 
+                     var ruleOrdinal = propertyEntry.sourceRule;
+                     if (!isValidOrdinal(ruleOrdinal, rules))
+                         continue;
+ 
+                     var originatingRule = rules[ruleOrdinal];
+                     cssProperty.ownerStyle = originatingRule.style;
+                     matchedRules.push(originatingRule);
+-                    isInherited = !targetElementData.ruleMatches.contains(originatingRule);
++                    isInherited = !targetElementData.ruleMatches.includes(originatingRule);
+                     break;
+                 }
+                 case DOMTracingAgent.PropertyEntryOrigin.Inline: {
+                     if (!propertyEntry.hasOwnProperty("sourceElement"))
+                         continue;
+ 
+                     var elementOrdinal = propertyEntry.sourceElement;
+                     if (!isValidOrdinal(elementOrdinal, elementData))
+                         continue;
+ 
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js b/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js
+index 0af11aa..c64a838 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js
+@@ -23,20 +23,21 @@
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementTrackingTimeline = class ElementTrackingTimeline extends WebInspector.Timeline
+ {
+     constructor(type, recording)
+     {
+         super(type, recording);
+ 
+         this._snapshotCount = 0;
++    }
+ 
+     // Public
+ 
+     reset(suppressEvents)
+     {
+         WebInspector.Timeline.prototype.reset.call(this, suppressEvents);
+     }
+ 
+     get traceRecords()
+     {
+diff --git a/Source/WebInspectorUI/UserInterface/Models/TimelineRecord.js b/Source/WebInspectorUI/UserInterface/Models/TimelineRecord.js
+index 218a4f3..5c2a9c5 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/TimelineRecord.js
++++ b/Source/WebInspectorUI/UserInterface/Models/TimelineRecord.js
+@@ -131,19 +131,19 @@ WebInspector.TimelineRecord = class TimelineRecord extends WebInspector.Object
+ };
+ 
+ WebInspector.TimelineRecord.Event = {
+     Updated: "timeline-record-updated"
+ };
+ 
+ WebInspector.TimelineRecord.Type = {
+     Network: "timeline-record-type-network",
+     Layout: "timeline-record-type-layout",
+     Script: "timeline-record-type-script",
+-    RenderingFrame: "timeline-record-type-rendering-frame"
++    RenderingFrame: "timeline-record-type-rendering-frame",
+     ElementTracking: "timeline-record-type-element-tracking",
+ };
+ 
+ WebInspector.TimelineRecord.TypeIdentifier = "timeline-record";
+ WebInspector.TimelineRecord.SourceCodeURLCookieKey = "timeline-record-source-code-url";
+ WebInspector.TimelineRecord.SourceCodeLocationLineCookieKey = "timeline-record-source-code-location-line";
+ WebInspector.TimelineRecord.SourceCodeLocationColumnCookieKey = "timeline-record-source-code-location-column";
+ WebInspector.TimelineRecord.TypeCookieKey = "timeline-record-type";
+diff --git a/Source/WebInspectorUI/UserInterface/Views/DOMTreeElement.js b/Source/WebInspectorUI/UserInterface/Views/DOMTreeElement.js
+index b3c6daa..964f0b4 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/DOMTreeElement.js
++++ b/Source/WebInspectorUI/UserInterface/Views/DOMTreeElement.js
+@@ -650,42 +650,42 @@ WebInspector.DOMTreeElement = class DOMTreeElement extends WebInspector.TreeElem
+     _populateTextContextMenu(contextMenu, textNode)
+     {
+         if (this.editable)
+             contextMenu.appendItem(WebInspector.UIString("Edit Text"), this._startEditingTextNode.bind(this, textNode));
+ 
+         this._populateNodeContextMenu(contextMenu);
+     }
+ 
+     _populateNodeContextMenu(contextMenu)
+     {
++        function startTrackingElement(element) {
++            WebInspector.domTracingManager.startTrackingElement(element)
++            .then(function() {
++                var recording = WebInspector.timelineManager.activeRecording;
++                var timeline = recording && recording.timelines.get(WebInspector.TimelineRecord.Type.ElementTracking);
++                if (timeline) {
++                    WebInspector.timelineSidebarPanel.showTimelineViewForTimeline(timeline);
++                    WebInspector.timelineSidebarPanel.show();
++                }
++            });
++        }
++
+         // Add free-form node-related actions.
+         if (this.editable)
+             contextMenu.appendItem(WebInspector.UIString("Edit as HTML"), this._editAsHTML.bind(this));
+         contextMenu.appendItem(WebInspector.UIString("Copy as HTML"), this._copyHTML.bind(this));
+         if (this.editable)
+             contextMenu.appendItem(WebInspector.UIString("Delete Node"), this.remove.bind(this));
+ 
+         var node = this.representedObject;
+-        if (node.isTrackable() && WebInspector.domTracingManager.targetElement !== node) {
+-            function startTrackingElement(element) {
+-                WebInspector.domTracingManager.startTrackingElement(element)
+-                .then(function() {
+-                    var recording = WebInspector.timelineManager.activeRecording;
+-                    var timeline = recording && recording.timelines.get(WebInspector.TimelineRecord.Type.ElementTracking);
+-                    if (timeline) {
+-                        WebInspector.timelineSidebarPanel.showTimelineViewForTimeline(timeline);
+-                        WebInspector.timelineSidebarPanel.show();
+-                    }
+-                });
+-            }
++        if (node.isTrackable() && WebInspector.domTracingManager.targetElement !== node)
+             contextMenu.appendItem(WebInspector.UIString("Track Element"), startTrackingElement.bind(null, node));
+-        }
+     }
+ 
+     _startEditing()
+     {
+         if (this.treeOutline.selectedDOMNode() !== this.representedObject)
+             return false;
+ 
+         if (!this.editable)
+             return false;
+ 
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
+index 8688206..3d289fb 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordingContentView.js
+@@ -645,21 +645,21 @@ WebInspector.TimelineRecordingContentView.prototype = {
+         WebInspector.timelineManager.removeEventListener(WebInspector.TimelineManager.Event.CapturingStarted, this._capturingStarted, this);
+         WebInspector.timelineManager.removeEventListener(WebInspector.TimelineManager.Event.CapturingStopped, this._capturingStopped, this);
+     },
+ 
+     _timeRangeSelectionChanged: function(event)
+     {
+         if (this.lastShownTimelineView) {
+             this.lastShownTimelineView.startTime = this._timelineOverview.selectionStartTime;
+             this.lastShownTimelineView.endTime = this._timelineOverview.selectionStartTime + this._timelineOverview.selectionDuration;
+ 
+-            WebInspector.renderingFrameDetailsSidebarPanel.updateRangeSelection(this.currentTimelineView.startTime, this.currentTimelineView.endTime);
++            WebInspector.renderingFrameDetailsSidebarPanel.updateRangeSelection(this._timelineOverview.selectionStartTime, this._timelineOverview.selectionEndTime);
+         }
+ 
+         // Delay until the next frame to stay in sync with the current timeline view's time-based layout changes.
+         requestAnimationFrame(function() {
+             var selectedTreeElement = this.lastShownTimelineView && this.lastShownTimelineView.navigationSidebarTreeOutline ? this.lastShownTimelineView.navigationSidebarTreeOutline.selectedTreeElement : null;
+             var selectionWasHidden = selectedTreeElement && selectedTreeElement.hidden;
+ 
+             WebInspector.timelineSidebarPanel.updateFilter();
+ 
+             if (selectedTreeElement && selectedTreeElement.hidden !== selectionWasHidden)
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
+index 084ea73..cb0fe58 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
+@@ -281,21 +281,21 @@ WebInspector.TimelineSidebarPanel = class TimelineSidebarPanel extends WebInspec
+             }.bind(this));
+         } else {
+             this.showTimelineViewForTimeline(timeline, false);
+             WebInspector.contentBrowser.showContentView(this._displayedContentView);
+             didChangeView = false;
+         }
+ 
+         return didChangeView;
+     }
+ 
+-    showSubviewForRepresentedObject: function(representedObject)
++    showSubviewForRepresentedObject(representedObject)
+     {
+         console.assert(WebInspector.ContentView.isViewable(representedObject), representedObject);
+ 
+         this._displayedContentView.showContentViewForRepresentedObject(representedObject);
+         WebInspector.contentBrowser.showContentView(this._displayedContentView);
+     }
+ 
+     // Protected
+ 
+     updateFilter()
+-- 
+2.3.5
+

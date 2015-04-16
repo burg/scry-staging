@@ -1,0 +1,1495 @@
+From 3b348287a7fac781d77a4e9c9e46f7df0d79399a Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Mon, 30 Mar 2015 10:10:44 -0700
+Subject: [PATCH] Collect effective styles in bulk and reuse rule/element
+ entries.
+
+This attaches effective style snapshots to specific node snapshots.
+It does not yet collect effective styles for an entire subtree, since
+the UI doesn't show these side-by-side yet.
+---
+ .../inspector/protocol/DOMTracing.json             |  50 +++-
+ Source/WebCore/inspector/InspectorCSSAgent.cpp     |  58 +++--
+ Source/WebCore/inspector/InspectorCSSAgent.h       |   3 +-
+ .../WebCore/inspector/InspectorDOMTracingAgent.cpp | 158 ++++++++----
+ .../WebCore/inspector/InspectorDOMTracingAgent.h   |  27 ++-
+ .../UserInterface/Models/DOMNodeSnapshot.js        |  15 +-
+ .../UserInterface/Models/DOMTreeSnapshot.js        | 268 ++++++++++++++++++++-
+ .../UserInterface/Models/EffectiveStyleSnapshot.js | 242 +------------------
+ .../UserInterface/Models/ElementSnapshot.js        |   8 +-
+ .../Views/ElementSnapshotStyleContentView.js       |   3 +-
+ 10 files changed, 487 insertions(+), 345 deletions(-)
+
+diff --git a/Source/JavaScriptCore/inspector/protocol/DOMTracing.json b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
+index a5c555d..9661971 100644
+--- a/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
++++ b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
+@@ -27,61 +27,88 @@
+                 { "name": "boundingBox", "$ref": "FloatRect", "description": "Bounding box for the element's fragments in root view (global, absolute) coordinates." },
+                 { "name": "elapsedTimestamp", "type": "number", "description": "Elapsed time since the start of page execution when the snapshot was created." }
+             ]
+         },
+         {
+             "id": "ElementSnapshotPayload",
+             "type": "object",
+             "properties": [
+                 { "name": "snapshotId", "$ref": "SnapshotId" },
+                 { "name": "imageData", "$ref": "ImageData", "description": "Base64-encoded image data for the snapshot." },
+-                { "name": "styleData", "$ref": "EffectiveStyle", "description": "Effective style for element based on properties contributed from inline styles and rules." },
++                { "name": "styleData", "$ref": "StyleSnapshot", "description": "Effective styles snapshot for rendered elements." },
+                 { "name": "subtreeData", "$ref": "DOMTreeSnapshot", "description": "DOM tree snapshot rooted at the target element. "}
+             ]
+         },
+         {
+             "id": "ImageData",
+             "type": "object",
+             "properties": [
+                 { "name": "mimeType", "type": "string", "description": "Mime type for the encoded image data." },
+                 { "name": "encodedData", "type": "string", "description": "base64-encoded image data." }
+             ]
+         },
+         {
++            "id": "ElementOrdinal",
++            "type": "integer",
++            "description": "Refers to an element entry by its position in the StyleSnapshot.elements array."
++        },
++        {
++            "id": "CSSRuleOrdinal",
++            "type": "integer",
++            "description": "Refers to CSSRule by its position in the StyleSnapshot.rules array."
++        },
++        {
++            "id": "StyleSnapshot",
++            "type": "object",
++            "properties": [
++                { "name": "effectiveStyles", "type": "array", "items": { "$ref": "EffectiveStyle" }, "description": "Effective styles for the target element and its descendants." },
++                { "name": "elements", "type": "array", "items" : { "$ref": "ElementEntry" }, "description": "Style data for elements that are ancestors or descendants of the target element."},
++                { "name": "rules", "type": "array", "items" : { "$ref": "CSS.CSSRule" }, "description": "Style data for rules that contribute to at least one effective style."}
++            ]
++        },
++        {
+             "id": "EffectiveStyle",
+             "type": "object",
+             "properties": [
+-                { "name": "targetElement", "$ref": "DOM.NodeId", "description": "The id for the element that was snapshotted."},
+-                { "name": "elements", "type": "array", "items": { "$ref": "ElementEntry" }, "description": "Elements that contributed styles from rules and inline styles, ordered from target element to root." },
+-                { "name": "properties", "type": "array", "items": { "$ref": "PropertyEntry"}, "description": "Effective properties for the target element." }
++                { "name": "target", "$ref": "DOM.NodeId", "description": "The id for the element that was snapshotted."},
++                { "name": "properties", "type": "array", "items": { "$ref": "PropertyEntry" }, "description": "Effective properties for the target element." }
+             ],
+             "description": "Describes the effective style properties for the target element, with cross-references to the elements that contributed properties via inline styles and matched rules"
+         },
+         {
+             "id": "PropertyEntry",
+             "type": "object",
+             "properties": [
+                 { "name": "property", "$ref": "CSS.CSSProperty", "description": "A property that forms part of the effective element style." },
+-                { "name": "sourceRule", "$ref": "CSS.CSSRuleId", "optional": true, "description": "If property was contributed by a rule that matched the target or target's ancestor element, the rule's identifier at time of snapshot. This identifier cross-references to a MatchedRule's CSSRuleId for the element that matched the rule."},
+-                { "name": "sourceElement", "$ref": "DOM.NodeId", "optional": true, "description": "If property was contributed by an element's inline style, the element's identifier at time of snapshot."}
++                { "name": "sourceRule", "$ref": "CSSRuleOrdinal", "optional": true, "description": "If property was contributed by a rule that matched the target or target's ancestor element, the rule's identifier at time of snapshot. This identifier cross-references to a MatchedRule's CSSRuleId for the element that matched the rule."},
++                { "name": "sourceElement", "$ref": "ElementOrdinal", "optional": true, "description": "If property was contributed by an element's inline style, the element's identifier at time of snapshot."}
+             ],
+-            "description": "An effective style property contributed by a rule or inline style."
++            "description": "An style property contributed by a rule or inline style."
+          },
+         {
+             "id": "ElementEntry",
+             "type": "object",
+             "properties": [
+-                { "name": "nodeId", "$ref": "DOM.NodeId", "description": "Id for the ancestor element that contributed inherited styles."},
+-                { "name": "inlineStyle", "$ref": "CSS.CSSStyle", "optional": true, "description": "The ancestor element's inline style, if any, in the style inheritance chain." },
+-                { "name": "matchedRules", "type": "array", "items": { "$ref": "CSS.RuleMatch" }, "description": "Matches of CSS rules matching the ancestor node in the style inheritance chain." }
++                { "name": "nodeId", "$ref": "DOM.NodeId", "description": "Identifier for the element that this object describes."},
++                { "name": "inlineStyle", "$ref": "CSS.CSSStyle", "optional": true, "description": "The element's inline style, if any." },
++                { "name": "matchedRules", "type": "array", "items": { "$ref": "ElementRuleMatch" }, "description": "CSS rules that match this element and contributed to at least one element's effective style." }
++            ],
++            "description": "Inline styles and matched rules for an element."
++        },
++        {
++            "id": "ElementRuleMatch",
++            "type": "object",
++            "properties": [
++                { "name": "rule", "$ref": "CSSRuleOrdinal", "description": "CSS rule in the match." },
++                { "name": "matchingSelectors", "type": "array", "items": { "type": "integer" }, "description": "Matching selector indices in the rule's selectorList selectors (0-based)." }
+             ],
+-            "description": "Inline styles and matched rules for an element that contributes style properties."
++            "description": "Match data for a CSS rule."
+         },
+         {
+             "id": "TraceOperationType",
+             "type": "string",
+             "enum": [
+                 "ElementInserted",
+                 "ElementRemoved",
+                 "AttributeModified",
+                 "AttributeRemoved"
+             ]
+@@ -102,20 +129,21 @@
+         {
+             "id": "NodeSnapshotOrdinal",
+             "type": "integer",
+             "description": "Refers to a node by its position in a DOMTreeSnapshot array."
+         },
+         {
+             "id": "NodeSnapshot",
+             "type": "object",
+             "description": "A lightweight serialization of a DOM node. It only includes properties that are relevant to CSS rule selectors. Property names follow the Node API (https://developer.mozilla.org/en-US/docs/Web/API/Node).",
+             "properties": [
++                { "name": "id", "type": "DOM.NodeId", "description": "Unique identifier for the DOM node." },
+                 { "name": "children", "type": "array", "optional": true, "items": { "$ref": "NodeSnapshotOrdinal" }, "description": "Snapshot ids for child nodes if any."},
+                 { "name": "nodeType", "type": "integer", "description": "Node type (as defined in Node.idl)." },
+                 { "name": "nodeName", "type": "string", "description": "Tag name if an element, otherwise #text or #document" },
+                 { "name": "nodeValue", "type": "string", "optional": true, "description": "If a text node, the node's text value."},
+                 { "name": "attributes", "type": "array", "items": { "type": "string" }, "optional": true, "description": "If an element, a list of attribute keys and values (key1, value1, key2, value2, ...)."}
+             ]
+         },
+         {
+             "id": "DOMTreeSnapshot",
+             "type": "object",
+diff --git a/Source/WebCore/inspector/InspectorCSSAgent.cpp b/Source/WebCore/inspector/InspectorCSSAgent.cpp
+index 75a03bc..03ac776 100644
+--- a/Source/WebCore/inspector/InspectorCSSAgent.cpp
++++ b/Source/WebCore/inspector/InspectorCSSAgent.cpp
+@@ -107,21 +107,20 @@ static unsigned computePseudoClassMask(InspectorArray* pseudoClassArray)
+             result |= PseudoClassVisited;
+     }
+ 
+     return result;
+ }
+ 
+ static Inspector::Protocol::CSS::StyleSheetOrigin stylesheetOriginToProtocolEnum(Inspector::StyleSheetOrigin origin);
+ static Inspector::Protocol::CSS::CSSMedia::Source mediaListSourceToProtocolEnum(Inspector::MediaListSource source);
+ 
+ static RefPtr<Inspector::Protocol::CSS::CSSStyleSheetBody> buildObjectForStyleSheet(Inspector::StylesheetRuleSet&);
+-static RefPtr<Inspector::Protocol::CSS::CSSRule> buildObjectForStyleRule(Inspector::StyleRule& rule, Element* element);
+ static Ref<Inspector::Protocol::CSS::SelectorList> buildObjectForSelectorList(Inspector::StyleRule&, WebCore::Element*);
+ static RefPtr<Inspector::Protocol::CSS::CSSStyle> buildObjectForStyleWithProperties(Inspector::StyleDeclaration&);
+ static Ref<Inspector::Protocol::CSS::CSSMedia> buildMediaObject(const MediaList& media, Inspector::MediaListSource mediaListSource, const String& sourceURL);
+ static void fillMediaListChain(CSSRule& rule, Inspector::Protocol::Array<Inspector::Protocol::CSS::CSSMedia>& mediaArray);
+ 
+ 
+ class ChangeRegionOversetTask {
+ public:
+     ChangeRegionOversetTask(InspectorCSSAgent*);
+     void scheduleFor(WebKitNamedFlow*, int documentNodeId);
+@@ -1165,21 +1164,21 @@ Ref<Inspector::Protocol::CSS::SelectorList> buildObjectForSelectorList(Inspector
+ struct CollectStylesheetRulesFunctor {
+     typedef RefPtr<Inspector::Protocol::Array<Inspector::Protocol::CSS::CSSRule>> ReturnType;
+ 
+     CollectStylesheetRulesFunctor()
+         : m_rulesArray(Inspector::Protocol::Array<Inspector::Protocol::CSS::CSSRule>::create())
+     {
+     }
+ 
+     void operator()(Inspector::StyleRule& rule)
+     {
+-        m_rulesArray->addItem(buildObjectForStyleRule(rule, nullptr));
++        m_rulesArray->addItem(InspectorCSSAgent::buildObjectForStyleRule(rule, nullptr));
+     }
+ 
+     ReturnType returnValue() { return WTF::move(m_rulesArray); }
+ 
+ private:
+     RefPtr<Inspector::Protocol::Array<Inspector::Protocol::CSS::CSSRule>> m_rulesArray;
+ };
+ 
+ 
+ RefPtr<Inspector::Protocol::CSS::CSSStyleSheetBody> buildObjectForStyleSheet(StylesheetRuleSet& stylesheet)
+@@ -1268,21 +1267,21 @@ void fillMediaListChain(CSSRule& rule, Inspector::Protocol::Array<Inspector::Pro
+                 }
+                 parentRule = styleSheet->ownerRule();
+                 if (parentRule)
+                     break;
+                 styleSheet = styleSheet->parentStyleSheet();
+             }
+         }
+     }
+ }
+ 
+-RefPtr<Inspector::Protocol::CSS::CSSRule> buildObjectForStyleRule(Inspector::StyleRule& rule, Element* element)
++RefPtr<Inspector::Protocol::CSS::CSSRule> InspectorCSSAgent::buildObjectForStyleRule(Inspector::StyleRule& rule, Element* element)
+ {
+     RefPtr<Inspector::Protocol::CSS::CSSStyle> styleObject;
+     rule.withStyle([&styleObject] (StyleDeclaration& style) {
+         styleObject = buildObjectForStyle(style);
+     });
+     ASSERT(styleObject);
+ 
+     StylesheetRuleSet* stylesheet = rule.stylesheet();
+     ASSERT(stylesheet);
+ 
+@@ -1304,56 +1303,55 @@ RefPtr<Inspector::Protocol::CSS::CSSRule> buildObjectForStyleRule(Inspector::Sty
+ 
+     auto mediaArray = Inspector::Protocol::Array<Inspector::Protocol::CSS::CSSMedia>::create();
+ 
+     fillMediaListChain(rule.rule(), mediaArray.get());
+     if (mediaArray->length())
+         result->setMedia(WTF::move(mediaArray));
+ 
+     return WTF::move(result);
+ }
+ 
+-RefPtr<Inspector::Protocol::CSS::RuleMatch> InspectorCSSAgent::buildObjectForMatchedRule(WebCore::StyleRule& styleRule, Element& element)
++RefPtr<Inspector::Protocol::Array<int>> InspectorCSSAgent::buildArrayForMatchingSelectors(WebCore::StyleRule& styleRule, Element& element)
+ {
+-    RefPtr<Inspector::Protocol::CSS::RuleMatch> result;
+-    withWrappedRule(styleRule, element.document(), [&] (Inspector::StyleRule& rule) {
+-        SelectorChecker::CheckingContext context(SelectorChecker::Mode::CollectingRules);
+-        SelectorChecker selectorChecker(element.document());
++    SelectorChecker::CheckingContext context(SelectorChecker::Mode::CollectingRules);
++    SelectorChecker selectorChecker(element.document());
+ 
+-        // FIXME: this is duplicated from RuleSelector, it should be calculated there.
+-        auto matchingSelectors = Inspector::Protocol::Array<int>::create();
+-        const CSSSelectorList& selectorList = styleRule.selectorList();
+-        long index = 0;
+-        for (const CSSSelector* selector = selectorList.first(); selector; selector = CSSSelectorList::next(selector)) {
+-            unsigned ignoredSpecificity;
+-            bool matched = selectorChecker.match(selector, &element, context, ignoredSpecificity);
+-            if (matched)
+-                matchingSelectors->addItem(index);
+-            ++index;
+-        }
+-
+-        result = Inspector::Protocol::CSS::RuleMatch::create()
+-            .setRule(buildObjectForStyleRule(rule, &element))
+-            .setMatchingSelectors(WTF::move(matchingSelectors))
+-            .release();
+-    });
+-    return WTF::move(result);
++    // FIXME: this is duplicated from RuleSelector, it should be calculated there.
++    auto matchingSelectors = Inspector::Protocol::Array<int>::create();
++    const CSSSelectorList& selectorList = styleRule.selectorList();
++    long index = 0;
++    for (const CSSSelector* selector = selectorList.first(); selector; selector = CSSSelectorList::next(selector)) {
++        unsigned ignoredSpecificity;
++        bool matched = selectorChecker.match(selector, &element, context, ignoredSpecificity);
++        if (matched)
++            matchingSelectors->addItem(index);
++        ++index;
++    }
++    return WTF::move(matchingSelectors);
+ }
+ 
+ // FIXME: turn this into a collector functor.
+-RefPtr<Inspector::Protocol::Array<Inspector::Protocol::CSS::RuleMatch>> InspectorCSSAgent::buildArrayForMatchedRuleList(const Vector<RefPtr<StyleRule>>& matchedRules, Element& element)
++RefPtr<Inspector::Protocol::Array<Inspector::Protocol::CSS::RuleMatch>> InspectorCSSAgent::buildArrayForMatchedRuleList(const Vector<RefPtr<WebCore::StyleRule>>& matchedRules, Element& element)
+ {
+     auto result = Inspector::Protocol::Array<Inspector::Protocol::CSS::RuleMatch>::create();
+ 
+-    for (auto& matchedRule : matchedRules)
+-        if (auto matchObject = buildObjectForMatchedRule(*matchedRule, element))
+-            result->addItem(WTF::move(matchObject));
++    for (auto& matchedRule : matchedRules) {
++        withWrappedRule(*matchedRule, element.document(), [&] (Inspector::StyleRule& rule) {
++            RefPtr<Inspector::Protocol::CSS::RuleMatch> matchObject = Inspector::Protocol::CSS::RuleMatch::create()
++                .setRule(buildObjectForStyleRule(rule, &element))
++                .setMatchingSelectors(buildArrayForMatchingSelectors(*matchedRule, element))
++                .release();
+ 
++            if (matchObject)
++                result->addItem(WTF::move(matchObject));
++        });
++    }
+     return WTF::move(result);
+ }
+ 
+ RefPtr<Inspector::Protocol::Array<Inspector::Protocol::CSS::Region>> InspectorCSSAgent::buildArrayForRegions(ErrorString& errorString, RefPtr<NodeList>&& regionList, int documentNodeId)
+ {
+     auto regions = Inspector::Protocol::Array<Inspector::Protocol::CSS::Region>::create();
+ 
+     for (unsigned i = 0; i < regionList->length(); ++i) {
+         Inspector::Protocol::CSS::Region::RegionOverset regionOverset;
+ 
+diff --git a/Source/WebCore/inspector/InspectorCSSAgent.h b/Source/WebCore/inspector/InspectorCSSAgent.h
+index 7ef6b53..9bbe5f6 100644
+--- a/Source/WebCore/inspector/InspectorCSSAgent.h
++++ b/Source/WebCore/inspector/InspectorCSSAgent.h
+@@ -121,21 +121,22 @@ public:
+     virtual void forcePseudoState(ErrorString&, int nodeId, const RefPtr<Inspector::InspectorArray>&& forcedPseudoClasses) override;
+     virtual void getNamedFlowCollection(ErrorString&, int documentNodeId, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::CSS::NamedFlow>>& result) override;
+ 
+     // Public entry points for the Inspector CSS wrapper system.
+     void withWrappedRule(WebCore::StyleRule&, Document& ownerDocument, const std::function<void(Inspector::StyleRule&)>&);
+     void withWrappedStyle(CSSStyleDeclaration&, const std::function<void(Inspector::StyleDeclaration&)>&);
+     Inspector::StylesheetRuleSet& ruleSetForStyleSheet(CSSStyleSheet&);
+     Inspector::InlineStyleRuleSet& ruleSetForInlineStyle(Element&);
+     Inspector::StylesheetRuleSet* ruleSetForRule(WebCore::StyleRule&, Document& ownerDocument);
+ 
+-    RefPtr<Inspector::Protocol::CSS::RuleMatch> buildObjectForMatchedRule(StyleRule&, Element&);
++    static RefPtr<Inspector::Protocol::Array<int>> buildArrayForMatchingSelectors(StyleRule&, Element&);
++    static RefPtr<Inspector::Protocol::CSS::CSSRule> buildObjectForStyleRule(Inspector::StyleRule&, Element* matchTarget);
+ 
+ private:
+     class StyleRuleSetAction;
+     class SetStyleSheetTextAction;
+     class SetStyleTextAction;
+     class SetRuleSelectorAction;
+     class AddRuleAction;
+ 
+     typedef HashMap<uint64_t, RefPtr<Inspector::StyleRuleSet>> IdentifierToRuleSetMap;
+     typedef HashMap<CSSStyleSheet*, RefPtr<Inspector::StylesheetRuleSet>> CSSStyleSheetToRuleSetMap;
+diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+index 3ed99bd..0e86038 100644
+--- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
++++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+@@ -55,25 +55,73 @@
+ #include <inspector/ScriptCallStackFactory.h>
+ #include <wtf/Stopwatch.h>
+ #include <wtf/TemporaryChange.h>
+ 
+ using namespace WebCore;
+ 
+ namespace Inspector {
+ 
+ static int maxCallStackDepth = 5;
+ 
+-StyleSnapshot::StyleSnapshot(RefPtr<Inspector::Protocol::DOMTracing::EffectiveStyle>&& encodedData)
++StyleSnapshot::StyleSnapshot(RefPtr<Inspector::Protocol::DOMTracing::StyleSnapshot>&& encodedData)
+     : encodedData(encodedData)
+ {
+ }
+ 
++void StyleSnapshotData::addElement(Element& element)
++{
++    ASSERT(elementOrdinals.size() == elementOrder.size());
++
++    if (elementOrdinals.contains(&element))
++        return;
++
++    uint64_t newOrdinal = elementOrder.size();
++    elementOrdinals.set(&element, newOrdinal);
++    elementOrder.append(&element);
++}
++
++void StyleSnapshotData::addRuleForElement(WebCore::StyleRule& rule, Element& element)
++{
++    if (!elementOrdinals.contains(&element))
++        addElement(element);
++
++    if (ruleOrdinals.contains(&rule))
++        return;
++
++    uint64_t newOrdinal = ruleOrder.size();
++    ruleOrdinals.set(&rule, newOrdinal);
++    ruleOrder.append(&rule);
++
++    if (!rulesToKeepForElement.contains(&element))
++        rulesToKeepForElement.set(&element, std::make_unique<Vector<RefPtr<WebCore::StyleRule>>>());
++
++    if (Vector<RefPtr<WebCore::StyleRule>>* rulesToKeep = rulesToKeepForElement.get(&element))
++        rulesToKeep->append(&rule);
++}
++
++uint64_t StyleSnapshotData::ordinalForElement(WebCore::Element& element)
++{
++    if (!elementOrdinals.contains(&element))
++        addElement(element);
++
++    auto findResult = elementOrdinals.find(&element);
++    ASSERT(findResult != elementOrdinals.end());
++    return findResult->value;
++}
++
++uint64_t StyleSnapshotData::ordinalForRule(WebCore::StyleRule& rule)
++{
++    auto findResult = ruleOrdinals.find(&rule);
++    ASSERT(findResult != ruleOrdinals.end());
++    return findResult->value;
++}
++
+ SubtreeSnapshot::SubtreeSnapshot(RefPtr<Inspector::Protocol::DOMTracing::DOMTreeSnapshot>&& encodedData)
+     : encodedData(encodedData)
+ {
+ }
+ 
+ ElementSnapshot::ElementSnapshot() { }
+ ElementSnapshot::~ElementSnapshot() { }
+ 
+ ElementSnapshot::ElementSnapshot(std::unique_ptr<ImageBuffer> data, const LayoutRect& bounds, uint64_t snapshotId)
+     : imageData(std::move(data))
+@@ -143,27 +191,25 @@ static RefPtr<Inspector::Protocol::CSS::CSSProperty> buildObjectForProperty(Styl
+             TextPosition start, end;
+             property.getTextRange(start, end);
+             result->setRange(buildObjectForSourceRange(start, end));
+         }
+         result->setStatus(status);
+     });
+ 
+     return WTF::move(result);
+ }
+ 
+-std::unique_ptr<StyleSnapshot> DOMTracingAgent::createStyleSnapshot(Element& targetElement)
++RefPtr<Inspector::Protocol::DOMTracing::EffectiveStyle> DOMTracingAgent::createEffectiveStyle(Element& targetElement, StyleSnapshotData& snapshotData)
+ {
+     std::bitset<numCSSProperties> propertyIsClaimed;
+     HashMap<CSSPropertyID, WebCore::StyleRule*> winningRuleMap;
+     HashMap<CSSPropertyID, Element*> winningInlineStyleMap;
+-    HashMap<Element*, std::unique_ptr<Vector<RefPtr<WebCore::StyleRule>>>> rulesToKeepForElement;
+-    HashSet<Element*> elementsWithUsefulInlineStyle;
+ 
+     StyleResolver& styleResolver = targetElement.document().ensureStyleResolver();
+ 
+     for (Element* element = &targetElement; element; element = element->parentElement()) {
+         // First try to claim properties in the inline style, as it has highest specificity.
+         const StyleProperties* properties = nullptr;
+         if (is<StyledElement>(element))
+             properties = downcast<StyledElement>(element)->inlineStyle();
+ 
+         unsigned size = properties ? properties->propertyCount() : 0;
+@@ -177,21 +223,21 @@ std::unique_ptr<StyleSnapshot> DOMTracingAgent::createStyleSnapshot(Element& tar
+             if (!propertyIsClaimed[property.id()]) {
+                 propertyIsClaimed.set(property.id());
+                 claimedPropertyFromInlineStyle = true;
+                 auto addResult = winningInlineStyleMap.set(property.id(), element);
+                 ASSERT_UNUSED(addResult, addResult.isNewEntry);
+                 LOG(WebReplay, "Claimed property  %s: %s\n", getPropertyName(property.id()), property.value()->cssText().utf8().data());
+             }
+         }
+ 
+         if (claimedPropertyFromInlineStyle)
+-            elementsWithUsefulInlineStyle.add(element);
++            snapshotData.addElement(*element);
+ 
+         // Then try to claim properties from each rule that matches this element.
+         // Rules are already sorted by descending specificity, so higher specificity
+         // rules and earlier rules will claim properties first.
+         auto matchedRules = styleResolver.styleRulesForElement(element, StyleResolver::AuthorCSSRules);
+         for (RefPtr<WebCore::StyleRule> rule : matchedRules) {
+             LOG(WebReplay, "Checking rule with selector: %s\n", rule->selectorList().selectorsText().utf8().data());
+ 
+             bool onlyConsiderInheritedProperties = (element != &targetElement);
+             const StyleProperties& properties = rule->properties();
+@@ -205,113 +251,134 @@ std::unique_ptr<StyleSnapshot> DOMTracingAgent::createStyleSnapshot(Element& tar
+                     propertyIsClaimed.set(property.id());
+                     claimedPropertyFromRule = true;
+                     auto addResult = winningRuleMap.set(property.id(), rule.get());
+                     ASSERT_UNUSED(addResult, addResult.isNewEntry);
+                     LOG(WebReplay, "Claimed property  %s: %s\n", getPropertyName(property.id()), property.value()->cssText().utf8().data());
+                 }
+             }
+             if (!claimedPropertyFromRule)
+                 continue;
+ 
+-            if (!rulesToKeepForElement.contains(element))
+-                rulesToKeepForElement.set(element, std::make_unique<Vector<RefPtr<WebCore::StyleRule>>>());
+-
+-            if (Vector<RefPtr<WebCore::StyleRule>>* rulesToKeep = rulesToKeepForElement.get(element))
+-                rulesToKeep->append(WTF::move(rule));
++            snapshotData.addRuleForElement(*rule, *element);
+         }
+         // TODO: add matched pseudo style rules. See CSSAgent. It could be folded into above.
+     }
+ 
+-    // For now, serialize the data directly to inspector objects since we don't do any analysis on
+-    // the backend. In the future, we may want to use a different intermediate format for that.
+-    auto elementsArray = Inspector::Protocol::Array<Inspector::Protocol::DOMTracing::ElementEntry>::create();
+-    for (Element* element = &targetElement; element; element = element->parentElement()) {
+-        auto matchedRulesArray = Inspector::Protocol::Array<Inspector::Protocol::CSS::RuleMatch>::create();
+-
+-        if (const Vector<RefPtr<WebCore::StyleRule>>* rulesToKeep = rulesToKeepForElement.get(element)) {
+-            for (RefPtr<WebCore::StyleRule> rule : *rulesToKeep)
+-                matchedRulesArray->addItem(m_cssAgent->buildObjectForMatchedRule(*rule, *element));
+-        }
+-
+-        auto elementObject = Inspector::Protocol::DOMTracing::ElementEntry::create()
+-            .setNodeId(m_domAgent->pushNodePathToFrontend(element))
+-            .setMatchedRules(WTF::move(matchedRulesArray))
+-            .release();
+-
+-        if (elementsWithUsefulInlineStyle.contains(element)) {
+-            ASSERT(is<StyledElement>(element));
+-            RefPtr<Inspector::Protocol::CSS::CSSStyle> styleObject;
+-            m_cssAgent->withWrappedStyle(*element->style(), [&styleObject] (StyleDeclaration& style) {
+-                styleObject = buildObjectForStyle(style);
+-            });
+-            ASSERT(styleObject);
+-            elementObject->setInlineStyle(WTF::move(styleObject));
+-        }
+-        elementsArray->addItem(WTF::move(elementObject));
+-    }
+-
+     auto propertiesArray = Inspector::Protocol::Array<Inspector::Protocol::DOMTracing::PropertyEntry>::create();
+     for (auto entry : winningRuleMap) {
+         RefPtr<Inspector::Protocol::DOMTracing::PropertyEntry> entryObject;
+         m_cssAgent->withWrappedRule(*entry.value, targetElement.document(), [&] (Inspector::StyleRule& rule) {
+             RefPtr<Inspector::Protocol::CSS::CSSProperty> propertyObject;
+             rule.withStyle([&] (Inspector::StyleDeclaration& style) {
+                 CSSPropertyID propertyId = entry.key;
+                 propertyObject = buildObjectForProperty(style, propertyId);
+             });
+             entryObject = Inspector::Protocol::DOMTracing::PropertyEntry::create()
+                 .setProperty(WTF::move(propertyObject))
+                 .release();
+ 
+-            entryObject->setSourceRule(rule.ruleId().asProtocolValue<Inspector::Protocol::CSS::CSSRuleId>());
++            entryObject->setSourceRule(snapshotData.ordinalForRule(*entry.value));
+         });
+         propertiesArray->addItem(WTF::move(entryObject));
+     }
+ 
+     for (auto entry : winningInlineStyleMap) {
+         ASSERT(is<StyledElement>(entry.value));
+         InlineStyleRuleSet& inlineStyle = m_cssAgent->ruleSetForInlineStyle(*entry.value);
+         RefPtr<Inspector::Protocol::CSS::CSSProperty> propertyObject;
+         RefPtr<Inspector::Protocol::DOMTracing::PropertyEntry> entryObject;
+         inlineStyle.withInlineStyle([&] (StyleDeclaration& style) {
+             CSSPropertyID propertyId = entry.key;
+             propertyObject = buildObjectForProperty(style, propertyId);
+             entryObject = Inspector::Protocol::DOMTracing::PropertyEntry::create()
+                 .setProperty(WTF::move(propertyObject))
+                 .release();
+         });
+ 
+-        entryObject->setSourceElement(m_domAgent->pushNodePathToFrontend(entry.value));
++        entryObject->setSourceElement(snapshotData.ordinalForElement(*entry.value));
+         propertiesArray->addItem(WTF::move(entryObject));
+     }
+ 
+-    auto effectiveStyleObject = Inspector::Protocol::DOMTracing::EffectiveStyle::create()
+-        .setTargetElement(m_domAgent->pushNodePathToFrontend(&targetElement))
+-        .setElements(WTF::move(elementsArray))
++    return Inspector::Protocol::DOMTracing::EffectiveStyle::create()
++        .setTarget(m_domAgent->pushNodePathToFrontend(&targetElement))
+         .setProperties(WTF::move(propertiesArray))
+         .release();
++}
++
++std::unique_ptr<StyleSnapshot> DOMTracingAgent::createStyleSnapshot(Element& targetElement, StyleSnapshotData& snapshotData)
++{
++    auto effectiveStylesArray = Inspector::Protocol::Array<Inspector::Protocol::DOMTracing::EffectiveStyle>::create();
++    // FIXME: capture effective styles for all element descendants of targetElement.
++    effectiveStylesArray->addItem(createEffectiveStyle(targetElement, snapshotData));
++
++    // For now, serialize the data directly to inspector objects since we don't do any analysis on
++    // the backend. In the future, we may want to use a different intermediate format for that.
++    auto elementsArray = Inspector::Protocol::Array<Inspector::Protocol::DOMTracing::ElementEntry>::create();
++    for (Element* element : snapshotData.elementOrder) {
++        auto matchedRulesArray = Inspector::Protocol::Array<Inspector::Protocol::DOMTracing::ElementRuleMatch>::create();
++
++        if (const Vector<RefPtr<WebCore::StyleRule>>* rulesToKeep = snapshotData.rulesToKeepForElement.get(element)) {
++            for (RefPtr<WebCore::StyleRule> rule : *rulesToKeep) {
++                RefPtr<Inspector::Protocol::DOMTracing::ElementRuleMatch> matchObject = Inspector::Protocol::DOMTracing::ElementRuleMatch::create()
++                    .setRule(snapshotData.ordinalForRule(*rule))
++                    .setMatchingSelectors(InspectorCSSAgent::buildArrayForMatchingSelectors(*rule, *element))
++                    .release();
++
++                matchedRulesArray->addItem(WTF::move(matchObject));
++            }
++        }
++
++        auto elementObject = Inspector::Protocol::DOMTracing::ElementEntry::create()
++            .setNodeId(m_domAgent->pushNodePathToFrontend(element))
++            .setMatchedRules(WTF::move(matchedRulesArray))
++            .release();
++
++        if (is<StyledElement>(element)) {
++            RefPtr<Inspector::Protocol::CSS::CSSStyle> styleObject;
++            m_cssAgent->withWrappedStyle(*element->style(), [&styleObject] (StyleDeclaration& style) {
++                styleObject = buildObjectForStyle(style);
++            });
++            ASSERT(styleObject);
++            elementObject->setInlineStyle(WTF::move(styleObject));
++        }
++        elementsArray->addItem(WTF::move(elementObject));
++    }
++
++    auto rulesArray = Inspector::Protocol::Array<Inspector::Protocol::CSS::CSSRule>::create();
++    for (WebCore::StyleRule* styleRule : snapshotData.ruleOrder) {
++        m_cssAgent->withWrappedRule(*styleRule, targetElement.document(), [&] (Inspector::StyleRule& rule) {
++            rulesArray->addItem(InspectorCSSAgent::buildObjectForStyleRule(rule, nullptr));
++        });
++    }
++
++    auto snapshotObject = Inspector::Protocol::DOMTracing::StyleSnapshot::create()
++        .setEffectiveStyles(WTF::move(effectiveStylesArray))
++        .setElements(WTF::move(elementsArray))
++        .setRules(WTF::move(rulesArray))
++        .release();
+ 
+-    return std::make_unique<StyleSnapshot>(WTF::move(effectiveStyleObject));
++    return std::make_unique<StyleSnapshot>(WTF::move(snapshotObject));
+ }
+ 
+ std::unique_ptr<SubtreeSnapshot> DOMTracingAgent::createSubtreeSnapshot(Element& rootElement)
+ {
+     auto nodeObjects = Inspector::Protocol::Array<Inspector::Protocol::DOMTracing::NodeSnapshot>::create();
+ 
+     HashMap<Node*, uint64_t> nodeOrdinals;
+     uint64_t nextOrdinal = 0;
+ 
+     for (Node* node = &rootElement; node; node = NodeTraversal::next(*node, &rootElement))
+         nodeOrdinals.set(node, nextOrdinal++);
+ 
+     for (Node* node = &rootElement; node; node = NodeTraversal::next(*node, &rootElement)) {
+         auto nodeObject = Inspector::Protocol::DOMTracing::NodeSnapshot::create()
++            .setId(m_domAgent->pushNodePathToFrontend(node))
+             .setNodeType(node->nodeType())
+             .setNodeName(node->nodeName())
+             .release();
+ 
+         if (node->hasChildNodes()) {
+             auto childOrdinalsArray = Inspector::Protocol::Array<Inspector::Protocol::DOMTracing::NodeSnapshotOrdinal>::create();
+             for (Node* child = node->firstChild(); child; child = child->nextSibling()) {
+                 auto findResult = nodeOrdinals.find(child);
+                 ASSERT(findResult != nodeOrdinals.end());
+                 childOrdinalsArray->addItem(findResult->value);
+@@ -594,21 +661,22 @@ void DOMTracingAgent::commitSnapshot(std::unique_ptr<ElementSnapshot> snapshot)
+     if (m_currentSnapshot && m_currentSnapshot->snapshotId) {
+         uint64_t key = m_currentSnapshot->snapshotId;
+         m_savedSnapshotMap.set(key, WTF::move(m_currentSnapshot));
+     }
+     m_currentSnapshot = WTF::move(snapshot);
+ 
+     if (!m_currentSnapshot->snapshotId)
+         return;
+ 
+     ASSERT(m_targetElement);
+-    m_currentSnapshot->effectiveStyle = createStyleSnapshot(*m_targetElement);
++    StyleSnapshotData snapshotData;
++    m_currentSnapshot->effectiveStyle = createStyleSnapshot(*m_targetElement, snapshotData);
+     m_currentSnapshot->subtree = createSubtreeSnapshot(*m_targetElement);
+     // Send the committed non-empty snapshot to the inspector frontend.
+     int nodeId = m_domAgent->pushNodePathToFrontend(m_targetElement.get());
+     ASSERT(nodeId); // This should get an already assigned id, or bind the node and get a new one.
+ 
+     double elapsedTime = m_instrumentingAgents->inspectorEnvironment().executionStopwatch()->elapsedTime();
+ 
+     auto snapshotObject = Inspector::Protocol::DOMTracing::ElementSnapshot::create()
+         .setNodeId(nodeId)
+         .setSnapshotId(m_currentSnapshot->snapshotId)
+diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.h b/Source/WebCore/inspector/InspectorDOMTracingAgent.h
+index b3a5145..2ee18bc 100644
+--- a/Source/WebCore/inspector/InspectorDOMTracingAgent.h
++++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.h
+@@ -37,31 +37,49 @@
+ namespace WebCore {
+ class CharacterData;
+ class Document;
+ class Element;
+ class Frame;
+ class ImageBuffer;
+ class InspectorCSSAgent;
+ class InspectorDOMAgent;
+ class Node;
+ class RenderObject;
++class StyleRule;
+ }
+ 
+ namespace Inspector {
+ 
+ struct TraceOperation;
+ 
+ struct StyleSnapshot {
+-    StyleSnapshot(RefPtr<Inspector::Protocol::DOMTracing::EffectiveStyle>&&);
++    StyleSnapshot(RefPtr<Inspector::Protocol::DOMTracing::StyleSnapshot>&&);
+     ~StyleSnapshot() { }
+ 
+-    RefPtr<Inspector::Protocol::DOMTracing::EffectiveStyle> encodedData;
++    RefPtr<Inspector::Protocol::DOMTracing::StyleSnapshot> encodedData;
++};
++
++struct StyleSnapshotData {
++    StyleSnapshotData() = default;
++    WTF_MAKE_NONCOPYABLE(StyleSnapshotData);
++public:
++    void addElement(WebCore::Element&);
++    void addRuleForElement(WebCore::StyleRule&, WebCore::Element&);
++
++    uint64_t ordinalForElement(WebCore::Element&);
++    uint64_t ordinalForRule(WebCore::StyleRule&);
++
++    HashMap<WebCore::Element*, uint64_t> elementOrdinals;
++    Vector<WebCore::Element*> elementOrder;
++    HashMap<WebCore::StyleRule*, uint64_t> ruleOrdinals;
++    Vector<WebCore::StyleRule*> ruleOrder;
++    HashMap<WebCore::Element*, std::unique_ptr<Vector<RefPtr<WebCore::StyleRule>>>> rulesToKeepForElement;
+ };
+ 
+ struct SubtreeSnapshot {
+     SubtreeSnapshot(RefPtr<Inspector::Protocol::DOMTracing::DOMTreeSnapshot>&&);
+     ~SubtreeSnapshot() { }
+ 
+     RefPtr<Inspector::Protocol::DOMTracing::DOMTreeSnapshot> encodedData;
+ };
+ 
+ struct ElementSnapshot {
+@@ -107,23 +125,24 @@ public:
+     void didRemoveDOMAttr(WebCore::Element&, const AtomicString& name);
+ 
+     bool setTargetElement(WebCore::Element*);
+ private:
+     void commitSnapshot(std::unique_ptr<ElementSnapshot>);
+     void elementAppearanceChanged();
+     void pushOperationToFrontend(const Inspector::TraceOperation&);
+ 
+     // Use this rather than manually constructing ElementSnapshot to avoid reentrancy issues.
+     std::unique_ptr<ElementSnapshot> createSnapshot(WebCore::Element&);
+-    std::unique_ptr<StyleSnapshot> createStyleSnapshot(WebCore::Element&);
+     std::unique_ptr<SubtreeSnapshot> createSubtreeSnapshot(WebCore::Element&);
+-
++    std::unique_ptr<StyleSnapshot> createStyleSnapshot(WebCore::Element&, StyleSnapshotData&);
++    RefPtr<Inspector::Protocol::DOMTracing::EffectiveStyle> createEffectiveStyle(WebCore::Element& targetElement, StyleSnapshotData& snapshotData);
++                                
+     std::unique_ptr<DOMTracingFrontendDispatcher> m_frontendDispatcher;
+     RefPtr<DOMTracingBackendDispatcher> m_backendDispatcher;
+ 
+     WebCore::InspectorDOMAgent* m_domAgent {nullptr};
+     WebCore::InspectorCSSAgent* m_cssAgent {nullptr};
+ 
+     HashMap<uint64_t, std::unique_ptr<ElementSnapshot>> m_savedSnapshotMap;
+     uint64_t m_nextSnapshotId {1};
+ 
+     WeakPtr<WebCore::Element> m_targetElement;
+diff --git a/Source/WebInspectorUI/UserInterface/Models/DOMNodeSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/DOMNodeSnapshot.js
+index 8f3b3c0..e7f7218 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/DOMNodeSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/DOMNodeSnapshot.js
+@@ -22,44 +22,45 @@
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ // This class acts as a static data source for DOM node data. It can be used in
+ // place of WebInspector.DOMTree. It does not update node data as it
+ // changes on the page, nor does it support editing or incremental fetching.
+ 
+ WebInspector.DOMNodeSnapshot = class DOMNodeSnapshot extends WebInspector.Object
+ {
+-    constructor(type, name, value, childOrdinals, attributeMap)
++    constructor(id, type, name, value, childOrdinals, attributeMap)
+     {
+         super();
+ 
+         this._nodesToResolve = childOrdinals || [];
+         this._attributeMap = attributeMap;
+ 
++        this.id = id;
+         this._nodeType = type;
+         this._nodeName = name;
+         this._nodeValue = value;
+     }
+ 
+     // Static
+ 
+     static fromPayload(payload)
+     {
+         var attributeList = payload.attributes || [];
+         console.assert(attributeList.length % 2 === 0, "Attribute list for node snapshot must have even number of entries.");
+ 
+         var attributeMap = attributeList.length ? new Map : null;
+         for (var i = 0; i < attributeList.length; i += 2)
+             attributeMap.set(attributeList[i], attributeList[i + 1]);
+ 
+-        return new WebInspector.DOMNodeSnapshot(payload.nodeType, payload.nodeName, payload.nodeValue, payload.children, attributeMap)
++        return new WebInspector.DOMNodeSnapshot(payload.id, payload.nodeType, payload.nodeName, payload.nodeValue, payload.children, attributeMap)
+     }
+ 
+     // Public
+ 
+     get children()
+     {
+         if (!this._children)
+             return null;
+ 
+         return this._children.slice();
+@@ -126,36 +127,46 @@ WebInspector.DOMNodeSnapshot = class DOMNodeSnapshot extends WebInspector.Object
+             attributesList.push({name, value});
+ 
+         return attributesList;
+     }
+ 
+     getAttribute(name)
+     {
+         return this._attributeMap ? this._attributeMap.get(name) : null;
+     }
+ 
++    get effectiveStyle()
++    {
++        return this._effectiveStyle;
++    }
++
+     // APIs that are cruft or redundant, but must exist to placate DOMTreeOutline / DOMTreeElement.
+ 
+     isXMLNode() { return false; }
+     isInShadowTree() { return false; }
+     isEditable() { return false; }
+     isTrackable() { return false; }
+     hasChildNodes() { return this.childNodeCount > 0; }
+     hasShadowRoots() { return false; }
+     hasAttributes() { return !!this._attributeMap; }
+     nodeNameInCorrectCase() { return this.nodeName().toLowerCase(); }
+     getSubtree(depth, callback) { setTimeout(callback, 0); }
+     getChildNodes(callback) { setTimeout(callback, 0); }
+     get enabledPseudoClasses() { return []; }
+ 
+     // Protected
+ 
++    set effectiveStyle(value)
++    {
++        this._effectiveStyle = value;
++    }
++
+     resolveChildren(nodeList)
+     {
+         console.assert(this._nodesToResolve, "Already resolved nodes.");
+         if (!this._nodesToResolve)
+             return;
+ 
+         if (this._nodesToResolve.length) {
+             this._children = [];
+             for (var childOrdinal of this._nodesToResolve) {
+                 var isValidIndex = childOrdinal === Number.constrain(childOrdinal, 0, nodeList.length - 1);
+diff --git a/Source/WebInspectorUI/UserInterface/Models/DOMTreeSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/DOMTreeSnapshot.js
+index f04ffc9..ba117c7 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/DOMTreeSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/DOMTreeSnapshot.js
+@@ -22,34 +22,292 @@
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ // This class acts as a static data source for DOM node data. It can be used in
+ // place of WebInspector.DOMTree. It does not update node data as it
+ // changes on the page, nor does it support editing or incremental fetching.
+ 
+ WebInspector.DOMTreeSnapshot = class DOMTreeSnapshot extends WebInspector.Object
+ {
+-    constructor(rootNode)
++    constructor(rootNode, nodeMap)
+     {
+         super();
+ 
+         this._rootNode = rootNode;
++        this._nodeMap = new Map;
+     }
+ 
+     // Static
+-    static fromPayload(payload)
++    static fromPayload(treePayload, stylePayload)
+     {
+-        var nodeList = payload.nodes.map(WebInspector.DOMNodeSnapshot.fromPayload);
+-        for (var node of nodeList)
++        // Create and resolve node snapshots.
++        var nodeList = treePayload.nodes.map(WebInspector.DOMNodeSnapshot.fromPayload);
++        var nodeMap = new Map;
++        for (var node of nodeList) {
++            nodeMap.set(node.id, node);
+             node.resolveChildren(nodeList);
++        }
+ 
+-        return new WebInspector.DOMTreeSnapshot(nodeList[0]);
++        var rules = [];
++        // Create rule objects.
++        for (var rulePayload of stylePayload.rules) {
++            var isInherited = false; // No context, so we don't know this yet.
++            var rule = parseRulePayload(rulePayload, null, null, isInherited);
++            rules.push(rule);
++        }
++
++        var elementData = [];
++        // Create element entries.
++        for (var entry of stylePayload.elements) {
++            var node = WebInspector.domTreeManager.nodeForId(entry.nodeId);
++            console.assert(node, node);
++            var inlineStyle = null;
++            if ("inlineStyle" in entry) {
++                var isInherited = false; // No context, so we don't know this yet.
++                inlineStyle = parseDeclarationPayload(entry.inlineStyle, node, isInherited, WebInspector.CSSStyleDeclaration.Type.Inline);
++            }
++
++            var matchedRules = [];
++            for (var ruleOrdinal of entry.matchedRules) {
++                if (!isValidOrdinal(ruleOrdinal, rules))
++                    continue;
++                matchedRules.push(rules[ruleOrdinal]);
++            }
++            elementData.push({node, matchedRules, inlineStyle});
++        }
++
++        var styleSnapshots = []; // FIXME: this array is for debugging only.                                         
++        // Parse effective style properties.
++        for (var entry of stylePayload.effectiveStyles) {
++            var effectiveProperties = [];
++            var matchedRules = [];
++            var inlineStyles = [];
++            for (var i = 0; i < entry.properties.length; ++i) {
++                var propertyEntry = entry.properties[i];
++                var property = parsePropertyPayload(propertyEntry.property, i, null);
++                // If property came from a rule, find that rule based on its id.
++                if ("sourceRule" in propertyEntry) {
++                    var ruleOrdinal = propertyEntry.sourceRule;
++                    if (!isValidOrdinal(ruleOrdinal, rules))
++                        continue;
++
++                    var originatingRule = rules[ruleOrdinal];
++                    property.ownerStyle = originatingRule.style;
++                    matchedRules.push(originatingRule);
++                }
++                // If property came from an element's inline style, find that.
++                else if ("sourceElement" in propertyEntry) {
++                    var elementOrdinal = propertyEntry.sourceElement;
++                    if (!isValidOrdinal(elementOrdinal, elementData))
++                        continue;
++
++                    var element = elementData[elementOrdinal];
++                    console.assert(element.inlineStyle !== null, "Unable to find cross-referenced inline style for element", element);
++                    property.ownerStyle = element.inlineStyle;
++                    inlineStyles.push(element.inlineStyle);
++                } else
++                    console.assert("Unknown source for effective style property: ", property);
++
++                effectiveProperties.push(property);
++            }
++
++            var targetElement = WebInspector.domTreeManager.nodeForId(entry.target);
++            var styleSnapshot = new WebInspector.EffectiveStyleSnapshot(targetElement, effectiveProperties, matchedRules, inlineStyles);
++            styleSnapshots.push(styleSnapshot);
++
++            // Associate effective style with node snapshot.
++            var targetElementId = styleSnapshot.targetElement.id;
++            console.assert(nodeMap.has(targetElementId), "Couldn't find node snapshot for effective style snapshot", styleSnapshot);
++            var nodeSnapshot = nodeMap.get(targetElementId);
++            nodeSnapshot.effectiveStyle = styleSnapshot;
++        }
++
++        return new WebInspector.DOMTreeSnapshot(nodeList[0], nodeMap);
++
++        function isValidOrdinal(ordinal, vector) {
++            var isValidIndex = ordinal === Number.constrain(ordinal, 0, vector.length - 1);
++            console.assert(isValidIndex, "Ordinal index out of bounds!", ordinal);
++            return isValidIndex;
++        }
++
++        function createSourceCodeLocation(sourceURL, sourceLine, sourceColumn) {
++            if (!sourceURL)
++                return null;
++
++            // FIXME: blindly searches all frames since we don't know which document this came from.
++            var sourceCode = WebInspector.frameResourceManager.resourceForURL(sourceURL);
++
++            if (!sourceCode)
++                return null;
++
++            return sourceCode.createSourceCodeLocation(sourceLine || 0, sourceColumn || 0);
++        };
++
++        function parseRulePayload(payload, matchedSelectorIndices, node, isInherited)
++        {
++            if (!payload)
++                return null;
++
++            // User and User Agent rules don't have 'ruleId' in the payload. However, their style's have 'styleId' and
++            // 'styleId' is the same identifier the backend uses for Author rule identifiers, so do the same here.
++            // They are excluded by the backend because they are not editable, however our front-end does not determine
++            // editability solely based on the existence of the id like the open source front-end does.
++            var ruleId = payload.ruleId || payload.style.styleId;
++
++            var style = parseDeclarationPayload(payload.style, node, isInherited, WebInspector.CSSStyleDeclaration.Type.Rule);
++            if (!style)
++                return null;
++
++            var selectorText = payload.selectorList.text;
++            var selectors = parseSelectorListPayload(payload.selectorList);
++            var sourceRange = payload.selectorList.range;
++            var sourceCodeLocation = createSourceCodeLocation(payload.sourceURL, sourceRange.startLine, sourceRange.startColumn);
++            var mediaList = parseMediaListPayload(payload.media);
++
++            var ruleType;
++            switch (payload.origin) {
++            case "regular":
++                ruleType = WebInspector.CSSRule.Type.Author;
++                break;
++            case "user":
++                ruleType = WebInspector.CSSRule.Type.User;
++                break;
++            case "user-agent":
++                ruleType = WebInspector.CSSRule.Type.UserAgent;
++                break;
++            case "inspector":
++                ruleType = WebInspector.CSSRule.Type.Inspector;
++                break;
++            }
++
++            var rule = new WebInspector.CSSRule(null, null, ruleId, ruleType, sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, null, mediaList);
++            style.ownerRule = rule;
++            return rule;
++        }
++
++        function parseMediaListPayload(mediaList)
++        {
++            if (!mediaList)
++                return [];
++
++            var mediaList = [];
++            for (var item of mediaList) {
++                var mediaType;
++                switch (item.source) {
++                case "mediaRule":
++                    mediaType = WebInspector.CSSMedia.Type.MediaRule;
++                    break;
++                case "importRule":
++                    mediaType = WebInspector.CSSMedia.Type.ImportRule;
++                    break;
++                case "linkedSheet":
++                    mediaType = WebInspector.CSSMedia.Type.LinkedStyleSheet;
++                    break;
++                case "inlineSheet":
++                    mediaType = WebInspector.CSSMedia.Type.InlineStyleSheet;
++                    break;
++                }
++
++                var location = this._createSourceCodeLocation(item.sourceURL, item.sourceLine);
++                mediaList.push(new WebInspector.CSSMedia(mediaType, mediaText, location));
++            }
++            return mediaList;
++        }
++
++        function parseSelectorListPayload(selectorList)
++        {
++            var selectors = selectorList.selectors;
++            if (!selectors.length)
++                return [];
++
++            return selectors.map(function(selectorPayload) {
++                return new WebInspector.CSSSelector(selectorPayload.text, selectorPayload.specificity, selectorPayload.dynamic);
++            });
++        }
++
++        function parseDeclarationPayload(payload, node, isInherited, styleType)
++        {
++            if (!payload)
++                return null;
++
++            var shorthands = {};
++            for (var i = 0; payload.shorthandEntries && i < payload.shorthandEntries.length; ++i) {
++                var shorthand = payload.shorthandEntries[i];
++                shorthands[shorthand.name] = shorthand.value;
++            }
++
++            var inheritedPropertyCount = 0;
++            var cssProperties = [];
++            for (var i = 0; payload.cssProperties && i < payload.cssProperties.length; ++i) {
++                var propertyPayload = payload.cssProperties[i];
++
++                if (isInherited && propertyPayload.name in WebInspector.CSSKeywordCompletions.InheritedProperties)
++                    ++inheritedPropertyCount;
++
++                var property = parsePropertyPayload(propertyPayload, i, payload.cssText);
++                cssProperties.push(property);
++            }
++
++            if (isInherited && !inheritedPropertyCount)
++                return null;
++
++            var textRange = parseSourceRangePayload(payload.range);
++            var declaration = new WebInspector.CSSStyleDeclaration(this, null, payload.styleId, styleType, node, isInherited, payload.cssText, cssProperties, textRange);
++            for (var cssProperty of cssProperties)
++                cssProperty.ownerStyle = declaration;
++
++            return declaration;
++        }
++
++        function parsePropertyPayload(payload, index, styleText)
++        {
++            if (!payload)
++                return null;
++
++            var propertyText = payload.text || "";
++            var value = (payload.value || "").replace(/\s*!important\s*$/, "");
++            var priority = payload.priority || "";
++
++            var enabled = true;
++            var overridden = false;
++            var implicit = payload.implicit || false;
++            var valid = "parsedOk" in payload ? payload.parsedOk : true;
++
++            switch (payload.status || "style") {
++            case "active":
++                enabled = true;
++                break;
++            case "inactive":
++                overridden = true;
++                enabled = true;
++                break;
++            case "disabled":
++                enabled = false;
++                break;
++            }
++
++            var styleSheetTextRange = parseSourceRangePayload(payload.range);
++            return new WebInspector.CSSProperty(index, propertyText, payload.name, value, priority, enabled, overridden, implicit, false, valid, styleSheetTextRange, null);
++        }
++
++        function parseSourceRangePayload(payload)
++        {
++            if (!payload)
++                return null;
++
++            return new WebInspector.TextRange(payload.startLine, payload.startColumn, payload.endLine, payload.endColumn);
++        }
+     }
+ 
+     // Public
+ 
+     get rootNode()
+     {
+         return this._rootNode;
+     }
++
++    findNode(id)
++    {
++        return this._nodeMap.get(id);
++    }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleSnapshot.js
+index 56ddcfe..aefdc29 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleSnapshot.js
+@@ -46,263 +46,27 @@ WebInspector.EffectiveStyleSnapshot = class EffectiveStyleSnapshot extends WebIn
+             // FIXME: is this actually used anywhere? Not sure where it is used. We could plug in the target element.
+             null, // node
+             false, // inherited
+             null, // text
+             this._properties, // properties
+             null, // styleSheetTextRange
+         ];
+         this._declaration = new WebInspector.CSSStyleDeclaration(...args);
+     }
+ 
+-    // Static
++    // Public
+ 
+-    static fromPayload(payload)
++    get targetElement()
+     {
+-        // Much of this parsing functionality is copied from DOMNodeStyles. It is
+-        // simplified in some parts because we do not need to update existing model objects.
+-
+-        var ruleIdToParsedRuleMap = new Map;
+-        var nodeIdToParsedInlineStyleMap = new Map;
+-
+-        var matchedRules = [];
+-        var inlineStyles = [];
+-
+-        var targetElement = WebInspector.domTreeManager.nodeForId(payload.targetElement);
+-
+-        for (var elementEntry of payload.elements) {
+-            var node = WebInspector.domTreeManager.nodeForId(elementEntry.nodeId);
+-            console.assert(node, node);
+-            var isInherited = node !== targetElement;
+-            if ("inlineStyle" in elementEntry) {
+-                var inlineStyle = parseDeclarationPayload(elementEntry.inlineStyle, node, isInherited, WebInspector.CSSStyleDeclaration.Type.Inline);
+-                nodeIdToParsedInlineStyleMap.set(elementEntry.nodeId, inlineStyle);
+-                inlineStyles.push(inlineStyle);
+-            }
+-
+-            // Iterate matched rules in reverse order to match the cascade order.
+-            for (var match of elementEntry.matchedRules) {
+-                var rule = parseRulePayload(match.rule, match.matchingSelectors, node, isInherited);
+-                if (!rule)
+-                    continue;
+-                var key = "%d:%d".format(rule.id.styleSheetId, rule.id.ordinal);
+-                ruleIdToParsedRuleMap.set(key, rule);
+-                matchedRules.push(rule);
+-            }
+-        }
+-
+-        var effectiveProperties = [];
+-        for (var i = 0; i < payload.properties.length; ++i) {
+-            var propertyEntry = payload.properties[i];
+-            var property = parsePropertyPayload(propertyEntry.property, i, null);
+-            // If property came from a rule, find that rule based on its id.
+-            if ("sourceRule" in propertyEntry) {
+-                var ruleId = propertyEntry.sourceRule;
+-                var key = "%d:%d".format(ruleId.styleSheetId, ruleId.ordinal);
+-                console.assert(ruleIdToParsedRuleMap.has(key));
+-                var originatingRule = ruleIdToParsedRuleMap.get(key);
+-                property.ownerStyle = originatingRule.style;
+-            }
+-            // If property came from an element's inline style, find that.
+-            else if ("sourceElement" in propertyEntry) {
+-                console.assert(nodeIdToParsedInlineStyleMap.has(propertyEntry.sourceElement));
+-                var originatingStyle = nodeIdToParsedInlineStyleMap.get(propertyEntry.sourceElement);
+-                property.ownerStyle = originatingStyle;
+-            }
+-
+-            effectiveProperties.push(property);
+-        }
+-
+-        function createSourceCodeLocation(sourceURL, sourceLine, sourceColumn) {
+-            if (!sourceURL)
+-                return null;
+-
+-            var sourceCode;
+-
+-            // Try to use the node to find the frame which has the correct resource first.
+-            if (targetElement.ownerDocument) {
+-                var mainResource = WebInspector.frameResourceManager.resourceForURL(targetElement.ownerDocument.documentURL);
+-                if (mainResource) {
+-                    var parentFrame = mainResource.parentFrame;
+-                    sourceCode = parentFrame.resourceForURL(sourceURL);
+-                }
+-            }
+-
+-            // If that didn't find the resource, then search all frames.
+-            if (!sourceCode)
+-                sourceCode = WebInspector.frameResourceManager.resourceForURL(sourceURL);
+-
+-            if (!sourceCode)
+-                return null;
+-
+-            return sourceCode.createSourceCodeLocation(sourceLine || 0, sourceColumn || 0);
+-        };
+-
+-        return new WebInspector.EffectiveStyleSnapshot(targetElement, effectiveProperties, matchedRules, inlineStyles);
+-
+-        function parseRulePayload(payload, matchedSelectorIndices, node, isInherited)
+-        {
+-            if (!payload)
+-                return null;
+-
+-            // User and User Agent rules don't have 'ruleId' in the payload. However, their style's have 'styleId' and
+-            // 'styleId' is the same identifier the backend uses for Author rule identifiers, so do the same here.
+-            // They are excluded by the backend because they are not editable, however our front-end does not determine
+-            // editability solely based on the existence of the id like the open source front-end does.
+-            var ruleId = payload.ruleId || payload.style.styleId;
+-
+-            var style = parseDeclarationPayload(payload.style, node, isInherited, WebInspector.CSSStyleDeclaration.Type.Rule);
+-            if (!style)
+-                return null;
+-
+-            var selectorText = payload.selectorList.text;
+-            var selectors = parseSelectorListPayload(payload.selectorList);
+-            var sourceRange = payload.selectorList.range;
+-            var sourceCodeLocation = createSourceCodeLocation(payload.sourceURL, sourceRange.startLine, sourceRange.startColumn);
+-            var mediaList = parseMediaListPayload(payload.media);
+-
+-            var ruleType;
+-            switch (payload.origin) {
+-            case "regular":
+-                ruleType = WebInspector.CSSRule.Type.Author;
+-                break;
+-            case "user":
+-                ruleType = WebInspector.CSSRule.Type.User;
+-                break;
+-            case "user-agent":
+-                ruleType = WebInspector.CSSRule.Type.UserAgent;
+-                break;
+-            case "inspector":
+-                ruleType = WebInspector.CSSRule.Type.Inspector;
+-                break;
+-            }
+-
+-            var rule = new WebInspector.CSSRule(null, null, ruleId, ruleType, sourceCodeLocation, selectorText, selectors, matchedSelectorIndices, null, mediaList);
+-            style.ownerRule = rule;
+-            return rule;
+-        }
+-
+-        function parseMediaListPayload(mediaList)
+-        {
+-            if (!mediaList)
+-                return [];
+-
+-            var mediaList = [];
+-            for (var item of mediaList) {
+-                var mediaType;
+-                switch (item.source) {
+-                case "mediaRule":
+-                    mediaType = WebInspector.CSSMedia.Type.MediaRule;
+-                    break;
+-                case "importRule":
+-                    mediaType = WebInspector.CSSMedia.Type.ImportRule;
+-                    break;
+-                case "linkedSheet":
+-                    mediaType = WebInspector.CSSMedia.Type.LinkedStyleSheet;
+-                    break;
+-                case "inlineSheet":
+-                    mediaType = WebInspector.CSSMedia.Type.InlineStyleSheet;
+-                    break;
+-                }
+-
+-                var location = this._createSourceCodeLocation(item.sourceURL, item.sourceLine);
+-                mediaList.push(new WebInspector.CSSMedia(mediaType, mediaText, location));
+-            }
+-            return mediaList;
+-        }
+-
+-        function parseSelectorListPayload(selectorList)
+-        {
+-            var selectors = selectorList.selectors;
+-            if (!selectors.length)
+-                return [];
+-
+-            return selectors.map(function(selectorPayload) {
+-                return new WebInspector.CSSSelector(selectorPayload.text, selectorPayload.specificity, selectorPayload.dynamic);
+-            });
+-        }
+-
+-        function parseDeclarationPayload(payload, node, isInherited, styleType)
+-        {
+-            if (!payload)
+-                return null;
+-
+-            var shorthands = {};
+-            for (var i = 0; payload.shorthandEntries && i < payload.shorthandEntries.length; ++i) {
+-                var shorthand = payload.shorthandEntries[i];
+-                shorthands[shorthand.name] = shorthand.value;
+-            }
+-
+-            var inheritedPropertyCount = 0;
+-            var cssProperties = [];
+-            for (var i = 0; payload.cssProperties && i < payload.cssProperties.length; ++i) {
+-                var propertyPayload = payload.cssProperties[i];
+-
+-                if (isInherited && propertyPayload.name in WebInspector.CSSKeywordCompletions.InheritedProperties)
+-                    ++inheritedPropertyCount;
+-
+-                var property = parsePropertyPayload(propertyPayload, i, payload.cssText);
+-                cssProperties.push(property);
+-            }
+-
+-            if (isInherited && !inheritedPropertyCount)
+-                return null;
+-
+-            var textRange = parseSourceRangePayload(payload.range);
+-            var declaration = new WebInspector.CSSStyleDeclaration(this, null, payload.styleId, styleType, node, isInherited, payload.cssText, cssProperties, textRange);
+-            for (var cssProperty of cssProperties)
+-                cssProperty.ownerStyle = declaration;
+-
+-            return declaration;
+-        }
+-
+-        function parsePropertyPayload(payload, index, styleText)
+-        {
+-            if (!payload)
+-                return null;
+-
+-            var propertyText = payload.text || "";
+-            var value = (payload.value || "").replace(/\s*!important\s*$/, "");
+-            var priority = payload.priority || "";
+-
+-            var enabled = true;
+-            var overridden = false;
+-            var implicit = payload.implicit || false;
+-            var valid = "parsedOk" in payload ? payload.parsedOk : true;
+-
+-            switch (payload.status || "style") {
+-            case "active":
+-                enabled = true;
+-                break;
+-            case "inactive":
+-                overridden = true;
+-                enabled = true;
+-                break;
+-            case "disabled":
+-                enabled = false;
+-                break;
+-            }
+-
+-            var styleSheetTextRange = parseSourceRangePayload(payload.range);
+-            return new WebInspector.CSSProperty(index, propertyText, payload.name, value, priority, enabled, overridden, implicit, false, valid, styleSheetTextRange, null);
+-        }
+-
+-        function parseSourceRangePayload(payload)
+-        {
+-            if (!payload)
+-                return null;
+-
+-            return new WebInspector.TextRange(payload.startLine, payload.startColumn, payload.endLine, payload.endColumn);
+-        }
++        return this._targetElement;
+     }
+ 
+-    // Public
+-
+     get properties()
+     {
+         return this._properties.slice();
+     }
+ 
+     get declaration()
+     {
+         return this._declaration;
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+index edf1feb..48d76f2 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+@@ -73,22 +73,21 @@ WebInspector.ElementSnapshot = class ElementSnapshot extends WebInspector.Object
+ {
+ 
+     constructor(header, payload)
+     {
+         super();
+ 
+         console.assert(header instanceof WebInspector.ElementSnapshotHeader);
+ 
+         this._header = header;
+         this._imageData = decodeBase64ToBlob(payload.imageData.encodedData, payload.imageData.mimeType);
+-        this._effectiveStyle = WebInspector.EffectiveStyleSnapshot.fromPayload(payload.styleData);
+-        this._treeSnapshot = WebInspector.DOMTreeSnapshot.fromPayload(payload.subtreeData);
++        this._treeSnapshot = WebInspector.DOMTreeSnapshot.fromPayload(payload.subtreeData, payload.styleData);
+     }
+ 
+     get displayName()
+     {
+         return this._header.displayName;
+     }
+ 
+     get snapshotId()
+     {
+         return this._header.snapshotId;
+@@ -104,20 +103,15 @@ WebInspector.ElementSnapshot = class ElementSnapshot extends WebInspector.Object
+         return this._header;
+     }
+ 
+     // This returns an object URL handle that should be revoked when no longer needed.
+     createObjectURLForImage()
+     {
+         console.assert(this._imageData instanceof Blob, this._imageData);
+         return URL.createObjectURL(this._imageData);
+     }
+ 
+-    get effectiveStyle()
+-    {
+-        return this._effectiveStyle;
+-    }
+-
+     get treeSnapshot()
+     {
+         return this._treeSnapshot;
+     }
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
+index a562463..b5997ca 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
+@@ -23,21 +23,22 @@
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementSnapshotStyleContentView = function(snapshot)
+ {
+     console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+     WebInspector.ContentView.call(this, snapshot);
+ 
+     this.element.classList.add(WebInspector.ElementSnapshotStyleContentView.StyleClassName);
+ 
+-    this._propertiesTextEditor = new WebInspector.CSSStyleDeclarationTextEditor(this, snapshot.effectiveStyle.declaration);
++    var effectiveStyle = snapshot.treeSnapshot.rootNode.effectiveStyle;
++    this._propertiesTextEditor = new WebInspector.CSSStyleDeclarationTextEditor(this, effectiveStyle.declaration);
+     this._propertiesTextEditor.showsImplicitProperties = false;
+     this._propertiesTextEditor.sortProperties = true;
+ 
+     this.element.appendChild(this._propertiesTextEditor.element);
+ };
+ 
+ WebInspector.ElementSnapshotStyleContentView.StyleClassName = "element-snapshot-style";
+ 
+ WebInspector.ElementSnapshotStyleContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotStyleContentView,
+-- 
+2.3.5
+

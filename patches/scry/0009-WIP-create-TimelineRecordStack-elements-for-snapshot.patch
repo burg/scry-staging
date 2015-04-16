@@ -1,0 +1,510 @@
+From 2ea9a49295c4ceab8d90f2651437f56a0f0a0590 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Mon, 2 Mar 2015 14:05:51 -0800
+Subject: [PATCH] WIP: create TimelineRecordStack elements for snapshot
+ records.
+
+TODO: needs better algorithm for placement
+ * don't overlap high count stacks
+ * more stable merge/split based on record centers rather than start times
+---
+ Source/WebInspectorUI/UserInterface/Main.html      |   2 +
+ .../Models/ElementTrackingTimeline.js              |  10 +
+ .../Views/ElementTrackingTimelineOverviewGraph.js  |  27 ++-
+ .../TimelineRecordStack.css}                       |  43 ++--
+ .../UserInterface/Views/TimelineRecordStack.js     | 234 +++++++++++++++++++++
+ 5 files changed, 292 insertions(+), 24 deletions(-)
+ copy Source/WebInspectorUI/UserInterface/{Models/ElementTrackingTimeline.js => Views/TimelineRecordStack.css} (68%)
+ create mode 100644 Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
+
+diff --git a/Source/WebInspectorUI/UserInterface/Main.html b/Source/WebInspectorUI/UserInterface/Main.html
+index deefc60..15f9794 100644
+--- a/Source/WebInspectorUI/UserInterface/Main.html
++++ b/Source/WebInspectorUI/UserInterface/Main.html
+@@ -136,20 +136,21 @@
+     <link rel="stylesheet" href="Views/SyntaxHighlightingDefaultTheme.css">
+     <link rel="stylesheet" href="Views/TextContentView.css">
+     <link rel="stylesheet" href="Views/TextEditor.css">
+     <link rel="stylesheet" href="Views/TextResourceContentView.css">
+     <link rel="stylesheet" href="Views/TimelineDataGrid.css">
+     <link rel="stylesheet" href="Views/TimelineIcons.css">
+     <link rel="stylesheet" href="Views/TimelineOverview.css">
+     <link rel="stylesheet" href="Views/TimelineRecordBar.css">
+     <link rel="stylesheet" href="Views/TimelineRecordFrame.css">
+     <link rel="stylesheet" href="Views/TimelineRecordingContentView.css">
++    <link rel="stylesheet" href="Views/TimelineRecordStack.css">
+     <link rel="stylesheet" href="Views/TimelineRuler.css">
+     <link rel="stylesheet" href="Views/TimelineSidebarPanel.css">
+     <link rel="stylesheet" href="Views/TimelineView.css">
+     <link rel="stylesheet" href="Views/Toolbar.css">
+     <link rel="stylesheet" href="Views/TreeElementStatusButton.css">
+     <link rel="stylesheet" href="Views/TypeTokenView.css">
+ 
+     <link rel="stylesheet" href="Controllers/CodeMirrorCompletionController.css">
+     <link rel="stylesheet" href="Controllers/CodeMirrorDragToAdjustNumberController.css">
+     <link rel="stylesheet" href="Controllers/CodeMirrorGradientEditingController.css">
+@@ -493,20 +494,21 @@
+     <script src="Views/SourceCodeTimelineTimelineDataGridNode.js"></script>
+     <script src="Views/SourceCodeTimelineTreeElement.js"></script>
+     <script src="Views/SourceMapResourceTreeElement.js"></script>
+     <script src="Views/SyntaxHighlightingSupport.js"></script>
+     <script src="Views/TextContentView.js"></script>
+     <script src="Views/TextResourceContentView.js"></script>
+     <script src="Views/TimelineOverview.js"></script>
+     <script src="Views/TimelineRecordBar.js"></script>
+     <script src="Views/TimelineRecordFrame.js"></script>
+     <script src="Views/TimelineRecordingContentView.js"></script>
++    <script src="Views/TimelineRecordStack.js"></script>
+     <script src="Views/TimelineRuler.js"></script>
+     <script src="Views/TimelineSidebarPanel.js"></script>
+     <script src="Views/ToggleButtonNavigationItem.js"></script>
+     <script src="Views/ToggleControlToolbarItem.js"></script>
+     <script src="Views/Toolbar.js"></script>
+     <script src="Views/TreeElementStatusButton.js"></script>
+     <script src="Views/TreeOutlineDataGridSynchronizer.js"></script>
+     <script src="Views/TypePropertiesSection.js"></script>
+     <script src="Views/TypeTokenView.js"></script>
+ 
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js b/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js
+index 00da6f5..9fec002 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js
+@@ -32,17 +32,27 @@ WebInspector.ElementTrackingTimeline.prototype = {
+     constructor: WebInspector.ElementTrackingTimeline,
+     __proto__: WebInspector.Timeline.prototype,
+ 
+     // Public
+ 
+     reset: function(suppressEvents)
+     {
+         WebInspector.Timeline.prototype.reset.call(this, suppressEvents);
+     },
+ 
++    get traceRecords()
++    {
++        return this.records.filter(function(record) { return record instanceof WebInspector.TraceOperationTimelineRecord; });
++    },
++
++    get snapshotRecords()
++    {
++        return this.records.filter(function(record) { return record instanceof WebInspector.ElementTrackingTimelineRecord; });
++    },
++
+     addRecord: function(record)
+     {
+         console.assert(record.type === WebInspector.TimelineRecord.Type.ElementTracking, record);
+ 
+         WebInspector.Timeline.prototype.addRecord.call(this, record);
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+index a745903..3cd99b5 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+@@ -26,20 +26,21 @@
+ WebInspector.ElementTrackingTimelineOverviewGraph = function(timeline)
+ {
+     WebInspector.TimelineOverviewGraph.call(this, timeline);
+ 
+     this.element.classList.add(WebInspector.ElementTrackingTimelineOverviewGraph.StyleClassName);
+ 
+     this.representedObject = timeline;
+     this.representedObject.addEventListener(WebInspector.Timeline.Event.RecordAdded, this._timelineRecordAdded, this);
+ 
+     this._timelineRecordBars = [];
++    this._timelineRecordStacks = [];
+ 
+     this.reset();
+ };
+ 
+ WebInspector.ElementTrackingTimelineOverviewGraph.StyleClassName = "element-tracking";
+ 
+ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+     constructor: WebInspector.ElementTrackingTimelineOverviewGraph,
+     __proto__: WebInspector.TimelineOverviewGraph.prototype,
+ 
+@@ -54,42 +55,62 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+         this.element.removeChildren();
+     },
+ 
+     updateLayout: function()
+     {
+         WebInspector.TimelineOverviewGraph.prototype.updateLayout.call(this);
+ 
+         var secondsPerPixel = this.timelineOverview.secondsPerPixel;
+ 
+         var recordBarIndex = 0;
+-
+         function createBar(records, renderMode)
+         {
+             var timelineRecordBar = this._timelineRecordBars[recordBarIndex];
+             if (!timelineRecordBar)
+                 timelineRecordBar = this._timelineRecordBars[recordBarIndex] = new WebInspector.TimelineRecordBar(records, renderMode);
+             else {
+                 timelineRecordBar.renderMode = renderMode;
+                 timelineRecordBar.records = records;
+             }
+             timelineRecordBar.refresh(this);
+             if (!timelineRecordBar.element.parentNode)
+                 this.element.appendChild(timelineRecordBar.element);
+             ++recordBarIndex;
+         }
+ 
+-        WebInspector.TimelineRecordBar.createCombinedBars(this.representedObject.records, secondsPerPixel, this, createBar.bind(this));
+-
++        // Create summary bars for trace operation records.
++        WebInspector.TimelineRecordBar.createCombinedBars(this.representedObject.traceRecords, secondsPerPixel, this, createBar.bind(this));
+         // Remove the remaining unused TimelineRecordBars.
+         for (; recordBarIndex < this._timelineRecordBars.length; ++recordBarIndex) {
+             this._timelineRecordBars[recordBarIndex].records = null;
+             this._timelineRecordBars[recordBarIndex].element.remove();
+         }
++
++        // Create preview boxes for output snapshot records.
++        var stackIndex = 0;
++        function createStack(records)
++        {
++            var stack = this._timelineRecordStacks[stackIndex];
++            if (!stack)
++                stack = this._timelineRecordStacks[stackIndex] = new WebInspector.TimelineRecordStack(records);
++            else {
++                stack.records = records;
++            }
++            stack.refresh(this);
++            if (!stack.element.parentNode)
++                this.element.appendChild(stack.element);
++            ++stackIndex;
++        }
++
++        WebInspector.TimelineRecordStack.createStacksForVisibleRecords(this.representedObject.snapshotRecords, secondsPerPixel, this, createStack.bind(this));
++        // Neuter any remaining objects not used in this layout iteration.
++        for (; stackIndex < this._timelineRecordStacks.length; ++stackIndex)
++            this._timelineRecordStacks[stackIndex].records = null;
+     },
+ 
+     // Private
+ 
+     _timelineRecordAdded: function(event)
+     {
+         this.needsLayout();
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
+similarity index 68%
+copy from Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js
+copy to Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
+index 00da6f5..df2cc26 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
+@@ -1,12 +1,13 @@
+ /*
+  * Copyright (C) 2014 Apple Inc. All rights reserved.
++ * Copyright (C) 2015 University of washington.
+  *
+  * Redistribution and use in source and binary forms, with or without
+  * modification, are permitted provided that the following conditions
+  * are met:
+  * 1. Redistributions of source code must retain the above copyright
+  *    notice, this list of conditions and the following disclaimer.
+  * 2. Redistributions in binary form must reproduce the above copyright
+  *    notice, this list of conditions and the following disclaimer in the
+  *    documentation and/or other materials provided with the distribution.
+  *
+@@ -16,33 +17,33 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-WebInspector.ElementTrackingTimeline = function(type, recording)
+-{
+-    WebInspector.Timeline.call(this, type, recording);
+-};
++.timeline-record-stack {
++    position: absolute;
++    height: 36px;
++    background-color: rgba(200, 200, 200, 0.8);
++    z-index: 10;
++    min-width: 48px;
++    border-left: 1px solid rgb(200, 200, 200);
++    border-right: 1px solid rgb(200, 200, 200);
++}
+ 
+-WebInspector.ElementTrackingTimeline.prototype = {
+-    constructor: WebInspector.ElementTrackingTimeline,
+-    __proto__: WebInspector.Timeline.prototype,
++.timeline-record-stack-counter {
++    position: absolute;
++    bottom: 2px;
++    right: 1px;
++    height: 13px;
+ 
+-    // Public
+-
+-    reset: function(suppressEvents)
+-    {
+-        WebInspector.Timeline.prototype.reset.call(this, suppressEvents);
+-    },
+-
+-    addRecord: function(record)
+-    {
+-        console.assert(record.type === WebInspector.TimelineRecord.Type.ElementTracking, record);
+-
+-        WebInspector.Timeline.prototype.addRecord.call(this, record);
+-    }
+-};
++    background-color: rgb(150, 150, 150);
++    color: rgb(255, 255, 255);
++    border-radius: 4px;
++    font-size: 9px;
++    text-align: center;
++    padding: 1px 4px 2px;
++}
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
+new file mode 100644
+index 0000000..3abad47
+--- /dev/null
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
+@@ -0,0 +1,234 @@
++/*
++ * Copyright (C) 2014 Apple Inc. All rights reserved.
++ * Copyright (C) 2015 University of washington.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++WebInspector.TimelineRecordStack = function(records)
++{
++    WebInspector.Object.call(this);
++
++    this._element = document.createElement("div");
++    this._element.classList.add(WebInspector.TimelineRecordStack.StyleClassName);
++    this._counterElement = document.createElement("span");
++    this._counterElement.classList.add(WebInspector.TimelineRecordStack.CounterStyleClassName);
++    this._element.appendChild(this._counterElement);
++
++    this.records = records;
++};
++
++WebInspector.Object.addConstructorFunctions(WebInspector.TimelineRecordStack);
++
++WebInspector.TimelineRecordStack.StyleClassName = "timeline-record-stack";
++WebInspector.TimelineRecordStack.CounterStyleClassName = "timeline-record-stack-counter";
++WebInspector.TimelineRecordStack.MinimumWidthPixels = 48;
++WebInspector.TimelineRecordStack.MinimumMarginPixels = 2;
++
++WebInspector.TimelineRecordStack.createStacksForVisibleRecords = function(records, secondsPerPixel, graphDataSource, createStackCallback)
++{
++    if (!records.length)
++        return;
++
++    var startTime = graphDataSource.startTime;
++    var currentTime = graphDataSource.currentTime;
++    var endTime = graphDataSource.endTime;
++
++    var visibleRecords = [];
++    var lastRecordType = null;
++
++    // FIXME: Do a binary search for records that fall inside start and current time.
++
++    for (var record of records) {
++        if (isNaN(record.startTime))
++            continue;
++
++        // If this bar is completely before the bounds of the graph, skip this record.
++        if (record.endTime < startTime)
++            continue;
++
++        // If this record is completely after the current time or end time, break out now.
++        // Records are sorted, so all records after this will be beyond the current or end time too.
++        if (record.startTime > currentTime || record.startTime > endTime)
++            break;
++
++        // Only a single record type is supported right now.
++        console.assert(!lastRecordType || record.type === lastRecordType);
++
++        visibleRecords.push(record);
++
++        lastRecordType = record.type;
++    }
++
++    if (!visibleRecords.length)
++        return;
++
++    if (visibleRecords.length === 1) {
++        createStackCallback(visibleRecords);
++        return;
++    }
++
++    function compareByActiveStartTime(a, b)
++    {
++        return a.activeStartTime - b.activeStartTime;
++    }
++
++    var minimumDuration = secondsPerPixel * WebInspector.TimelineRecordStack.MinimumWidthPixels;
++    var minimumMargin = secondsPerPixel * WebInspector.TimelineRecordStack.MinimumMarginPixels;
++
++    lastRecordType = null;
++
++    var activeStartTime = NaN;
++    var activeEndTime = NaN;
++    var activeRecords = [];
++
++    for (var record of visibleRecords) {
++        // Create the active bar if the previous record is far enough away.
++        // Also create it if the current record has no active start time.
++        if (!isNaN(activeStartTime) && (activeStartTime + Math.max(activeEndTime - activeStartTime, minimumDuration) + minimumMargin <= record.startTime
++            || (isNaN(record.startTime) && !isNaN(activeEndTime)))) {
++            createStackCallback(activeRecords);
++            activeRecords = [];
++            activeStartTime = NaN;
++            activeEndTime = NaN;
++        }
++
++        if (isNaN(record.startTime))
++            continue;
++
++        // If this is a new bar, peg the start time.
++        if (isNaN(activeStartTime))
++            activeStartTime = record.startTime;
++
++        // Update the end time to be the maximum we encounter. activeEndTime might be NaN, so "|| 0" to prevent Math.max from returning NaN.
++        if (!isNaN(record.endTime))
++            activeEndTime = Math.max(activeEndTime || 0, record.endTime);
++
++        activeRecords.push(record);
++    }
++
++    // Create the active bar for the last record if needed.
++    if (!isNaN(activeStartTime))
++        createStackCallback(activeRecords);
++};
++
++WebInspector.TimelineRecordStack.prototype = {
++    constructor: WebInspector.TimelineRecordStack,
++    __proto__: WebInspector.Object.prototype,
++
++    // Public
++
++    get element()
++    {
++        return this._element;
++    },
++
++    get records()
++    {
++        return this._records;
++    },
++
++    set records(records)
++    {
++        if (this._records && this._records.length)
++            this._element.classList.remove(this._records[0].type);
++
++        records = records || [];
++
++        if (!(records instanceof Array))
++            records = [records];
++
++        this._records = records;
++
++        // Assume all records are the same type.
++        if (this._records.length)
++            this._element.classList.add(this._records[0].type);
++        else // Tear down any unused DOM.
++            this._element.remove();
++    },
++
++    refresh: function(graphDataSource)
++    {
++        if (!this._records || !this._records.length)
++            return false;
++
++        var firstRecord = this._records[0];
++        var barStartTime = firstRecord.startTime;
++
++        // If this bar has no time info, return early.
++        if (isNaN(barStartTime))
++            return false;
++
++        var graphStartTime = graphDataSource.startTime;
++        var graphEndTime = graphDataSource.endTime;
++        var graphCurrentTime = graphDataSource.currentTime;
++
++        var barEndTime = this._records.reduce(function(previousValue, currentValue) { return Math.max(previousValue, currentValue.endTime); }, 0);
++
++        // If this bar is completely after the current time, return early.
++        if (barStartTime > graphCurrentTime)
++            return false;
++
++        // If this bar is completely before or after the bounds of the graph, return early.
++        if (barEndTime < graphStartTime || barStartTime > graphEndTime)
++            return false;
++
++        if (this._records.length === 1)
++            this._counterElement.remove();
++        else {
++            this._counterElement.textContent = this._records.length;
++            if (!this._counterElement.parentNode)
++                this._element.appendChild(this._counterElement);
++        }
++
++        // FIXME: may need to adjust the stack creation code to match ranges used here to avoid visual glitches.
++
++        // Find the center of this stack's records, then push out to include max(record span, min width).
++        var secondsPerPixel = graphDataSource.timelineOverview ? graphDataSource.timelineOverview.secondsPerPixel : 0;
++        var barCenterTime = barStartTime + (barEndTime - barStartTime) / 2;
++        var adjustedDuration = Math.max(barEndTime - barStartTime, secondsPerPixel * WebInspector.TimelineRecordStack.MinimumWidthPixels);
++        var adjustedStartTime = barCenterTime - (adjustedDuration / 2);
++        var adjustedEndTime = barCenterTime + (adjustedDuration / 2);
++
++        //                                                                                  
++        var graphDuration = graphEndTime - graphStartTime;
++        var newBarLeftPosition = (adjustedStartTime - graphStartTime) / graphDuration;
++        this._updateElementPosition(this._element, newBarLeftPosition, "left");
++
++        var newBarWidth = ((adjustedEndTime - graphStartTime) / graphDuration) - newBarLeftPosition;
++        this._updateElementPosition(this._element, newBarWidth, "width");
++
++        return true;
++    },
++
++    // Private
++
++    _updateElementPosition: function(element, newPosition, property)
++    {
++        newPosition *= 100;
++        newPosition = newPosition.toFixed(2);
++
++        var currentPosition = parseFloat(element.style[property]).toFixed(2);
++        if (currentPosition !== newPosition)
++            element.style[property] = newPosition + "%";
++    }
++};
+-- 
+2.3.5
+

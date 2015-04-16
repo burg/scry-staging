@@ -1,0 +1,240 @@
+From 29621b3cdd51909912daabc037f22bbdd63a4436 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Sun, 8 Mar 2015 22:15:42 -0700
+Subject: [PATCH] Improve behavior for clicking multi-record snapshot stacks in
+ timeline. Add hover styles.
+
+---
+ .../Views/ElementTrackingTimelineOverviewGraph.js  | 50 ++++++++++++++--------
+ .../UserInterface/Views/TimelineRecordStack.css    | 15 ++++++-
+ .../UserInterface/Views/TimelineRecordStack.js     |  2 -
+ 3 files changed, 45 insertions(+), 22 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+index d4fd565..19c92f7 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+@@ -70,23 +70,21 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+             var stack = this._timelineRecordStacks[stackIndex];
+             if (!stack)
+                 stack = this._timelineRecordStacks[stackIndex] = new WebInspector.TimelineRecordStack(records);
+             else {
+                 stack.records = records;
+             }
+             stack.refresh(this);
+             if (!stack.element.parentNode)
+                 this.element.appendChild(stack.element);
+ 
+-            if (records.length !== 1)
+-                stack.selected = false;
+-            else if (this._selectedRecords.indexOf(records[0]) !== -1)
++            if (records.some(function isSelected(record) { return this._selectedRecords.indexOf(record) !== -1; }, this))
+                 stack.selected = true;
+             else
+                 stack.selected = false;
+ 
+             if (records.length) {
+                 var snapshot = records[0].snapshot;
+                 console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+                 snapshot.fetchData().then(function(data) {
+                     stack.previewContentURL = data.contentURL;
+                 });
+@@ -105,53 +103,63 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+ 
+     _timelineRecordAdded: function(event)
+     {
+         this.needsLayout();
+     },
+ 
+     _timelineGraphClicked: function(event)
+     {
+         if (event.target.classList.contains(WebInspector.TimelineRecordStack.StyleClassName))
+             this._recordStackClicked(event);
++
++        if (event.target.classList.contains(WebInspector.TimelineRecordStack.CounterStyleClassName))
++            this._recordStackCounterClicked(event);
+     },
+ 
+     _recordStackClicked: function(event)
+     {
+         var recordStack = event.target.recordStack;
+         console.assert(recordStack instanceof WebInspector.TimelineRecordStack, recordStack);
+ 
+-        // Can only select if it represents a single snapshot.
+-        if (recordStack.records.length > 1) {
+-            this._zoomToSplitRecordStack(recordStack);
+-            return;
++        function recordIsFilteredOut(record) {
++            var provisionalTreeElement = WebInspector.timelineSidebarPanel.treeElementForRepresentedObject(record.snapshot);
++            return !provisionalTreeElement || provisionalTreeElement.hidden;
+         }
+-
+-        // Don't process the selection if its tree element is not visible with current filters.
++        // Don't process the selection if none of its tree elements are visible with current filters.
+         // FIXME: we may want to revise or delete this if it's too awkward.
+-        var selectedRecord = recordStack.records[0];
+-        var provisionalTreeElement = WebInspector.timelineSidebarPanel.treeElementForRepresentedObject(selectedRecord.snapshot);
+-        if (!provisionalTreeElement || provisionalTreeElement.hidden)
++        if (recordStack.records.every(recordIsFilteredOut))
+             return;
+ 
++        var previouslySelectedRecord = null;
++        var previouslySelectedRecordIndex = -1;
++        for (var record of recordStack.records) {
++            previouslySelectedRecordIndex = this._selectedRecords.indexOf(record);
++            if (previouslySelectedRecordIndex !== -1) {
++                previouslySelectedRecord = record;
++                break;
++            }
++        }
++
++        var newlySelectedRecord = recordStack.records[0];
++
+         // If already selected, deselect it.
+-        var foundIndex = this._selectedRecords.indexOf(selectedRecord);
+-        if (foundIndex !== -1 && WebInspector.modifierKeys.metaKey)
+-            this._selectedRecords.splice(foundIndex, 1);
++        if (previouslySelectedRecord && WebInspector.modifierKeys.metaKey)
++            this._selectedRecords.splice(previouslySelectedRecordIndex, 1);
+         // If not a cmd-click, only select one stack.
+         else if (!WebInspector.modifierKeys.metaKey)
+-            this._selectedRecords = [selectedRecord];
++            this._selectedRecords = [newlySelectedRecord];
+         // If two stacks are already selected, replace the most recent selection.
+         else if (this._selectedRecords.length == 2)
+-            this._selectedRecords.splice(1, 1, selectedRecord);
++            this._selectedRecords.splice(1, 1, newlySelectedRecord);
+         // This is a cmd-click that adds a second selection.
+         else
+-            this._selectedRecords.push(selectedRecord);
++            this._selectedRecords.push(newlySelectedRecord);
+ 
+         this.needsLayout();
+ 
+         // Decide which views to show, if any.
+         if (!this._selectedRecords.length) {
+             var selectedTimeline = WebInspector.timelineSidebarPanel.selectedTimeline;
+             if (selectedTimeline)
+                 WebInspector.timelineSidebarPanel.showTimelineViewForTimeline(selectedTimeline);
+             else
+                 WebInspector.timelineSidebarPanel.showDefaultContentView();
+@@ -164,20 +172,26 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+             treeElement.revealAndSelect(omitFocus, selectedByUser, suppressOnSelect, suppressOnDeselect);
+         } else {
+             console.assert(this._selectedRecords.length === 2);
+             WebInspector.domTracingManager.requestSnapshotDiff(this._selectedRecords[0].snapshot, this._selectedRecords[1].snapshot)
+                 .then(function(snapshotDiffObject) {
+                     WebInspector.timelineSidebarPanel.showSubviewForRepresentedObject(snapshotDiffObject);
+                 });
+         }
+     },
+ 
++    _recordStackCounterClicked: function(event)
++    {
++        var recordStack = event.target.parentElement.recordStack;
++        this._zoomToSplitRecordStack(recordStack);
++    },
++
+     _zoomToSplitRecordStack: function(recordStack)
+     {
+         console.assert(recordStack.records.length > 1);
+ 
+         var initialSecondsPerPixel = this.timelineOverview.secondsPerPixel;
+         var initialStartTime = this.timelineOverview.scrollStartTime;
+         var initialEndTime = this.timelineOverview.endTime;
+ 
+         var proposedSecondsPerPixel = initialSecondsPerPixel;
+         var stackCount;
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
+index d46dde8..024c6c9 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
+@@ -21,45 +21,56 @@
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ .timeline-record-stack {
+     position: absolute;
+     z-index: 10;
+ 
+-    height: 34px;
++    height: 35px;
+     min-width: 36px;
+ 
+     border: 2px solid rgb(240, 240, 240);
+     background-color: rgb(240, 240, 240);
+ 
+     cursor: pointer;
+ }
+ 
++.timeline-record-stack:hover {
++    border-color: rgb(225, 225, 240);
++    border-radius: 4px;
++}
++
+ .timeline-record-stack img.preview-image {
+     pointer-events: none;
+ 
+     /* Parent borders are 2px on top, bottom. */
+-    max-height: 30px;
++    max-height: 31px;
+ }
+ 
+ .timeline-record-stack.selected {
+     border-color: rgb(34, 131, 246);
+     border-radius: 4px;
+ }
+ 
+ .timeline-record-stack-counter {
+     position: absolute;
+     bottom: 2px;
+     right: 1px;
+     height: 13px;
+     z-index: 50;
+ 
+     background-color: rgb(150, 150, 150);
+     color: rgb(255, 255, 255);
+     border-radius: 4px;
+     font-size: 9px;
+     text-align: center;
+     padding: 1px 4px 2px;
++
++    cursor: -webkit-zoom-in;
++}
++
++.timeline-record-stack:hover .timeline-record-stack-counter {
++    background-color: rgb(130, 130, 130);
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
+index 5d3680c..9434e39 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.js
+@@ -175,22 +175,20 @@ WebInspector.TimelineRecordStack.prototype = {
+             this._element.remove();
+     },
+ 
+     get selected()
+     {
+         return this._isSelected;
+     },
+ 
+     set selected(value)
+     {
+-        console.assert(!value || this._records.length === 1, this);
+-
+         this._isSelected = !!value;
+         this._element.classList.toggle(WebInspector.TimelineRecordStack.SelectedStyleClassName, value);
+     },
+ 
+     get previewContentURL()
+     {
+         return this._previewContentURL;
+     },
+ 
+     set previewContentURL(value)
+-- 
+2.3.5
+

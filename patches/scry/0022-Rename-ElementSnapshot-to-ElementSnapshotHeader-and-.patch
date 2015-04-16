@@ -1,0 +1,718 @@
+From d494aae37280fac69fafa40ab39021443ced48d1 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Mon, 9 Mar 2015 10:57:03 -0700
+Subject: [PATCH] Rename ElementSnapshot to ElementSnapshotHeader, and
+ ElementSnapshotData to ElementSnapshot.
+
+---
+ .../UserInterface/Controllers/DOMTracingManager.js | 15 ++---
+ .../UserInterface/Models/ElementSnapshot.js        | 77 +++++++++++++---------
+ .../UserInterface/Models/ElementSnapshotDiff.js    |  4 +-
+ .../Models/ElementTrackingTimeline.js              |  2 +-
+ .../Models/ElementTrackingTimelineRecord.js        | 22 +++----
+ .../UserInterface/Protocol/DOMTracingObserver.js   |  6 +-
+ .../Views/ElementSnapshotContentView.js            |  1 +
+ .../Views/ElementSnapshotDiffContentView.js        | 21 ++----
+ .../Views/ElementSnapshotOutputContentView.js      | 11 ++--
+ .../Views/ElementTrackingTimelineOverviewGraph.js  | 12 ++--
+ .../Views/ElementTrackingTimelineView.js           |  2 +-
+ .../Views/TimelineRecordTreeElement.js             |  2 +-
+ .../UserInterface/Views/TimelineSidebarPanel.js    |  8 ++-
+ 13 files changed, 94 insertions(+), 89 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
+index b3e822a..ffdccf9 100644
+--- a/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
++++ b/Source/WebInspectorUI/UserInterface/Controllers/DOMTracingManager.js
+@@ -22,21 +22,21 @@
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.DOMTracingManager = class DOMTracingManager extends WebInspector.Object
+ {
+     constructor()
+     {
+         super();
+ 
+-        this._snapshotMap = new Map;
++        this._snapshotHeaderMap = new Map;
+         this._targetNode = null;
+ 
+         // This maps from key "prestate.snapshotId:poststate.snapshotId" to a promise
+         // that resolves to an ElementSnapshotDiff instance for the states.
+         this._snapshotDiffPromises = new Map;
+ 
+         WebInspector.TimelineManager.addEventListener(WebInspector.TimelineManager.Event.CapturingStopped, this._timelineCapturingStopped, this);
+     }
+ 
+     // Public
+@@ -74,22 +74,22 @@ WebInspector.DOMTracingManager = class DOMTracingManager extends WebInspector.Ob
+         return this._targetNode;
+     }
+ 
+     snapshotForId(snapshotId)
+     {
+         return this._snapshotMap.get(snapshotId);
+     }
+ 
+     requestSnapshotDiff(first, second)
+     {
+-        console.assert(first instanceof WebInspector.ElementSnapshot, first);
+-        console.assert(second instanceof WebInspector.ElementSnapshot, second);
++        console.assert(first instanceof WebInspector.ElementSnapshotHeader, first);
++        console.assert(second instanceof WebInspector.ElementSnapshotHeader, second);
+         console.assert(first !== second, "Cannot diff a snapshot with itself.");
+ 
+         var [prestate, poststate] = [first, second];
+         if (first.ordinal > second.ordinal)
+             [prestate, poststate] = [second, first];
+ 
+         var key = "%d:%d".format(prestate.snapshotId, poststate.snapshotId);
+         if (this._snapshotDiffPromises.has(key))
+             return this._snapshotDiffPromises.get(key);
+ 
+@@ -99,27 +99,26 @@ WebInspector.DOMTracingManager = class DOMTracingManager extends WebInspector.Ob
+             });
+ 
+         this._snapshotDiffPromises.set(key, result);
+         return result;
+     }
+ 
+     // Protected - Called by DOMTracingObserver
+ 
+     snapshotCreated(snapshotPayload)
+     {
+-        var snapshot = new WebInspector.ElementSnapshot(snapshotPayload);
+-        this._snapshotMap.set(snapshot.snapshotId, snapshot);
++        var header = new WebInspector.ElementSnapshotHeader(snapshotPayload);
++        this._snapshotHeaderMap.set(header.snapshotId, header);
+ 
+         var eventType = WebInspector.ElementTrackingTimelineRecord.EventType.OutputChanged;
+-        var record = new WebInspector.ElementTrackingTimelineRecord(eventType, snapshot);
++        var record = new WebInspector.ElementTrackingTimelineRecord(eventType, header);
+         WebInspector.timelineManager.activeRecording.addRecord(record);
+-        console.log("Added snapshot record: ", record, snapshot);
+     }
+ 
+     operationRecorded(type, relation, data, timestamp, stackTrace)
+     {
+         var eventType = null;
+         switch (type) {
+         case DOMTracingAgent.TraceOperationType.ElementInserted:
+             eventType = WebInspector.TraceOperationTimelineRecord.EventType.ElementInserted; break;
+         case DOMTracingAgent.TraceOperationType.ElementRemoved:
+             eventType = WebInspector.TraceOperationTimelineRecord.EventType.ElementRemoved; break;
+@@ -168,19 +167,19 @@ WebInspector.DOMTracingManager = class DOMTracingManager extends WebInspector.Ob
+         var sourceCodeLocation = significantCallFrame && significantCallFrame.sourceCodeLocation;
+ 
+         var record = new WebInspector.TraceOperationTimelineRecord(eventType, relationToTarget, data, timestamp, callFrames, sourceCodeLocation);
+         WebInspector.timelineManager.activeRecording.addRecord(record);
+     }
+ 
+     // Private
+ 
+     _clearBindings()
+     {
+-        this._snapshotMap.clear();
++        this._snapshotHeaderMap.clear();
+     }
+ 
+     _timelineCapturingStopped(event)
+     {
+         if (this._targetNode)
+             this.stopTracking();
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+index 3481654..23fb55d 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshot.js
+@@ -16,66 +16,83 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-WebInspector.ElementSnapshotData = function(snapshotId, payload)
+-{
+-    this.snapshotId = snapshotId;
+-    this._imageDataURL = payload.imageData;
+-}
+-
+-WebInspector.ElementSnapshotData.prototype = {
+-    constructor: WebInspector.ElementSnapshotData,
+-    __proto__: WebInspector.Object.prototype,
+-
+-    get contentURL()
+-    {
+-        const maximumDataURLSize = 1024 * 1024; // 1 MiB
+-
+-        if (!this._imageDataURL)
+-            return null;
+-
+-        if (this._imageDataURL.length > maximumDataURLSize) {
+-            console.error("Element snapshot too large " + Number.bytesToString(this._imageDataURL.length) + "for data url.");
+-            return null;
+-        }
+-
+-        return this._imageDataURL;
+-    }
+-}
+-
+-WebInspector.ElementSnapshot = function(payload)
++WebInspector.ElementSnapshotHeader = function(payload)
+ {
+     this.nodeId = payload.nodeId;
+     this.snapshotId = payload.snapshotId; // Used when making queries to the backend.
+     this.elapsedTime = payload.elapsedTimestamp;
+     this.boundingRect = WebInspector.Rect.fromObject(payload.boundingBox);
+ 
+     // Assigned when a record for the snapshot is added to an ElementTrackingTimeline instance.
+     this.ordinal = NaN;
+ 
+     this._payloadPromise = null;
+ }
+ 
+-WebInspector.ElementSnapshot.prototype = {
+-    constructor: WebInspector.ElementSnapshot,
++WebInspector.ElementSnapshotHeader.prototype = {
++    constructor: WebInspector.ElementSnapshotHeader,
+     __proto__: WebInspector.Object.prototype,
+ 
+     fetchData: function()
+     {
+         if (!this._payloadPromise) {
+             this._payloadPromise = DOMTracingAgent.getSnapshotPayload.promise(this.snapshotId)
+                 .then(function(response) {
+                     console.assert(response.payload.snapshotId === this.snapshotId);
+-                    return new WebInspector.ElementSnapshotData(this.snapshotId, response.payload);
++                    return new WebInspector.ElementSnapshot(this, response.payload);
+                 }.bind(this));
+         }
+ 
+         return this._payloadPromise;
++    },
++
++    saveIdentityToCookie: function(cookie)
++    {
++        // Do nothing, since snapshots are not saved across reloads or reopens.
++    }
++}
++
++WebInspector.ElementSnapshot = function(header, payload)
++{
++    console.assert(header instanceof WebInspector.ElementSnapshotHeader);
++
++    this._header = header;
++    this._imageDataURL = payload.imageData;
++}
++
++WebInspector.ElementSnapshot.prototype = {
++    constructor: WebInspector.ElementSnapshot,
++    __proto__: WebInspector.Object.prototype,
++
++    get snapshotId()
++    {
++        return this._header.snapshotId;
++    },
++
++    get ordinal()
++    {
++        return this._header.ordinal;
++    },
++
++    get contentURL()
++    {
++        const maximumDataURLSize = 1024 * 1024; // 1 MiB
++
++        if (!this._imageDataURL)
++            return null;
++
++        if (this._imageDataURL.length > maximumDataURLSize) {
++            console.error("Element snapshot too large " + Number.bytesToString(this._imageDataURL.length) + "for data url.");
++            return null;
++        }
++
++        return this._imageDataURL;
+     }
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js
+index 897e37e..17bb944 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementSnapshotDiff.js
+@@ -18,22 +18,22 @@
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementSnapshotDiff = function(preState, postState)
+ {
+-    console.assert(preState instanceof WebInspector.ElementSnapshotData, preState);
+-    console.assert(postState instanceof WebInspector.ElementSnapshotData, postState);
++    console.assert(preState instanceof WebInspector.ElementSnapshot, preState);
++    console.assert(postState instanceof WebInspector.ElementSnapshot, postState);
+     console.assert(preState !== postState, "Cannot diff a snapshot with itself.");
+ 
+     this.preState = preState;
+     this.postState = postState;
+ }
+ 
+ WebInspector.ElementSnapshotDiff.prototype = {
+     constructor: WebInspector.ElementSnapshotDiff,
+     __proto__: WebInspector.Object.prototype,
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js b/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js
+index 963020c..0af11aa 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimeline.js
+@@ -46,15 +46,15 @@ WebInspector.ElementTrackingTimeline = class ElementTrackingTimeline extends Web
+     get snapshotRecords()
+     {
+         return this.records.filter(function(record) { return record instanceof WebInspector.ElementTrackingTimelineRecord; });
+     }
+ 
+     addRecord(record)
+     {
+         console.assert(record.type === WebInspector.TimelineRecord.Type.ElementTracking, record);
+ 
+         if (record instanceof WebInspector.ElementTrackingTimelineRecord)
+-            record.snapshot.ordinal = ++this._snapshotCount;
++            record.snapshotHeader.ordinal = ++this._snapshotCount;
+ 
+         WebInspector.Timeline.prototype.addRecord.call(this, record);
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimelineRecord.js b/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimelineRecord.js
+index ce38f47..53490ab 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimelineRecord.js
++++ b/Source/WebInspectorUI/UserInterface/Models/ElementTrackingTimelineRecord.js
+@@ -16,32 +16,32 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-WebInspector.ElementTrackingTimelineRecord = function(eventType, snapshot)
++WebInspector.ElementTrackingTimelineRecord = function(eventType, snapshotHeader)
+ {
+-    WebInspector.TimelineRecord.call(this, WebInspector.TimelineRecord.Type.ElementTracking, snapshot.elapsedTime, snapshot.elapsedTime);
++    WebInspector.TimelineRecord.call(this, WebInspector.TimelineRecord.Type.ElementTracking, snapshotHeader.elapsedTime, snapshotHeader.elapsedTime);
+ 
+     console.assert(eventType, eventType);
+-    console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
++    console.assert(snapshotHeader instanceof WebInspector.ElementSnapshotHeader, snapshotHeader);
+ 
+     if (eventType in WebInspector.ElementTrackingTimelineRecord.EventType)
+         eventType = WebInspector.ElementTrackingTimelineRecord.EventType[eventType];
+ 
+     this._eventType = eventType;
+-    this._snapshot = snapshot;
++    this._snapshotHeader = snapshotHeader;
+ };
+ 
+ WebInspector.ElementTrackingTimelineRecord.EventType = {
+     OutputChanged: "element-tracking-timeline-record-output-changed",
+ };
+ 
+ WebInspector.ElementTrackingTimelineRecord.displayNameForEventType = function(eventType)
+ {
+     switch (eventType) {
+     case WebInspector.ElementTrackingTimelineRecord.EventType.OutputChanged:
+@@ -58,45 +58,45 @@ WebInspector.ElementTrackingTimelineRecord.prototype = {
+ 
+     // Public
+ 
+     get eventType()
+     {
+         return this._eventType;
+     },
+ 
+     get x()
+     {
+-        return this._snapshot.boundingRect.origin.x;
++        return this._snapshotHeader.boundingRect.origin.x;
+     },
+ 
+     get y()
+     {
+-        return this._snapshot.boundingRect.origin.y;
++        return this._snapshotHeader.boundingRect.origin.y;
+     },
+ 
+     get width()
+     {
+-        return this._snapshot.boundingRect.size.width;
++        return this._snapshotHeader.boundingRect.size.width;
+     },
+ 
+     get height()
+     {
+-        return this._snapshot.boundingRect.size.height;
++        return this._snapshotHeader.boundingRect.size.height;
+     },
+ 
+     get rect()
+     {
+-        return this._snapshot.boundingRect;
++        return this._snapshotHeader.boundingRect;
+     },
+ 
+-    get snapshot()
++    get snapshotHeader()
+     {
+-        return this._snapshot;
++        return this._snapshotHeader;
+     },
+ 
+     saveIdentityToCookie: function(cookie)
+     {
+         WebInspector.TimelineRecord.prototype.saveIdentityToCookie.call(this, cookie);
+ 
+         cookie[WebInspector.ElementTrackingTimelineRecord.EventTypeCookieKey] = this._eventType;
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Protocol/DOMTracingObserver.js b/Source/WebInspectorUI/UserInterface/Protocol/DOMTracingObserver.js
+index 27be1c7..2dc368a 100644
+--- a/Source/WebInspectorUI/UserInterface/Protocol/DOMTracingObserver.js
++++ b/Source/WebInspectorUI/UserInterface/Protocol/DOMTracingObserver.js
+@@ -18,20 +18,20 @@
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.DOMTracingObserver = class DOMTracingObserver
+ {
+-    snapshotCreated(snapshot)
++    snapshotCreated(snapshotHeader)
+     {
+-        WebInspector.domTracingManager.snapshotCreated(snapshot);
+-    },
++        WebInspector.domTracingManager.snapshotCreated(snapshotHeader);
++    }
+ 
+     operationRecorded(type, data, relation, timestamp, stackTrace)
+     {
+         WebInspector.domTracingManager.operationRecorded(type, data, relation, timestamp, stackTrace);
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+index 7e57375..e6f28b6 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
+@@ -18,20 +18,21 @@
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementSnapshotContentView = function(snapshot)
+ {
++    console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+     WebInspector.ClusterContentView.call(this, snapshot);
+ 
+     this._snapshot = snapshot;
+ 
+     function createPathComponent(displayName, classNames, identifier)
+     {
+         var pathComponent = new WebInspector.HierarchicalPathComponent(displayName, classNames, identifier, false, true);
+         pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._pathComponentSelected, this);
+         return pathComponent;
+     }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
+index 8bb4e43..7fcdfc6 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.js
+@@ -20,51 +20,40 @@
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementSnapshotDiffContentView = function(snapshotDiff)
+ {
+     WebInspector.ContentView.call(this, snapshotDiff);
+ 
+-    this._preState = {
+-        header: WebInspector.domTracingManager.snapshotForId(snapshotDiff.preState.snapshotId),
+-        data: snapshotDiff.preState
+-    };
++    this._preState = snapshotDiff.preState;
++    this._postState = snapshotDiff.postState;
+ 
+-    this._postState = {
+-        header: WebInspector.domTracingManager.snapshotForId(snapshotDiff.postState.snapshotId),
+-        data: snapshotDiff.postState
+-    };
+-
+-    var displayName = WebInspector.UIString("View Changes (Snapshots %d–%d)").format(this._preState.header.ordinal, this._postState.header.ordinal);
++    var displayName = WebInspector.UIString("View Changes (Snapshots %d–%d)").format(this._preState.ordinal, this._postState.ordinal);
+     this._pathComponent = new WebInspector.HierarchicalPathComponent(displayName, WebInspector.ElementSnapshotDiffContentView.IconStyleClassName, this, false, false);
+ 
+     this.element.classList.add(WebInspector.ElementSnapshotDiffContentView.StyleClassName);
+ 
+     var resizerDelegate = this;
+     this._resizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
+     this.element.appendChild(this._resizer.element);
+ 
+     this._preimageElement = document.createElement("img");
+     this._preimageElement.className = WebInspector.ElementSnapshotDiffContentView.SplitPaneStyleClassName;
+-    this._preimageElement.style.width = this._preState.header.boundingRect.size.width + 'px';
+-    this._preimageElement.style.height = this._preState.header.boundingRect.size.height + 'px';
+-    this._preimageElement.src = this._preState.data.contentURL;
++    this._preimageElement.src = this._preState.contentURL;
+     this.element.appendChild(this._preimageElement);
+ 
+     this._postimageElement = document.createElement("img");
+     this._postimageElement.className = WebInspector.ElementSnapshotDiffContentView.SplitPaneStyleClassName;
+-    this._postimageElement.style.width = this._postState.header.boundingRect.size.width + 'px';
+-    this._postimageElement.style.height = this._postState.header.boundingRect.size.height + 'px';
+-    this._postimageElement.src = this._postState.data.contentURL;
++    this._postimageElement.src = this._postState.contentURL;
+     this.element.appendChild(this._postimageElement);
+ 
+     this._repositionSplitPanes(0.5);
+ };
+ 
+ WebInspector.ElementSnapshotDiffContentView.StyleClassName = "element-snapshot-diff";
+ WebInspector.ElementSnapshotDiffContentView.IconStyleClassName = "snapshot-diff-icon";
+ WebInspector.ElementSnapshotDiffContentView.SplitPaneStyleClassName = "split-pane";
+ 
+ WebInspector.ElementSnapshotDiffContentView.prototype = {
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.js
+index 5d28630..44e8f6f 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotOutputContentView.js
+@@ -18,30 +18,27 @@
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementSnapshotOutputContentView = function(snapshot)
+ {
++    console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+     WebInspector.ContentView.call(this, snapshot, WebInspector.ElementSnapshotOutputContentView.StyleClassName);
+ 
+-    this._imageElement = null;
+-
+     this.element.classList.add(WebInspector.ElementSnapshotOutputContentView.StyleClassName);
+ 
+-    snapshot.fetchData().then(function(data) {
+-        this._imageElement = document.createElement("img");
+-        this._imageElement.src = data.contentURL;
+-        this.element.appendChild(this._imageElement);
+-    }.bind(this));
++    this._imageElement = document.createElement("img");
++    this._imageElement.src = snapshot.contentURL;
++    this.element.appendChild(this._imageElement);
+ };
+ 
+ WebInspector.ElementSnapshotOutputContentView.StyleClassName = "element-snapshot-output";
+ 
+ WebInspector.ElementSnapshotOutputContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotOutputContentView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+index 19c92f7..7f3d2eb 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineOverviewGraph.js
+@@ -76,23 +76,23 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+             stack.refresh(this);
+             if (!stack.element.parentNode)
+                 this.element.appendChild(stack.element);
+ 
+             if (records.some(function isSelected(record) { return this._selectedRecords.indexOf(record) !== -1; }, this))
+                 stack.selected = true;
+             else
+                 stack.selected = false;
+ 
+             if (records.length) {
+-                var snapshot = records[0].snapshot;
+-                console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+-                snapshot.fetchData().then(function(data) {
++                var header = records[0].snapshotHeader;
++                console.assert(header instanceof WebInspector.ElementSnapshotHeader, header);
++                header.fetchData().then(function(data) {
+                     stack.previewContentURL = data.contentURL;
+                 });
+             }
+ 
+             ++stackIndex;
+         }
+ 
+         WebInspector.TimelineRecordStack.createStacksForVisibleRecords(this.representedObject.snapshotRecords, secondsPerPixel, this, createStack.bind(this));
+         // Neuter any remaining objects not used in this layout iteration.
+         for (; stackIndex < this._timelineRecordStacks.length; ++stackIndex)
+@@ -114,21 +114,21 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+         if (event.target.classList.contains(WebInspector.TimelineRecordStack.CounterStyleClassName))
+             this._recordStackCounterClicked(event);
+     },
+ 
+     _recordStackClicked: function(event)
+     {
+         var recordStack = event.target.recordStack;
+         console.assert(recordStack instanceof WebInspector.TimelineRecordStack, recordStack);
+ 
+         function recordIsFilteredOut(record) {
+-            var provisionalTreeElement = WebInspector.timelineSidebarPanel.treeElementForRepresentedObject(record.snapshot);
++            var provisionalTreeElement = WebInspector.timelineSidebarPanel.treeElementForRepresentedObject(record.snapshotHeader);
+             return !provisionalTreeElement || provisionalTreeElement.hidden;
+         }
+         // Don't process the selection if none of its tree elements are visible with current filters.
+         // FIXME: we may want to revise or delete this if it's too awkward.
+         if (recordStack.records.every(recordIsFilteredOut))
+             return;
+ 
+         var previouslySelectedRecord = null;
+         var previouslySelectedRecordIndex = -1;
+         for (var record of recordStack.records) {
+@@ -157,29 +157,29 @@ WebInspector.ElementTrackingTimelineOverviewGraph.prototype = {
+         this.needsLayout();
+ 
+         // Decide which views to show, if any.
+         if (!this._selectedRecords.length) {
+             var selectedTimeline = WebInspector.timelineSidebarPanel.selectedTimeline;
+             if (selectedTimeline)
+                 WebInspector.timelineSidebarPanel.showTimelineViewForTimeline(selectedTimeline);
+             else
+                 WebInspector.timelineSidebarPanel.showDefaultContentView();
+         } else if (this._selectedRecords.length === 1) {
+-            var treeElement = WebInspector.timelineSidebarPanel.treeElementForRepresentedObject(this._selectedRecords[0].snapshot);
++            var treeElement = WebInspector.timelineSidebarPanel.treeElementForRepresentedObject(this._selectedRecords[0].snapshotHeader);
+             const omitFocus = true;
+             const selectedByUser = true;
+             const suppressOnSelect = false;
+             const suppressOnDeselect = false;
+             treeElement.revealAndSelect(omitFocus, selectedByUser, suppressOnSelect, suppressOnDeselect);
+         } else {
+             console.assert(this._selectedRecords.length === 2);
+-            WebInspector.domTracingManager.requestSnapshotDiff(this._selectedRecords[0].snapshot, this._selectedRecords[1].snapshot)
++            WebInspector.domTracingManager.requestSnapshotDiff(this._selectedRecords[0].snapshotHeader, this._selectedRecords[1].snapshotHeader)
+                 .then(function(snapshotDiffObject) {
+                     WebInspector.timelineSidebarPanel.showSubviewForRepresentedObject(snapshotDiffObject);
+                 });
+         }
+     },
+ 
+     _recordStackCounterClicked: function(event)
+     {
+         var recordStack = event.target.parentElement.recordStack;
+         this._zoomToSplitRecordStack(recordStack);
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js
+index 64a3259..a7f8a7f 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementTrackingTimelineView.js
+@@ -171,21 +171,21 @@ WebInspector.ElementTrackingTimelineView.prototype = {
+     // Private
+ 
+     _processPendingRecords: function()
+     {
+         if (!this._pendingRecords.length)
+             return;
+ 
+         for (var timelineRecord of this._pendingRecords) {
+             const includeTimerIdentifier = false;
+             const sourceCodeLocation = null;
+-            const representedObject = timelineRecord instanceof WebInspector.ElementTrackingTimelineRecord ? timelineRecord.snapshot : timelineRecord;
++            const representedObject = timelineRecord instanceof WebInspector.ElementTrackingTimelineRecord ? timelineRecord.snapshotHeader : timelineRecord;
+             var treeElement = new WebInspector.TimelineRecordTreeElement(timelineRecord, WebInspector.SourceCodeLocation.NameStyle.Short, includeTimerIdentifier, sourceCodeLocation, representedObject);
+             var dataGridNode = new WebInspector.ElementTrackingTimelineDataGridNode(timelineRecord, this.zeroTime);
+ 
+             this._dataGrid.addRowInSortOrder(treeElement, dataGridNode);
+         }
+ 
+         this._pendingRecords = [];
+     },
+ 
+     _elementTrackingTimelineRecordAdded: function(event)
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
+index 947f9ce..56946b3 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordTreeElement.js
+@@ -101,21 +101,21 @@ WebInspector.TimelineRecordTreeElement = class TimelineRecordTreeElement extends
+             break;
+ 
+         case WebInspector.TimelineRecord.Type.RenderingFrame:
+             title = WebInspector.UIString("Frame %d").format(timelineRecord.frameNumber);
+             iconStyleClass = WebInspector.TimelineRecordTreeElement.RenderingFrameRecordIconStyleClass;
+             break;
+ 
+         case WebInspector.TimelineRecord.Type.ElementTracking:
+             if (timelineRecord instanceof WebInspector.ElementTrackingTimelineRecord) {
+                 title = WebInspector.ElementTrackingTimelineRecord.displayNameForEventType(timelineRecord.eventType);
+-                subtitle = WebInspector.UIString("Snapshot %d").format(timelineRecord.snapshot.ordinal || " ");
++                subtitle = WebInspector.UIString("Snapshot %d").format(timelineRecord.snapshotHeader.ordinal || " ");
+                 iconStyleClass = WebInspector.TimelineRecordTreeElement.OutputChangedIconStyleClass;
+             }
+ 
+             if (timelineRecord instanceof WebInspector.TraceOperationTimelineRecord) {
+                 title = WebInspector.TraceOperationTimelineRecord.displayNameForEventType(timelineRecord.eventType);
+                 iconStyleClass = WebInspector.TimelineRecordTreeElement.EvaluatedRecordIconStyleClass;
+             }
+             break;
+ 
+         default:
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
+index 119e91f..b74ef13 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineSidebarPanel.js
+@@ -262,23 +262,25 @@ WebInspector.TimelineSidebarPanel = class TimelineSidebarPanel extends WebInspec
+         console.assert(record instanceof WebInspector.TimelineRecord, record);
+         console.assert(this._displayedRecording);
+ 
+         var timeline = this._displayedRecording.timelines.get(record.type);
+         console.assert(timeline && timeline.records.indexOf(record) !== -1, timeline, record);
+ 
+         var didChangeView = true;
+         if (record.sourceCodeLocation)
+             WebInspector.resourceSidebarPanel.showOriginalOrFormattedSourceCodeLocation(record.sourceCodeLocation);
+         else if (record instanceof WebInspector.ElementTrackingTimelineRecord) {
+-            this.showTimelineViewForTimeline(timeline, false);
+-            this._displayedContentView.showContentViewForRepresentedObject(record.snapshot);
+-            WebInspector.contentBrowser.showContentView(this._displayedContentView);
++            record.snapshotHeader.fetchData().then(function(snapshot) {
++                this.showTimelineViewForTimeline(timeline, false);
++                this._displayedContentView.showContentViewForRepresentedObject(snapshot);
++                WebInspector.contentBrowser.showContentView(this._displayedContentView);
++            }.bind(this));
+         } else {
+             this.showTimelineViewForTimeline(timeline, false);
+             WebInspector.contentBrowser.showContentView(this._displayedContentView);
+             didChangeView = false;
+         }
+ 
+         return didChangeView;
+     }
+ 
+     showSubviewForRepresentedObject: function(representedObject)
+-- 
+2.3.5
+

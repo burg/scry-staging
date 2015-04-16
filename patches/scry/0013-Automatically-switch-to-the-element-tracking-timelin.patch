@@ -1,0 +1,54 @@
+From 614eccadad2ef960ddf1ef8b20e466f76ed37411 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Wed, 4 Mar 2015 16:19:32 -0800
+Subject: [PATCH] Automatically switch to the element tracking timeline when
+ starting tracking.
+
+---
+ .../WebInspectorUI/UserInterface/Views/DOMTreeElement.js | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Views/DOMTreeElement.js b/Source/WebInspectorUI/UserInterface/Views/DOMTreeElement.js
+index 33d8ad3..05689ed 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/DOMTreeElement.js
++++ b/Source/WebInspectorUI/UserInterface/Views/DOMTreeElement.js
+@@ -646,22 +646,34 @@ WebInspector.DOMTreeElement = class DOMTreeElement extends WebInspector.TreeElem
+     _populateNodeContextMenu(contextMenu)
+     {
+         // Add free-form node-related actions.
+         if (this.editable)
+             contextMenu.appendItem(WebInspector.UIString("Edit as HTML"), this._editAsHTML.bind(this));
+         contextMenu.appendItem(WebInspector.UIString("Copy as HTML"), this._copyHTML.bind(this));
+         if (this.editable)
+             contextMenu.appendItem(WebInspector.UIString("Delete Node"), this.remove.bind(this));
+ 
+         var node = this.representedObject;
+-        if (node.nodeType() === Node.ELEMENT_NODE && WebInspector.domTracingManager.targetElement !== node)
+-            contextMenu.appendItem(WebInspector.UIString("Track Element"), WebInspector.domTracingManager.startTrackingElement.bind(WebInspector.domTracingManager, node));
++        if (node.nodeType() === Node.ELEMENT_NODE && WebInspector.domTracingManager.targetElement !== node) {
++            function startTrackingElement(element) {
++                WebInspector.domTracingManager.startTrackingElement(element)
++                .then(function() {
++                    var recording = WebInspector.timelineManager.activeRecording;
++                    var timeline = recording && recording.timelines.get(WebInspector.TimelineRecord.Type.ElementTracking);
++                    if (timeline) {
++                        WebInspector.timelineSidebarPanel.showTimelineViewForTimeline(timeline);
++                        WebInspector.timelineSidebarPanel.show();
++                    }
++                });
++            }
++        }
++            contextMenu.appendItem(WebInspector.UIString("Track Element"), startTrackingElement.bind(null, node));
+     }
+ 
+     _startEditing()
+     {
+         if (this.treeOutline.selectedDOMNode() !== this.representedObject)
+             return false;
+ 
+         if (!this.editable)
+             return false;
+ 
+-- 
+2.3.5
+

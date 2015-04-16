@@ -1,0 +1,385 @@
+From d2874123fdc870b3f5b5fa56694a2b1e3d9fbcb1 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Wed, 1 Apr 2015 11:07:41 -0700
+Subject: [PATCH] Show inherited and matched properties separately in style
+ content view.
+
+Fix a bug on the backend where a rule that was already encountered
+was not being added to an element's matchedRule list.
+---
+ .../WebCore/inspector/InspectorDOMTracingAgent.cpp |  12 ++--
+ .../Localizations/en.lproj/localizedStrings.js     | Bin 63248 -> 63508 bytes
+ .../UserInterface/Models/DOMTreeSnapshot.js        |  50 +++++++++++-----
+ .../UserInterface/Models/EffectiveStyleSnapshot.js |  65 ++++++++++++++++-----
+ .../Views/ElementSnapshotStyleContentView.js       |  45 ++++++++++----
+ 5 files changed, 125 insertions(+), 47 deletions(-)
+
+diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+index b15429b..2f66601 100644
+--- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
++++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+@@ -77,32 +77,32 @@ void StyleSnapshotData::addElement(Element& element)
+     uint64_t newOrdinal = elementOrder.size();
+     elementOrdinals.set(&element, newOrdinal);
+     elementOrder.append(&element);
+ }
+ 
+ void StyleSnapshotData::addRuleForElement(WebCore::StyleRule& rule, Element& element)
+ {
+     if (!elementOrdinals.contains(&element))
+         addElement(element);
+ 
++    if (!rulesToKeepForElement.contains(&element))
++        rulesToKeepForElement.set(&element, std::make_unique<Vector<RefPtr<WebCore::StyleRule>>>());
++
++    if (Vector<RefPtr<WebCore::StyleRule>>* rulesToKeep = rulesToKeepForElement.get(&element))
++        rulesToKeep->append(&rule);
++
+     if (ruleOrdinals.contains(&rule))
+         return;
+ 
+     uint64_t newOrdinal = ruleOrder.size();
+     ruleOrdinals.set(&rule, newOrdinal);
+     ruleOrder.append(&rule);
+-
+-    if (!rulesToKeepForElement.contains(&element))
+-        rulesToKeepForElement.set(&element, std::make_unique<Vector<RefPtr<WebCore::StyleRule>>>());
+-
+-    if (Vector<RefPtr<WebCore::StyleRule>>* rulesToKeep = rulesToKeepForElement.get(&element))
+-        rulesToKeep->append(&rule);
+ }
+ 
+ uint64_t StyleSnapshotData::ordinalForElement(WebCore::Element& element)
+ {
+     if (!elementOrdinals.contains(&element))
+         addElement(element);
+ 
+     auto findResult = elementOrdinals.find(&element);
+     ASSERT(findResult != elementOrdinals.end());
+     return findResult->value;
+diff --git a/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js b/Source/WebInspectorUI/Localizations/en.lproj/localizedStrings.js
+index b09db697bd801dd11b9f27040b59710e5a5084eb..e181a6b2ccec97ac55e73f690e7324430583b55b 100644
+GIT binary patch
+delta 77
+zcmbR6j(N%l<_&)BlW(*MOg{2iVe*wW5g;u#*=mEvX0LW3KJG+@5{6`k42D#Ol*tD_
+SEA#p?po&O>l}1h7mIwe3WFG<m
+
+delta 19
+bcmbR8fqB9^<_&)Bo3FI<@oi3+wj~h&VT}oP
+
+diff --git a/Source/WebInspectorUI/UserInterface/Models/DOMTreeSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/DOMTreeSnapshot.js
+index ba117c7..b588411 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/DOMTreeSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/DOMTreeSnapshot.js
+@@ -50,82 +50,100 @@ WebInspector.DOMTreeSnapshot = class DOMTreeSnapshot extends WebInspector.Object
+ 
+         var rules = [];
+         // Create rule objects.
+         for (var rulePayload of stylePayload.rules) {
+             var isInherited = false; // No context, so we don't know this yet.
+             var rule = parseRulePayload(rulePayload, null, null, isInherited);
+             rules.push(rule);
+         }
+ 
+         var elementData = [];
++        var nodeIdToElementOrdinal = new Map;
+         // Create element entries.
+         for (var entry of stylePayload.elements) {
+             var node = WebInspector.domTreeManager.nodeForId(entry.nodeId);
+-            console.assert(node, node);
++            console.assert(node, "Couldn't find existing node for id", entry.nodeId);
+             var inlineStyle = null;
+             if ("inlineStyle" in entry) {
+                 var isInherited = false; // No context, so we don't know this yet.
+-                inlineStyle = parseDeclarationPayload(entry.inlineStyle, node, isInherited, WebInspector.CSSStyleDeclaration.Type.Inline);
++                inlineStyle = parseDeclarationPayload(entry.inlineStyle, node || null, isInherited, WebInspector.CSSStyleDeclaration.Type.Inline);
+             }
+ 
+-            var matchedRules = [];
+-            for (var ruleOrdinal of entry.matchedRules) {
+-                if (!isValidOrdinal(ruleOrdinal, rules))
++            var ruleMatches = [];
++            // FIXME: We currently ignore the "matchingSelectors" property. This would be
++            // necessary to compute which selector became matched/unmatched.
++            for (var match of entry.matchedRules) {
++                if (!isValidOrdinal(match.rule, rules))
+                     continue;
+-                matchedRules.push(rules[ruleOrdinal]);
++                ruleMatches.push(rules[match.rule]);
+             }
+-            elementData.push({node, matchedRules, inlineStyle});
++            nodeIdToElementOrdinal.set(entry.nodeId, elementData.length);
++            elementData.push({node, ruleMatches, inlineStyle});
+         }
+ 
+-        var styleSnapshots = []; // FIXME: this array is for debugging only.                                         
+         // Parse effective style properties.
+         for (var entry of stylePayload.effectiveStyles) {
+-            var effectiveProperties = [];
++            var matchedProperties = [];
++            var inheritedProperties = [];
+             var matchedRules = [];
+             var inlineStyles = [];
++            console.assert(nodeIdToElementOrdinal.has(entry.target), "Can't find element entry.");
++            var targetOrdinal = nodeIdToElementOrdinal.get(entry.target);
++            if (!isValidOrdinal(targetOrdinal, elementData))
++                continue;
++            var target = elementData[targetOrdinal];
++
+             for (var i = 0; i < entry.properties.length; ++i) {
+                 var propertyEntry = entry.properties[i];
+                 var property = parsePropertyPayload(propertyEntry.property, i, null);
++                var isInherited = false;
+                 // If property came from a rule, find that rule based on its id.
+                 if ("sourceRule" in propertyEntry) {
+                     var ruleOrdinal = propertyEntry.sourceRule;
+                     if (!isValidOrdinal(ruleOrdinal, rules))
+                         continue;
+ 
+                     var originatingRule = rules[ruleOrdinal];
+                     property.ownerStyle = originatingRule.style;
+                     matchedRules.push(originatingRule);
++
++                    if (!target.ruleMatches.contains(originatingRule))
++                        isInherited = true;
+                 }
+                 // If property came from an element's inline style, find that.
+                 else if ("sourceElement" in propertyEntry) {
+                     var elementOrdinal = propertyEntry.sourceElement;
+                     if (!isValidOrdinal(elementOrdinal, elementData))
+                         continue;
+ 
+                     var element = elementData[elementOrdinal];
+                     console.assert(element.inlineStyle !== null, "Unable to find cross-referenced inline style for element", element);
+                     property.ownerStyle = element.inlineStyle;
+                     inlineStyles.push(element.inlineStyle);
++
++                    if (elementOrdinal !== targetOrdinal)
++                        isInherited = true;
+                 } else
+                     console.assert("Unknown source for effective style property: ", property);
+ 
+-                effectiveProperties.push(property);
++                if (isInherited)
++                    inheritedProperties.push(property);
++                else
++                    matchedProperties.push(property);
+             }
+ 
+-            var targetElement = WebInspector.domTreeManager.nodeForId(entry.target);
+-            var styleSnapshot = new WebInspector.EffectiveStyleSnapshot(targetElement, effectiveProperties, matchedRules, inlineStyles);
+-            styleSnapshots.push(styleSnapshot);
++            var element = WebInspector.domTreeManager.nodeForId(entry.target);
++            var styleSnapshot = new WebInspector.EffectiveStyleSnapshot(element, matchedProperties, inheritedProperties, matchedRules, inlineStyles);
+ 
+             // Associate effective style with node snapshot.
+-            var targetElementId = styleSnapshot.targetElement.id;
+-            console.assert(nodeMap.has(targetElementId), "Couldn't find node snapshot for effective style snapshot", styleSnapshot);
+-            var nodeSnapshot = nodeMap.get(targetElementId);
++            console.assert(nodeMap.has(entry.target), "Couldn't find node snapshot for effective style snapshot", styleSnapshot);
++            var nodeSnapshot = nodeMap.get(entry.target);
+             nodeSnapshot.effectiveStyle = styleSnapshot;
+         }
+ 
+         return new WebInspector.DOMTreeSnapshot(nodeList[0], nodeMap);
+ 
+         function isValidOrdinal(ordinal, vector) {
+             var isValidIndex = ordinal === Number.constrain(ordinal, 0, vector.length - 1);
+             console.assert(isValidIndex, "Ordinal index out of bounds!", ordinal);
+             return isValidIndex;
+         }
+diff --git a/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleSnapshot.js b/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleSnapshot.js
+index aefdc29..916a38f 100644
+--- a/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleSnapshot.js
++++ b/Source/WebInspectorUI/UserInterface/Models/EffectiveStyleSnapshot.js
+@@ -22,51 +22,86 @@
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ // This class acts as a static data source for style data. It can be used in
+ // place of WebInspector.DOMNodeStyles. It does not update style data as it
+ // changes on the page, nor does it support editing.
+ 
+ WebInspector.EffectiveStyleSnapshot = class EffectiveStyleSnapshot extends WebInspector.Object
+ {
+-    constructor(targetElement, properties, matchedRules, inlineStyles)
++    constructor(element, matchedProperties, inheritedProperties, matchedRules, inlineStyles)
+     {
+         super();
+ 
+-        this._targetElement = targetElement;
+-        this._properties = properties;
++        this._element = element;
++        this._matchedProperties = matchedProperties;
++        this._inheritedProperties = inheritedProperties;
+         this._matchedRules = matchedRules;
+         this._inlineStyles = inlineStyles;
++    }
++
++    // Public
++
++    get element()
++    {
++        return this._element;
++    }
++
++    get matchedProperties()
++    {
++        return this._matchedProperties.slice();
++    }
++
++    get matchedPropertiesDeclaration()
++    {
++        if (!this._matchedProperties.length)
++            return null;
++
++        if (this._matchedPropertiesDeclaration)
++            return this._matchedPropertiesDeclaration;
+ 
+         var args = [
+             null, // updateDelegate
+             null, // ownerStyleSheet
+             null, // id
+             WebInspector.CSSStyleDeclaration.Type.Effective, // type
+             // FIXME: is this actually used anywhere? Not sure where it is used. We could plug in the target element.
+             null, // node
+             false, // inherited
+             null, // text
+-            this._properties, // properties
++            this._matchedProperties, // properties
+             null, // styleSheetTextRange
+         ];
+-        this._declaration = new WebInspector.CSSStyleDeclaration(...args);
++        this._matchedPropertiesDeclaration = new WebInspector.CSSStyleDeclaration(...args);
++        return this._matchedPropertiesDeclaration;
+     }
+ 
+-    // Public
+-
+-    get targetElement()
++    get inheritedProperties()
+     {
+-        return this._targetElement;
++        return this._inheritedProperties.slice();
+     }
+ 
+-    get properties()
++    get inheritedPropertiesDeclaration()
+     {
+-        return this._properties.slice();
+-    }
++        if (!this._inheritedProperties.length)
++            return null;
+ 
+-    get declaration()
+-    {
+-        return this._declaration;
++        if (this._inheritedPropertiesDeclaration)
++            return this._inheritedPropertiesDeclaration;
++
++        var args = [
++            null, // updateDelegate
++            null, // ownerStyleSheet
++            null, // id
++            WebInspector.CSSStyleDeclaration.Type.Effective, // type
++            // FIXME: is this actually used anywhere? Not sure where it is used. We could plug in the target element.
++            null, // node
++            false, // inherited
++            null, // text
++            this._inheritedProperties, // properties
++            null, // styleSheetTextRange
++        ];
++        this._inheritedPropertiesDeclaration = new WebInspector.CSSStyleDeclaration(...args);
++        return this._inheritedPropertiesDeclaration;
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
+index cd70ad7..50f7e39 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
+@@ -23,46 +23,71 @@
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ WebInspector.ElementSnapshotStyleContentView = function(snapshot)
+ {
+     console.assert(snapshot instanceof WebInspector.ElementSnapshot, snapshot);
+     WebInspector.ContentView.call(this, snapshot);
+ 
+     this.element.classList.add(WebInspector.ElementSnapshotStyleContentView.StyleClassName);
+ 
+-    this._propertiesTextEditor = new WebInspector.CSSStyleDeclarationTextEditor(this, null);
+-    this._propertiesTextEditor.showsImplicitProperties = false;
+-    this._propertiesTextEditor.sortProperties = true;
++    this._matchedPropertiesTextEditor = new WebInspector.CSSStyleDeclarationTextEditor(this, null);
++    this._matchedPropertiesTextEditor.showsImplicitProperties = false;
++    this._matchedPropertiesTextEditor.sortProperties = true;
+ 
+-    this.element.appendChild(this._propertiesTextEditor.element);
++    this._inheritedPropertiesTextEditor = new WebInspector.CSSStyleDeclarationTextEditor(this, null);
++    this._inheritedPropertiesTextEditor.showsImplicitProperties = false;
++    this._inheritedPropertiesTextEditor.sortProperties = true;
++
++    function createSingletonSection(rowContent, identifier, title) {
++        var propertiesRow = new WebInspector.DetailsSectionRow;
++        propertiesRow.element.appendChild(rowContent);
++        var propertiesGroup = new WebInspector.DetailsSectionGroup([propertiesRow]);
++        return new WebInspector.DetailsSection(identifier, title, [propertiesGroup]);
++    }
++
++    this._matchedPropertiesSection = createSingletonSection(this._matchedPropertiesTextEditor.element, "effective-style-matched-properties", WebInspector.UIString("Matched Properties"));
++    this._inheritedPropertiesSection = createSingletonSection(this._inheritedPropertiesTextEditor.element, "effective-style-inherited-properties", WebInspector.UIString("Inherited Properties"));
++    this.element.appendChild(this._matchedPropertiesSection.element);
++    this.element.appendChild(this._inheritedPropertiesSection.element);
+ };
+ 
+ WebInspector.ElementSnapshotStyleContentView.StyleClassName = "element-snapshot-style";
+ 
+ WebInspector.ElementSnapshotStyleContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotStyleContentView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+     shown: function()
+     {
+         WebInspector.ContentView.prototype.shown.call(this);
+ 
+-        this._propertiesTextEditor.updateLayout();
++        this.updateLayout();
+     },
+ 
+     updateLayout: function()
+     {
+-        this._propertiesTextEditor.updateLayout();
++        this._matchedPropertiesTextEditor.updateLayout();
++        this._inheritedPropertiesTextEditor.updateLayout();
+     },
+ 
+     showStyleForNode: function(nodeSnapshot)
+     {
+         var canShowStyle = nodeSnapshot && nodeSnapshot.effectiveStyle;
+-        if (canShowStyle)
+-            this._propertiesTextEditor.style = nodeSnapshot.effectiveStyle.declaration;
+-        else
+-            this._propertiesTextEditor.style = null;
++        if (canShowStyle) {
++            this._matchedPropertiesTextEditor.style = nodeSnapshot.effectiveStyle.matchedPropertiesDeclaration;
++            this._inheritedPropertiesTextEditor.style = nodeSnapshot.effectiveStyle.inheritedPropertiesDeclaration;
++        } else {
++            this._matchedPropertiesTextEditor.style = null;
++            this._inheritedPropertiesTextEditor.style = null;
++        }
++
++        var hasMatchedProperties = this._matchedPropertiesTextEditor.style;
++        var hasInheritedProperties = this._inheritedPropertiesTextEditor.style;
++
++        // Don't hide all property sections; we want "No Properties" to appear at least once for text nodes.
++        this._matchedPropertiesSection.element.classList.toggle("hidden", !hasMatchedProperties && hasInheritedProperties);
++        this._inheritedPropertiesSection.element.classList.toggle("hidden", !hasInheritedProperties);
+ 
+         this.updateLayout();
+     }
+ };
+-- 
+2.3.5
+

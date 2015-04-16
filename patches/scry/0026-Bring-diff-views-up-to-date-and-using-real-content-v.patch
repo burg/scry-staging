@@ -1,0 +1,300 @@
+From a29c5b1beae0362e24e2efb3f573b93aeba8b6a4 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Thu, 12 Mar 2015 10:12:53 -0700
+Subject: [PATCH] Bring diff views up to date and using real content views.
+
+---
+ .../Views/ElementSnapshotDiffContentView.css       |  8 +++--
+ .../Views/ElementSnapshotDiffOutputContentView.js  | 37 +++++++++++++++-------
+ .../Views/ElementSnapshotDiffStyleContentView.js   | 37 +++++++++++++++-------
+ .../Views/ElementSnapshotStyleContentView.js       |  5 +++
+ .../UserInterface/Views/TimelineRecordStack.css    |  5 +--
+ 5 files changed, 66 insertions(+), 26 deletions(-)
+
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
+index 6bcc32a..784c1c67 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffContentView.css
+@@ -16,30 +16,34 @@
+  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
+  * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-.content-view.element-snapshot-diff .split-pane {
++.content-view.element-snapshot-diff .content-view > .split-pane {
+     position: absolute;
+     top: 0;
+     bottom: 0;
+     left: 0;
+     right: 0;
++}
++
++.split-pane {
++    /* Fallback to an opaque color in case a subclass hasn't specified one. */
+     background-color: #fff;
+ }
+ 
+-.content-view.element-snapshot-diff .resizer {
++.content-view.element-snapshot-diff .content-view > .resizer {
+     border-left: 1px solid rgb(179, 179, 179);
+ }
+ 
+ .snapshot-diff-icon .icon {
+     content: url(../Images/Diff.svg);
+ }
+ 
+ .diff-visual-output-icon > .icon {
+     content: url(../Images/Camera.svg);
+ }
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffOutputContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffOutputContentView.js
+index aeaea37..c18e5f7 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffOutputContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffOutputContentView.js
+@@ -29,34 +29,32 @@ WebInspector.ElementSnapshotDiffOutputContentView = function(snapshotDiff)
+ 
+     this._preState = snapshotDiff.preState;
+     this._postState = snapshotDiff.postState;
+ 
+     this.element.classList.add(WebInspector.ElementSnapshotDiffOutputContentView.StyleClassName);
+ 
+     var resizerDelegate = this;
+     this._resizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
+     this.element.appendChild(this._resizer.element);
+ 
+-    this._preimageElement = document.createElement("img");
+-    this._preimageElement.className = WebInspector.ElementSnapshotDiffOutputContentView.SplitPaneStyleClassName;
+-    this._preimageElement.src = this._preState.contentURL;
+-    this.element.appendChild(this._preimageElement);
++    this._preStateContentView = new WebInspector.ElementSnapshotOutputContentView(this._preState);
++    this._preStateContentView.element.classList.add(WebInspector.ElementSnapshotDiffOutputContentView.SplitPaneStyleClassName);
++    this.element.appendChild(this._preStateContentView.element);
+ 
+-    this._postimageElement = document.createElement("img");
+-    this._postimageElement.className = WebInspector.ElementSnapshotDiffOutputContentView.SplitPaneStyleClassName;
+-    this._postimageElement.src = this._postState.contentURL;
+-    this.element.appendChild(this._postimageElement);
++    this._postStateContentView = new WebInspector.ElementSnapshotOutputContentView(this._postState);
++    this._postStateContentView.element.classList.add(WebInspector.ElementSnapshotDiffOutputContentView.SplitPaneStyleClassName);
++    this.element.appendChild(this._postStateContentView.element);
+ 
+     this._repositionSplitPanes(0.5);
+ };
+ 
+-WebInspector.ElementSnapshotDiffOutputContentView.StyleClassName = "element-snapshot-diff-visual-output";
++WebInspector.ElementSnapshotDiffOutputContentView.StyleClassName = "compare-visual-output";
+ WebInspector.ElementSnapshotDiffOutputContentView.IconStyleClassName = "diff-visual-output-icon";
+ WebInspector.ElementSnapshotDiffOutputContentView.SplitPaneStyleClassName = "split-pane";
+ 
+ WebInspector.ElementSnapshotDiffOutputContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotDiffOutputContentView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+     // Disallow the quick console from popping up, we need a lot of space.
+     get supportsSplitContentBrowser()
+     {
+@@ -70,23 +68,40 @@ WebInspector.ElementSnapshotDiffOutputContentView.prototype = {
+         this._centerOffsetBeforeDrag = resizer.initialPosition - this.element.totalOffsetLeft;
+     },
+ 
+     resizerDragging: function(resizer, positionDelta)
+     {
+         var availableWidth = this.element.offsetWidth;
+         var centerPercent = (this._centerOffsetBeforeDrag - positionDelta) / availableWidth;
+         this._repositionSplitPanes(Number.constrain(centerPercent, 0.01, 0.99));
+     },
+ 
++    shown: function()
++    {
++        WebInspector.ContentView.prototype.shown.call(this);
++        this._preStateContentView.shown();
++        this._postStateContentView.shown();
++    },
++
++    updateLayout: function()
++    {
++        WebInspector.ContentView.prototype.updateLayout.call(this);
++        this._preStateContentView.updateLayout();
++        this._postStateContentView.updateLayout();
++    },
++
+     // Private
+ 
+     _repositionSplitPanes: function(centerPercent)
+     {
+         if (centerPercent === this._centerPercent)
+             return;
+ 
+         this._centerPercent = centerPercent || 0.5;
+         this._resizer.element.style.left = "%.5f".format(this._centerPercent * 100) + '%';
+-        this._preimageElement.style.right = "%.5f".format((1.0 - this._centerPercent) * 100) + '%';
+-        this._postimageElement.style.left = "%.5f".format(this._centerPercent * 100) + '%';
++        this._preStateContentView.element.style.right = "%.5f".format((1.0 - this._centerPercent) * 100) + '%';
++        this._postStateContentView.element.style.left = "%.5f".format(this._centerPercent * 100) + '%';
++
++        this._preStateContentView.updateLayout();
++        this._postStateContentView.updateLayout();
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffStyleContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffStyleContentView.js
+index 7e2ab20..94e3f8e 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffStyleContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotDiffStyleContentView.js
+@@ -29,34 +29,32 @@ WebInspector.ElementSnapshotDiffStyleContentView = function(snapshotDiff)
+ 
+     this._preState = snapshotDiff.preState;
+     this._postState = snapshotDiff.postState;
+ 
+     this.element.classList.add(WebInspector.ElementSnapshotDiffStyleContentView.StyleClassName);
+ 
+     var resizerDelegate = this;
+     this._resizer = new WebInspector.Resizer(WebInspector.Resizer.RuleOrientation.Vertical, resizerDelegate);
+     this.element.appendChild(this._resizer.element);
+ 
+-    this._preimageElement = document.createElement("img");
+-    this._preimageElement.className = WebInspector.ElementSnapshotDiffStyleContentView.SplitPaneStyleClassName;
+-    this._preimageElement.src = this._preState.contentURL;
+-    this.element.appendChild(this._preimageElement);
++    this._preStateContentView = new WebInspector.ElementSnapshotStyleContentView(this._preState);
++    this._preStateContentView.element.classList.add(WebInspector.ElementSnapshotDiffStyleContentView.SplitPaneStyleClassName);
++    this.element.appendChild(this._preStateContentView.element);
+ 
+-    this._postimageElement = document.createElement("img");
+-    this._postimageElement.className = WebInspector.ElementSnapshotDiffStyleContentView.SplitPaneStyleClassName;
+-    this._postimageElement.src = this._postState.contentURL;
+-    this.element.appendChild(this._postimageElement);
++    this._postStateContentView = new WebInspector.ElementSnapshotStyleContentView(this._postState);
++    this._postStateContentView.element.classList.add(WebInspector.ElementSnapshotDiffStyleContentView.SplitPaneStyleClassName);
++    this.element.appendChild(this._postStateContentView.element);
+ 
+     this._repositionSplitPanes(0.5);
+ };
+ 
+-WebInspector.ElementSnapshotDiffStyleContentView.StyleClassName = "element-snapshot-diff-effective-style";
++WebInspector.ElementSnapshotDiffStyleContentView.StyleClassName = "compare-effective-style";
+ WebInspector.ElementSnapshotDiffStyleContentView.IconStyleClassName = "diff-effective-style-icon";
+ WebInspector.ElementSnapshotDiffStyleContentView.SplitPaneStyleClassName = "split-pane";
+ 
+ WebInspector.ElementSnapshotDiffStyleContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotDiffStyleContentView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+     // Disallow the quick console from popping up, we need a lot of space.
+     get supportsSplitContentBrowser()
+     {
+@@ -70,23 +68,40 @@ WebInspector.ElementSnapshotDiffStyleContentView.prototype = {
+         this._centerOffsetBeforeDrag = resizer.initialPosition - this.element.totalOffsetLeft;
+     },
+ 
+     resizerDragging: function(resizer, positionDelta)
+     {
+         var availableWidth = this.element.offsetWidth;
+         var centerPercent = (this._centerOffsetBeforeDrag - positionDelta) / availableWidth;
+         this._repositionSplitPanes(Number.constrain(centerPercent, 0.01, 0.99));
+     },
+ 
++    shown: function()
++    {
++        WebInspector.ContentView.prototype.shown.call(this);
++        this._preStateContentView.shown();
++        this._postStateContentView.shown();
++    },
++
++    updateLayout: function()
++    {
++        WebInspector.ContentView.prototype.updateLayout.call(this);
++        this._preStateContentView.updateLayout();
++        this._postStateContentView.updateLayout();
++    },
++
+     // Private
+ 
+     _repositionSplitPanes: function(centerPercent)
+     {
+         if (centerPercent === this._centerPercent)
+             return;
+ 
+         this._centerPercent = centerPercent || 0.5;
+         this._resizer.element.style.left = "%.5f".format(this._centerPercent * 100) + '%';
+-        this._preimageElement.style.right = "%.5f".format((1.0 - this._centerPercent) * 100) + '%';
+-        this._postimageElement.style.left = "%.5f".format(this._centerPercent * 100) + '%';
++        this._preStateContentView.element.style.right = "%.5f".format((1.0 - this._centerPercent) * 100) + '%';
++        this._postStateContentView.element.style.left = "%.5f".format(this._centerPercent * 100) + '%';
++
++        this._preStateContentView.updateLayout();
++        this._postStateContentView.updateLayout();
+     }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
+index 68e888d..a562463 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
++++ b/Source/WebInspectorUI/UserInterface/Views/ElementSnapshotStyleContentView.js
+@@ -43,11 +43,16 @@ WebInspector.ElementSnapshotStyleContentView.prototype = {
+     constructor: WebInspector.ElementSnapshotStyleContentView,
+     __proto__: WebInspector.ContentView.prototype,
+ 
+ 
+     shown: function()
+     {
+         WebInspector.ContentView.prototype.shown.call(this);
+ 
+         this._propertiesTextEditor.updateLayout();
+     },
++
++    updateLayout: function()
++    {
++        this._propertiesTextEditor.updateLayout();
++    }
+ };
+diff --git a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
+index 024c6c9..056fb5b 100644
+--- a/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
++++ b/Source/WebInspectorUI/UserInterface/Views/TimelineRecordStack.css
+@@ -24,36 +24,37 @@
+  * THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+ .timeline-record-stack {
+     position: absolute;
+     z-index: 10;
+ 
+     height: 35px;
+     min-width: 36px;
+ 
+-    border: 2px solid rgb(240, 240, 240);
+-    background-color: rgb(240, 240, 240);
++    border: 2px solid rgb(230, 230, 230);
++    background-color: rgb(230, 230, 230);
+ 
+     cursor: pointer;
+ }
+ 
+ .timeline-record-stack:hover {
+     border-color: rgb(225, 225, 240);
+     border-radius: 4px;
+ }
+ 
+ .timeline-record-stack img.preview-image {
+     pointer-events: none;
+ 
+     /* Parent borders are 2px on top, bottom. */
+     max-height: 31px;
++    max-width: 40px;
+ }
+ 
+ .timeline-record-stack.selected {
+     border-color: rgb(34, 131, 246);
+     border-radius: 4px;
+ }
+ 
+ .timeline-record-stack-counter {
+     position: absolute;
+     bottom: 2px;
+-- 
+2.3.5
+

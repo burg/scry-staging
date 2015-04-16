@@ -1,0 +1,42 @@
+From 1fd00f5d20d955e337af218ef18c83f48bfbeb34 Mon Sep 17 00:00:00 2001
+From: "Brian J. Burg" <burg@cs.washington.edu>
+Date: Tue, 14 Apr 2015 02:17:27 -0700
+Subject: [PATCH] Fixup assertion in operation tracing cpp code
+
+---
+ Source/WebCore/inspector/InspectorDOMTracingAgent.cpp | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+index bfbb040..0ba9784 100644
+--- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
++++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
+@@ -719,21 +719,24 @@ void DOMTracingAgent::didInsertDOMNode(Node& node)
+ {
+     if (!m_targetElement)
+         return;
+ 
+     if (!is<Element>(node))
+         return;
+ 
+     Element& childElement = downcast<Element>(node);
+ 
+     Element* parentElement = childElement.parentElement();
+-    ASSERT(parentElement);
++    // Somehow, this was not true on Mozilla page when tracking mosaic.
++    if (!parentElement)
++        return;
++
+     int parentNodeId = m_domAgent->pushNodePathToFrontend(parentElement);
+     int childNodeId = m_domAgent->pushNodePathToFrontend(&childElement);
+ 
+     ElementInsertedOperation operation(parentNodeId, childNodeId);
+     operation.relation = determineRelationshipToTarget(childElement, *m_targetElement);
+     pushOperationToFrontend(operation);
+ }
+ 
+ void DOMTracingAgent::didRemoveDOMNode(Node& node)
+ {
+-- 
+2.3.5
+

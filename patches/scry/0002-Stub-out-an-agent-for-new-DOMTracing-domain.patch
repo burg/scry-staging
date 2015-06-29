@@ -1,4 +1,4 @@
-From 2e90602bdaf38d61cbee647483b65660c99cf4af Mon Sep 17 00:00:00 2001
+From db2c1834d5544add24a910b5fd216a631981a4e1 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 15 Jan 2015 13:51:04 -0800
 Subject: [PATCH] Stub out an agent for new DOMTracing domain.
@@ -21,10 +21,10 @@ Subject: [PATCH] Stub out an agent for new DOMTracing domain.
  create mode 100644 Source/WebCore/inspector/InspectorDOMTracingAgent.h
 
 diff --git a/Source/JavaScriptCore/DerivedSources.make b/Source/JavaScriptCore/DerivedSources.make
-index 699ac7e..6835ee3 100644
+index 185dc7e..3c0b730 100644
 --- a/Source/JavaScriptCore/DerivedSources.make
 +++ b/Source/JavaScriptCore/DerivedSources.make
-@@ -114,20 +114,21 @@ InitBytecodes.asm: $(JavaScriptCore)/generate-bytecode-files $(JavaScriptCore)/b
+@@ -115,20 +115,21 @@ InitBytecodes.asm: $(JavaScriptCore)/generate-bytecode-files $(JavaScriptCore)/b
  
  # Inspector interfaces
  

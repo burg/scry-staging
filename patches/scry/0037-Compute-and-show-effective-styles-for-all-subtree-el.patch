@@ -1,4 +1,4 @@
-From d6cea6994a0aa501bc217889fef9f4b752b3e4d8 Mon Sep 17 00:00:00 2001
+From 054664db7dc378120c09a40b7fb4130c8178969c Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Tue, 31 Mar 2015 15:31:24 -0700
 Subject: [PATCH] Compute and show effective styles for all subtree elements.
@@ -13,7 +13,7 @@ Hook up subtree element selection to showing its style snapshot.
  5 files changed, 50 insertions(+), 5 deletions(-)
 
 diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-index 0e86038..c3b11df 100644
+index eda72b4..fc0e053 100644
 --- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 @@ -300,22 +300,26 @@ RefPtr<Inspector::Protocol::DOMTracing::EffectiveStyle> DOMTracingAgent::createE

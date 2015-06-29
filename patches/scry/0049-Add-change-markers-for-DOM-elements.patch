@@ -1,4 +1,4 @@
-From e30f31e837fc36372a3f06f4bc810229cd5bc184 Mon Sep 17 00:00:00 2001
+From 36cd5ef910dd8d59fb43acfe542fc3cd6305b7d8 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Tue, 14 Apr 2015 00:07:55 -0700
 Subject: [PATCH] Add change markers for DOM elements.
@@ -324,10 +324,10 @@ index 329adad..b3c6daa 100644
          {
              // Trim empty lines from the beginning and extra space at the end since most style and script tags begin with a newline
 diff --git a/Source/WebInspectorUI/UserInterface/Views/DOMTreeOutline.js b/Source/WebInspectorUI/UserInterface/Views/DOMTreeOutline.js
-index cb2859c..4f44ba3 100644
+index 0e5fc24..03e1400 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/DOMTreeOutline.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/DOMTreeOutline.js
-@@ -606,11 +606,21 @@ WebInspector.DOMTreeOutline.DefaultDelegate = {
+@@ -605,11 +605,21 @@ WebInspector.DOMTreeOutline.DefaultDelegate = {
      showHighlightForNode: function(node)
      {
          console.assert(node instanceof WebInspector.DOMNode, node);

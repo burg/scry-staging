@@ -1,4 +1,4 @@
-From e56c354abf65fa3c95118716b9d260d1b2e1fbd8 Mon Sep 17 00:00:00 2001
+From 22bf020b8c99026ef876cc2b5435ecc7a021fa53 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 13 Feb 2015 15:10:21 -0800
 Subject: [PATCH] For each trace operation, include relationship to target
@@ -14,7 +14,7 @@ Some things to look at:
  .../inspector/protocol/Timeline.json               |   3 +-
  .../WebCore/inspector/ElementTraceOperations.cpp   |  16 +++++++++
  Source/WebCore/inspector/ElementTraceOperations.h  |  15 ++++++++
- .../WebCore/inspector/InspectorDOMTracingAgent.cpp |  31 +++++++++++++++-
+ .../WebCore/inspector/InspectorDOMTracingAgent.cpp |  36 +++++++++++++++++--
  .../Localizations/en.lproj/localizedStrings.js     | Bin 62016 -> 62752 bytes
  .../UserInterface/Controllers/DOMTracingManager.js |  26 ++++++++++++--
  .../UserInterface/Models/ElementSnapshot.js        |   1 -
@@ -22,7 +22,7 @@ Some things to look at:
  .../UserInterface/Protocol/DOMTracingObserver.js   |   4 +--
  .../Views/ElementTrackingTimelineDataGridNode.js   |   5 +++
  .../Views/ElementTrackingTimelineView.js           |   5 ++-
- 12 files changed, 149 insertions(+), 10 deletions(-)
+ 12 files changed, 153 insertions(+), 11 deletions(-)
 
 diff --git a/Source/JavaScriptCore/inspector/protocol/DOMTracing.json b/Source/JavaScriptCore/inspector/protocol/DOMTracing.json
 index 62a4df8..191aabf 100644
@@ -198,10 +198,10 @@ index 8623035..b218421 100644
      virtual TraceOperationType type() const override { return TraceOperationType::ElementInserted; }
      virtual Ref<InspectorObject> createProtocolObject() const override;
 diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-index 1e67e91..b432b53 100644
+index 1e67e91..e78c5d2 100644
 --- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-@@ -212,71 +212,99 @@ void DOMTracingAgent::didPaint(RenderObject& renderer, const LayoutRect& layerRe
+@@ -212,71 +212,102 @@ void DOMTracingAgent::didPaint(RenderObject& renderer, const LayoutRect& layerRe
              commitSnapshot(WTF::move(snapshot));
  
              LOG(WebReplay, "DOM Tracing: Detected rendering differences for element %p - x,y (%.1f, %.1f) w,h (%.1f, %.1f)\n",
@@ -247,7 +247,11 @@ index 1e67e91..b432b53 100644
      Element& childElement = downcast<Element>(node);
  
      Element* parentElement = childElement.parentElement();
-     ASSERT(parentElement);
+-    ASSERT(parentElement);
++    // Somehow, this was not true on Mozilla page when tracking mosaic.
++    if (!parentElement)
++        return;
++
      int parentNodeId = m_domAgent->pushNodePathToFrontend(parentElement);
      int childNodeId = m_domAgent->pushNodePathToFrontend(&childElement);
  
@@ -301,7 +305,7 @@ index 1e67e91..b432b53 100644
  
          commitSnapshot(std::make_unique<ElementSnapshot>());
          m_targetElement = WeakPtr<Element>();
-@@ -326,20 +354,21 @@ void DOMTracingAgent::commitSnapshot(std::unique_ptr<ElementSnapshot> snapshot)
+@@ -326,20 +357,21 @@ void DOMTracingAgent::commitSnapshot(std::unique_ptr<ElementSnapshot> snapshot)
          .setBoundingBox(createProtocolObjectForFloatRect(FloatRect(m_currentSnapshot->boundingBox)))
          .setElapsedTimestamp(elapsedTime)
          .release();

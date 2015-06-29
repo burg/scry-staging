@@ -1,4 +1,4 @@
-From 154f6c6220dbe3ef9699724f19f35b8cc5138442 Mon Sep 17 00:00:00 2001
+From 32b9730d9205fc78bb0be536b825cafb99386a46 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sat, 14 Mar 2015 15:29:30 -0700
 Subject: [PATCH] Support snapshots >1MB by making blobs instead of data urls
@@ -53,7 +53,7 @@ index c69d050..bf2c09a 100644
          },
          {
 diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-index f4c5eb8..00bb277 100644
+index 4278359..fe410d0 100644
 --- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 @@ -354,23 +354,37 @@ void DOMTracingAgent::getSnapshotPayload(ErrorString& error, int snapshotId, Ref

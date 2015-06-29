@@ -1,4 +1,4 @@
-From 3b348287a7fac781d77a4e9c9e46f7df0d79399a Mon Sep 17 00:00:00 2001
+From 0f79a9963e0de8ab1329a9f6030ad62c29c9e3f8 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 30 Mar 2015 10:10:44 -0700
 Subject: [PATCH] Collect effective styles in bulk and reuse rule/element
@@ -330,7 +330,7 @@ index 7ef6b53..9bbe5f6 100644
      typedef HashMap<uint64_t, RefPtr<Inspector::StyleRuleSet>> IdentifierToRuleSetMap;
      typedef HashMap<CSSStyleSheet*, RefPtr<Inspector::StylesheetRuleSet>> CSSStyleSheetToRuleSetMap;
 diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-index 3ed99bd..0e86038 100644
+index 2588c09..eda72b4 100644
 --- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 @@ -55,25 +55,73 @@
@@ -634,7 +634,7 @@ index 3ed99bd..0e86038 100644
                  auto findResult = nodeOrdinals.find(child);
                  ASSERT(findResult != nodeOrdinals.end());
                  childOrdinalsArray->addItem(findResult->value);
-@@ -594,21 +661,22 @@ void DOMTracingAgent::commitSnapshot(std::unique_ptr<ElementSnapshot> snapshot)
+@@ -597,21 +664,22 @@ void DOMTracingAgent::commitSnapshot(std::unique_ptr<ElementSnapshot> snapshot)
      if (m_currentSnapshot && m_currentSnapshot->snapshotId) {
          uint64_t key = m_currentSnapshot->snapshotId;
          m_savedSnapshotMap.set(key, WTF::move(m_currentSnapshot));

@@ -1,4 +1,4 @@
-From 1b1565ee146a8c0a7d5727e083afbeedc185c543 Mon Sep 17 00:00:00 2001
+From f16b28451377ba3cc9ffab40faba5c9ca69d4c53 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 1 Apr 2015 10:04:56 -0700
 Subject: [PATCH] Exclude properties with implicit initial values from
@@ -10,7 +10,7 @@ Improve diagnostic logging in effective style calculation code.
  1 file changed, 26 insertions(+), 11 deletions(-)
 
 diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-index c3b11df..b15429b 100644
+index fc0e053..4badd65 100644
 --- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 @@ -198,69 +198,84 @@ static RefPtr<Inspector::Protocol::CSS::CSSProperty> buildObjectForProperty(Styl

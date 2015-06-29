@@ -1,4 +1,4 @@
-From 89c1d33cd50cbf13151b9aca3c9f4a3c0351abee Mon Sep 17 00:00:00 2001
+From 0c95c3334739246c6207346c07f44335fe3c983d Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sun, 8 Mar 2015 16:13:36 -0700
 Subject: [PATCH] Improve timeline snapshot styles.

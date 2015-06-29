@@ -1,4 +1,4 @@
-From 515135cc04f3531aacd8d3211b4115f42f04cc92 Mon Sep 17 00:00:00 2001
+From 88dc12ffb1e191b6a18a080d24562255b085e8a3 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sat, 14 Mar 2015 21:29:26 -0700
 Subject: [PATCH] Move the timeline overview scroll bar out of the way of the

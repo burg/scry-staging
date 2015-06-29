@@ -1,4 +1,4 @@
-From b35719b2448a9f6c9094add9cd4d77ef879c90ca Mon Sep 17 00:00:00 2001
+From d2dd45465f148e76d62a1e46f888760712e75344 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 16 Apr 2015 15:32:27 -0700
 Subject: [PATCH] Misc fixes after rebasing.

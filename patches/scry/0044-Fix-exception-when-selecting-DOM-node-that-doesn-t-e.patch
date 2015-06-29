@@ -1,4 +1,4 @@
-From a17eb8e43ca991d47e140bbd0de93a99adf9e9ed Mon Sep 17 00:00:00 2001
+From f11c7c223f76377ee9aa007aa516ea73f78a8f53 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sun, 12 Apr 2015 13:42:13 -0700
 Subject: [PATCH] Fix exception when selecting DOM node that doesn't exist in

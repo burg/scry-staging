@@ -1,4 +1,4 @@
-From ec2f3d08b8715be22d12c6f2a4abb1d50e4207ff Mon Sep 17 00:00:00 2001
+From c00bd9d2357642aee33fee0dc23812524fc77d3b Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 13 Apr 2015 14:40:33 -0700
 Subject: [PATCH] Hook up trace and preview content views.

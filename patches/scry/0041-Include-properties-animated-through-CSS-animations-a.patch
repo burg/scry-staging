@@ -1,4 +1,4 @@
-From 7a97d6bf0cc2ae2eba9d518fcf4a729467484d7d Mon Sep 17 00:00:00 2001
+From e89e155be4f5ff0aedb8d61c85ccbee4ff9eea7d Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 2 Apr 2015 14:39:49 -0700
 Subject: [PATCH] Include properties animated through CSS animations and
@@ -61,7 +61,7 @@ index 9661971..07a9e6f 100644
              "properties": [
                  { "name": "nodeId", "$ref": "DOM.NodeId", "description": "Identifier for the element that this object describes."},
 diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-index 2f66601..bfbb040 100644
+index 5000850..0ba9784 100644
 --- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 @@ -20,20 +20,21 @@

@@ -1,4 +1,4 @@
-From 5b71429184d53f4bed9faf304419e2a21ceddc05 Mon Sep 17 00:00:00 2001
+From e91c7c6bbe2d67f25bf3d4ab252960139ed14f55 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 19 Mar 2015 14:08:01 -0700
 Subject: [PATCH] Capture snapshots of the DOM tree for committed element
@@ -175,7 +175,7 @@ index bf2c09a..a5c555d 100644
              ]
          },
 diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-index 00bb277..3ed99bd 100644
+index fe410d0..2588c09 100644
 --- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 @@ -35,20 +35,21 @@
@@ -319,7 +319,7 @@ index 00bb277..3ed99bd 100644
      // If the target node was in this frame, its document will soon be detached.
      if (!m_targetElement || m_targetElement->document().frame() == &frame)
          setTargetElement(nullptr);
-@@ -538,21 +595,21 @@ void DOMTracingAgent::commitSnapshot(std::unique_ptr<ElementSnapshot> snapshot)
+@@ -541,21 +598,21 @@ void DOMTracingAgent::commitSnapshot(std::unique_ptr<ElementSnapshot> snapshot)
          uint64_t key = m_currentSnapshot->snapshotId;
          m_savedSnapshotMap.set(key, WTF::move(m_currentSnapshot));
      }

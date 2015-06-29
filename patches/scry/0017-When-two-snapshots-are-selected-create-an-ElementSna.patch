@@ -1,4 +1,4 @@
-From f5cebc7ff719ae7c8ad2021272734e2c4062f081 Mon Sep 17 00:00:00 2001
+From 1f133ffff69b7f31d16cbb37bdc5826f0217fc45 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Thu, 5 Mar 2015 16:51:28 -0800
 Subject: [PATCH] When two snapshots are selected, create an

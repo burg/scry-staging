@@ -1,4 +1,4 @@
-From aa92af9c02c45d7ee49bf8d689c2527176dc2806 Mon Sep 17 00:00:00 2001
+From f11125ddc7fa2603da20b385c6cbf3cc298547ce Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 11 Mar 2015 15:46:37 -0700
 Subject: [PATCH] Convert ElementSnapshotDiffContentView to be a

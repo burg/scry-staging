@@ -1,4 +1,4 @@
-From 2ea9a49295c4ceab8d90f2651437f56a0f0a0590 Mon Sep 17 00:00:00 2001
+From 65d09f778975807c2de7700de40053b59aa62be8 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 2 Mar 2015 14:05:51 -0800
 Subject: [PATCH] WIP: create TimelineRecordStack elements for snapshot

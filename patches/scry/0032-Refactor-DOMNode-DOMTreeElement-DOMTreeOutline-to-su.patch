@@ -1,4 +1,4 @@
-From 3e3deda8663674654abc4651e4e9674561f84320 Mon Sep 17 00:00:00 2001
+From 6b58a2a634ead5853542e6f6340375f52aa659e9 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 20 Mar 2015 14:08:28 -0700
 Subject: [PATCH] Refactor DOMNode, DOMTreeElement, DOMTreeOutline to support
@@ -216,10 +216,10 @@ index 05689ed..329adad 100644
              return false;
  
 diff --git a/Source/WebInspectorUI/UserInterface/Views/DOMTreeOutline.js b/Source/WebInspectorUI/UserInterface/Views/DOMTreeOutline.js
-index 29bc717..cb2859c 100644
+index 452b26c..0e5fc24 100644
 --- a/Source/WebInspectorUI/UserInterface/Views/DOMTreeOutline.js
 +++ b/Source/WebInspectorUI/UserInterface/Views/DOMTreeOutline.js
-@@ -85,20 +85,30 @@ WebInspector.DOMTreeOutline = class DOMTreeOutline extends WebInspector.TreeOutl
+@@ -84,20 +84,30 @@ WebInspector.DOMTreeOutline = class DOMTreeOutline extends WebInspector.TreeOutl
      {
          this._visible = visible;
          if (!this._visible)
@@ -250,7 +250,7 @@ index 29bc717..cb2859c 100644
          if (this._rootDOMNode === x)
              return;
  
-@@ -333,54 +343,57 @@ WebInspector.DOMTreeOutline = class DOMTreeOutline extends WebInspector.TreeOutl
+@@ -332,54 +342,57 @@ WebInspector.DOMTreeOutline = class DOMTreeOutline extends WebInspector.TreeOutl
  
          if (element) {
              element.hovered = true;
@@ -311,7 +311,7 @@ index 29bc717..cb2859c 100644
              return false;
  
          var treeElement = this._treeElementFromEvent(event);
-@@ -581,10 +594,23 @@ WebInspector.DOMTreeOutline = class DOMTreeOutline extends WebInspector.TreeOutl
+@@ -580,10 +593,23 @@ WebInspector.DOMTreeOutline = class DOMTreeOutline extends WebInspector.TreeOutl
              nodeStyles.addEventListener(WebInspector.DOMNodeStyles.Event.Refreshed, toggleProperties, this);
              nodeStyles.refresh();
          } else

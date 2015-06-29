@@ -1,4 +1,4 @@
-From 1f3eeabf637df2454b5e6b32c1478836af916e3b Mon Sep 17 00:00:00 2001
+From a0faf1e797cd5bdc06ca5e0a524fc166c9ce7f6f Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Sun, 12 Apr 2015 18:09:05 -0700
 Subject: [PATCH] Add change markers to CSS snapshot text editors.

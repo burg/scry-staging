@@ -1,4 +1,4 @@
-From 420480a1b2af560be508951afb11502a409af503 Mon Sep 17 00:00:00 2001
+From 9ad2d26f4ccd5a4e8621900536af513f0d475cad Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 9 Feb 2015 21:44:02 -0800
 Subject: [PATCH] Show a content view for snapshot images.
@@ -14,7 +14,7 @@ Subject: [PATCH] Show a content view for snapshot images.
  create mode 100644 Source/WebInspectorUI/UserInterface/Views/ElementSnapshotContentView.js
 
 diff --git a/Source/WebInspectorUI/UserInterface/Base/Main.js b/Source/WebInspectorUI/UserInterface/Base/Main.js
-index 0e4031d..c0cace4 100644
+index a6f3dd0..ed1340f 100644
 --- a/Source/WebInspectorUI/UserInterface/Base/Main.js
 +++ b/Source/WebInspectorUI/UserInterface/Base/Main.js
 @@ -389,21 +389,24 @@ WebInspector.sidebarPanelForRepresentedObject = function(representedObject)

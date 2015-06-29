@@ -1,4 +1,4 @@
-From e658ad8a4da64e7642bdf71a1e6c3f699cc74472 Mon Sep 17 00:00:00 2001
+From 5994983844c60baaa08b8f0151084d8a275180dd Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 27 Feb 2015 11:09:08 -0800
 Subject: [PATCH] Collect and dump target element's effective properties and
@@ -179,7 +179,7 @@ index 8cb943b..625519f 100644
  
      auto consoleAgentPtr = std::make_unique<PageConsoleAgent>(m_injectedScriptManager.get(), m_domAgent);
 diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-index b432b53..f4c5eb8 100644
+index e78c5d2..4278359 100644
 --- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 @@ -25,41 +25,54 @@
@@ -501,7 +501,7 @@ index b432b53..f4c5eb8 100644
      // If the target node was in this frame, its document will soon be detached.
      if (!m_targetElement || m_targetElement->document().frame() == &frame)
          setTargetElement(nullptr);
-@@ -334,22 +522,24 @@ void DOMTracingAgent::commitSnapshot(std::unique_ptr<ElementSnapshot> snapshot)
+@@ -337,22 +525,24 @@ void DOMTracingAgent::commitSnapshot(std::unique_ptr<ElementSnapshot> snapshot)
      // Empty snapshots are loaded when tracking is stopped. Don't save those.
      if (m_currentSnapshot && m_currentSnapshot->snapshotId) {
          uint64_t key = m_currentSnapshot->snapshotId;

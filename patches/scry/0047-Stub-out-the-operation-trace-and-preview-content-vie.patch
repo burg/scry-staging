@@ -1,4 +1,4 @@
-From 9dde923df50ea8b9ece0da7f2c4a9daaa5a943f9 Mon Sep 17 00:00:00 2001
+From 15323f64878c3fbddc67444d87586fd191de7206 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Mon, 13 Apr 2015 10:14:06 -0700
 Subject: [PATCH] Stub out the operation trace and preview content views, shown

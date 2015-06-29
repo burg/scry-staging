@@ -1,4 +1,4 @@
-From d2874123fdc870b3f5b5fa56694a2b1e3d9fbcb1 Mon Sep 17 00:00:00 2001
+From 1b762956bfece967bf23e41626ae79120044701c Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Wed, 1 Apr 2015 11:07:41 -0700
 Subject: [PATCH] Show inherited and matched properties separately in style
@@ -15,7 +15,7 @@ was not being added to an element's matchedRule list.
  5 files changed, 125 insertions(+), 47 deletions(-)
 
 diff --git a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
-index b15429b..2f66601 100644
+index 4badd65..5000850 100644
 --- a/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 +++ b/Source/WebCore/inspector/InspectorDOMTracingAgent.cpp
 @@ -77,32 +77,32 @@ void StyleSnapshotData::addElement(Element& element)

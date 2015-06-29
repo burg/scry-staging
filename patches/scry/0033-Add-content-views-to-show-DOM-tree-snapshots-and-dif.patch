@@ -1,4 +1,4 @@
-From bb8596000ca57db75158ff463b31eddc484fb8b0 Mon Sep 17 00:00:00 2001
+From 6c0820ecbd96f3f86a5e151f4bd27649de268fac Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 20 Mar 2015 10:09:03 -0700
 Subject: [PATCH] Add content views to show DOM tree snapshots and diff them.

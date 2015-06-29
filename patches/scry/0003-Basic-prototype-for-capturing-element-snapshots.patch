@@ -1,4 +1,4 @@
-From 702ae3370c73993a92b5965c13200b238935c122 Mon Sep 17 00:00:00 2001
+From 31c266d15cea782fce43d73354ccaa9740f98b59 Mon Sep 17 00:00:00 2001
 From: "Brian J. Burg" <burg@cs.washington.edu>
 Date: Fri, 23 Jan 2015 15:03:00 -0800
 Subject: [PATCH] Basic prototype for capturing element snapshots.
@@ -1127,7 +1127,7 @@ zq05lVkPoC&p{C)Hg_(UIN*2Xz7#}8Y5G{`)590&nnG|Fue+&|y%n_psQ-Us35a~Ag
 yK_c5^saT=SzhYABIAH<6FgfG4DGE<z^QqhSI5rDC?d3!gzxPgMa*P40h&lk7hI@zr
 
 diff --git a/Source/WebInspectorUI/UserInterface/Base/Main.js b/Source/WebInspectorUI/UserInterface/Base/Main.js
-index 15a7f26..0e4031d 100644
+index 691ec09..a6f3dd0 100644
 --- a/Source/WebInspectorUI/UserInterface/Base/Main.js
 +++ b/Source/WebInspectorUI/UserInterface/Base/Main.js
 @@ -59,20 +59,22 @@ WebInspector.loaded = function()
